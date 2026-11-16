@@ -43,7 +43,7 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
     items = batch_items(db, [item.batch_id], workspace_id, session_id)
     dependencies = dependency_map(db, [item.batch_id], workspace_id, session_id)
     instance_baseline = instance_store.baseline(db, workspace_id, session_id)
-    statuses = effective_statuses(items, dependencies, session.draft_json, instance_baseline)
+    statuses = effective_statuses(items)
     if (
         statuses[item.id][0] != "pending"
         or item.target_kind != "material_object"

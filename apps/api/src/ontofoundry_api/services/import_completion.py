@@ -37,7 +37,6 @@ from ontofoundry_api.services.material_store import store_text_material
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.proposals import (
     batch_items,
-    dependency_map,
     effective_statuses,
 )
 
@@ -69,12 +68,7 @@ def pending_candidate(db, session):
         )
     )
     items = batch_items(db, batches, session.workspace_id, session.id)
-    statuses = effective_statuses(
-        items,
-        dependency_map(db, batches, session.workspace_id, session.id),
-        session.draft_json,
-        __import__("ontofoundry_api.services.instance_store", fromlist=["baseline"]).baseline(db, session.workspace_id, session.id),
-    )
+    statuses = effective_statuses(items)
     data = deepcopy(session.draft_json)
     for item in items:
         if item.target_kind not in {k.value for k in COLLECTIONS} or statuses[item.id][0] != "pending":

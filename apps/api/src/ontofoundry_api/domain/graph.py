@@ -182,6 +182,12 @@ class DraftIndex:
         return None
 
 
+def read_only_index(draft: CoreDraft) -> CoreDraft:
+    """Attach a memoizing index to a draft the caller will not change (one read request)."""
+    object.__setattr__(draft, "_published_index", DraftIndex(draft))
+    return draft
+
+
 def draft_index(draft: CoreDraft) -> DraftIndex:
     """Only published read contexts attach an index; mutable drafts build local indexes."""
     index = getattr(draft, "_published_index", None)

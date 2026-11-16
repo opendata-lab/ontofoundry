@@ -144,12 +144,8 @@ def _elements(draft: dict[str, Any]) -> dict[str, tuple[str, dict]]:
     }
 
 
-def effective_statuses(
-    items: list[ProposalItemRecord],
-    dependencies: dict[str, list[str]],
-    draft: dict[str, Any],
-    instance_baseline: dict | None = None,
-) -> dict[str, tuple[str, str]]:
+def effective_statuses(items: list[ProposalItemRecord]) -> dict[str, tuple[str, str]]:
+    """Stored statuses; conflicts are recorded when a decision or check runs, not on read."""
     return {item.id: (item.status, item.status_reason or "") for item in items}
 
 
@@ -300,10 +296,7 @@ def pending_summary(
     ).all()
     ids = [row.id for row in batches]
     items = batch_items(db, ids, workspace_id, session_id)
-    statuses = effective_statuses(
-        items, dependency_map(db, ids, workspace_id, session_id), draft,
-        __import__("ontofoundry_api.services.instance_store", fromlist=["baseline"]).baseline(db, workspace_id, session_id)
-    )
+    statuses = effective_statuses(items)
     # The batch to show by default: the newest one that can be acted on.
     available = [row.id for row in batches if row.status == "available"]
     return {

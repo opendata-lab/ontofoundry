@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, Literal
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
@@ -91,25 +91,34 @@ def _evidence_view(db: Session, workspace_id: str, entries: list[dict]) -> list[
     return views
 
 
-def _item_view(db, workspace_id, item, statuses, dependencies, elements, alignment=None, diagnostics=None) -> dict[str, Any]:
+def _atomic_peers(db, workspace_id, session_id, items) -> dict[str, list[str]]:
+    """Members of each atomic group in the session, read in one query."""
+    groups = {i.atomic_group_id for i in items if i.atomic_group_id}
+    peers: dict[str, list[str]] = {}
+    if groups:
+        for identity, group in db.execute(
+            select(ProposalItemRecord.id, ProposalItemRecord.atomic_group_id).where(
+                ProposalItemRecord.workspace_id == workspace_id,
+                ProposalItemRecord.session_id == session_id,
+                ProposalItemRecord.atomic_group_id.in_(groups),
+            )
+        ):
+            peers.setdefault(group, []).append(identity)
+    return peers
+
+
+def _item_view(item, statuses, dependencies, elements, context) -> dict[str, Any]:
+    db, workspace_id = context.db, context.workspace_id
     before, after = item.before_json, item.after_json
     element = after or before or {}
     status, reason = statuses[item.id]
     group = set(dependency_group(item.id, dependencies))
-    if item.atomic_group_id:
-        peers = db.scalars(
-            select(ProposalItemRecord.id).where(
-                ProposalItemRecord.workspace_id == workspace_id,
-                ProposalItemRecord.session_id == item.session_id,
-                ProposalItemRecord.atomic_group_id == item.atomic_group_id,
-            )
-        ).all()
-        for peer in peers:
-            group.update(dependency_group(peer, dependencies))
+    for peer in context.peers.get(item.atomic_group_id, []) if item.atomic_group_id else []:
+        group.update(dependency_group(peer, dependencies))
     from ontofoundry_api.services.dataset_proposals import proposal_diagnostics
 
     return {
-        "source_diagnostics": proposal_diagnostics(db, workspace_id, item, diagnostics),
+        "source_diagnostics": proposal_diagnostics(db, workspace_id, item, context.diagnostics),
         "id": item.id,
         "batch_id": item.batch_id,
         "ordinal": item.ordinal,
@@ -131,10 +140,10 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements, alignme
         ),
         "reason": item.reason or "",
         "atomic_group_id": item.atomic_group_id,
-        "duplicate_candidates": duplicate_candidates(db, item),
+        "duplicate_candidates": context.duplicates(item),
         # Review hints derived on read, never stored (AR-04).
-        "similar_definitions": alignment.similar_definitions(item) if alignment else [],
-        "physical_differences": alignment.physical_differences(item, elements) if alignment else [],
+        "similar_definitions": context.alignment.similar_definitions(item),
+        "physical_differences": context.alignment.physical_differences(item, elements),
         "depends_on": dependencies.get(item.id, []),
         "dependency_group": sorted(group),
         "status": status,
@@ -196,12 +205,7 @@ def list_batches(
     page = batches[:limit]
     ids = [b.id for b in page]
     items = _batch_items(db, ids, workspace_id, session_id)
-    statuses = effective_statuses(
-        items,
-        dependency_map(db, ids, workspace_id, session_id),
-        session.draft_json,
-        instance_store.baseline(db, workspace_id, session_id),
-    )
+    statuses = effective_statuses(items)
     by_batch: dict[str, list] = {}
     for item in items:
         by_batch.setdefault(item.batch_id, []).append(item)
@@ -231,12 +235,7 @@ def read_batch(
     draft = session_draft(session)
     items = _batch_items(db, [batch.id], workspace_id, session_id)
     dependencies = dependency_map(db, [batch.id], workspace_id, session_id)
-    statuses = effective_statuses(
-        items,
-        dependencies,
-        session.draft_json,
-        instance_store.baseline(db, workspace_id, session_id),
-    )
+    statuses = effective_statuses(items)
     elements = _session_elements(
         instance_store.session_snapshot(db, workspace_id, session_id, draft)
     )
@@ -245,16 +244,21 @@ def read_batch(
         if element:
             elements[str(element["id"])] = (item.target_kind, element)
     from ontofoundry_api.services.dataset_proposals import DiagnosticsContext
+    from ontofoundry_api.services.instance_duplicates import DuplicateCandidates
     from ontofoundry_api.services.proposal_alignment import AlignmentContext
 
-    alignment = AlignmentContext(db, workspace_id, draft)
-    diagnostics = DiagnosticsContext(db, workspace_id, session)
+    # Everything an item view derives from the whole session, built once per read.
+    context = SimpleNamespace(
+        db=db,
+        workspace_id=workspace_id,
+        alignment=AlignmentContext(db, workspace_id, draft),
+        diagnostics=DiagnosticsContext(db, workspace_id, session),
+        duplicates=DuplicateCandidates(db, workspace_id, session),
+        peers=_atomic_peers(db, workspace_id, session_id, items),
+    )
     return {
         **_batch_summary(batch, items, statuses, session),
-        "items": [
-            _item_view(db, workspace_id, i, statuses, dependencies, elements, alignment, diagnostics)
-            for i in items
-        ],
+        "items": [_item_view(i, statuses, dependencies, elements, context) for i in items],
     }
 
 
@@ -317,13 +321,7 @@ def proposal_metrics(
     for session in sessions:
         ids = [b.id for b in batches if b.session_id == session.id]
         items = _batch_items(db, ids, workspace_id, session.id)
-        deps = dependency_map(db, ids, workspace_id, session.id)
-        for status, _ in effective_statuses(
-            items,
-            deps,
-            session_draft(session),
-            instance_store.baseline(db, workspace_id, session.id),
-        ).values():
+        for status, _ in effective_statuses(items).values():
             effective[status] += 1
     decisions: dict[str, int] = {"accept": 0, "reject": 0, "restore": 0}
     for row in db.scalars(
@@ -341,43 +339,6 @@ def proposal_metrics(
         "items": effective,
         "decisions": decisions,
     }
-
-
-def duplicate_candidates(db, item):
-    if (
-        item.target_kind != "material_object"
-        or item.operation != "create"
-        or item.after_json is None
-    ):
-        return []
-    from ontofoundry_api.domain.core import CoreDraft
-    from ontofoundry_api.domain.instance_display import (
-        business_identity,
-        document_display_text,
-    )
-
-    draft = CoreDraft.model_validate(
-        get_modeling_session(db, item.workspace_id, item.session_id).draft_json
-    )
-    fact = item.after_json
-    identity = business_identity(draft, UUID(fact["type_id"]), fact["values"])
-    if identity is None:
-        return []
-    candidates = instance_store.baseline(db, item.workspace_id, item.session_id)["items"]
-    return [
-        {
-            "id": str(e.id),
-            "type_id": str(e.type_id),
-            "display_text": document_display_text(draft, e),
-            "expected_target_hash": entry["hash"],
-            "revision": entry["revision"],
-        }
-        for entry in candidates
-        if entry["target_kind"] == "material_object"
-        for e in [MaterialObject.model_validate(entry["element"])]
-        if str(e.type_id) == fact["type_id"]
-        and business_identity(draft, e.type_id, e.values) == identity
-    ]
 
 
 class FactProposalRevision(Strict):
