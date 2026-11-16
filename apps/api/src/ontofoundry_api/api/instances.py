@@ -3,23 +3,30 @@
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field
 from sqlalchemy.orm import Session
 
-from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import get_modeling_session, published_snapshot
-from ontofoundry_api.contracts.instances import AbandonSessionRead, InstanceBaseline
+from ontofoundry_api.api.auth import Principal, current_principal, ontology_principal
+from ontofoundry_api.contracts.instances import InstanceBaseline
 from ontofoundry_api.database import get_db
 from ontofoundry_api.domain.core import Strict
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.access import (
-    require_edit,
+    authorization_fingerprint,
     require_instances,
     require_mappings,
     require_read,
 )
 from ontofoundry_api.services.instance_neighborhood import database_neighborhood
+from ontofoundry_api.services.instance_query import (
+    ObjectSearch,
+    get_object,
+    object_neighborhood,
+    search_objects,
+)
+from ontofoundry_api.services.ontology_query import current_version
+from ontofoundry_api.services.sessions import get_modeling_session, published_snapshot
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["instances"])
 
@@ -46,7 +53,7 @@ def neighborhood(
     raw = (
         get_modeling_session(db, workspace_id, body.session_id).draft_json
         if body.session_id
-        else published_snapshot(workspace_id, db, user)
+        else published_snapshot(workspace_id, db)
     )
     return database_neighborhood(
         db, workspace_id, read_snapshot(raw, workspace_id), body, request.app.state.settings
@@ -99,19 +106,6 @@ def session_instance_baseline(
     return baseline(db, workspace_id, session_id)
 
 
-@router.post("/sessions/{session_id}/abandon", response_model=AbandonSessionRead)
-def abandon_session(
-    workspace_id: str,
-    session_id: str,
-    db: Session = Depends(get_db),
-    user: Principal = Depends(current_principal),
-):
-    require_edit(db, str(workspace_id), user)
-    from ontofoundry_api.services.instance_store import abandon
-
-    result = abandon(db, workspace_id, session_id, user.id)
-    db.commit()
-    return result
 
 
 @router.get("/instances/{kind}/{instance_id}/history")
@@ -136,3 +130,73 @@ def instance_history(
             InstanceHistoryRead.model_validate(row, from_attributes=True) for row in rows
         ]
     }
+
+
+@router.get("/objects")
+def objects(
+    workspace_id: str,
+    request: Request,
+    version_id: str | None = None,
+    options: ObjectSearch = Depends(),
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(ontology_principal),
+):
+    require_read(session, str(workspace_id), principal)
+    require_instances(session, workspace_id, principal)
+    if options.source == "database":
+        require_mappings(session, workspace_id, principal)
+    return search_objects(
+        session,
+        current_version(session, workspace_id, version_id),
+        options,
+        request.app.state.settings,
+        permission_fingerprint=authorization_fingerprint(session, workspace_id, principal),
+    )
+
+
+@router.get("/objects/{ref}")
+def object_detail(
+    workspace_id: str,
+    ref: str,
+    request: Request,
+    version_id: str | None = None,
+    snapshot_date: str | None = None,
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(ontology_principal),
+):
+    require_read(session, str(workspace_id), principal)
+    require_instances(session, workspace_id, principal)
+    if ref.startswith("db."):
+        require_mappings(session, workspace_id, principal)
+    return get_object(
+        session,
+        current_version(session, workspace_id, version_id),
+        ref,
+        request.app.state.settings,
+        snapshot_date=snapshot_date,
+    )
+
+
+@router.get("/objects/{ref}/neighborhood")
+def object_graph(
+    workspace_id: str,
+    ref: str,
+    request: Request,
+    version_id: str | None = None,
+    snapshot_date: str | None = None,
+    depth: int = Query(default=1, ge=1, le=3),
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(ontology_principal),
+):
+    require_read(session, str(workspace_id), principal)
+    require_instances(session, workspace_id, principal)
+    if ref.startswith("db."):
+        require_mappings(session, workspace_id, principal)
+    return object_neighborhood(
+        session,
+        current_version(session, workspace_id, version_id),
+        ref,
+        depth,
+        request.app.state.settings,
+        snapshot_date=snapshot_date,
+    )

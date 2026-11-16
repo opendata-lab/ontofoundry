@@ -135,7 +135,7 @@ def test_publish_rechecks_datasets_saved_directly_into_the_session(client):
     saved = client.put(ROOT + f"/sessions/{session['id']}", json={"revision": session["revision"], "draft": draft})
     assert saved.status_code == 200, saved.text
     session = saved.json()
-    preview = client.post(ROOT + f"/sessions/{session['id']}/preview", json={"expected_session_revision": session["revision"]})
+    preview = client.post(ROOT + f"/sessions/{session['id']}/publish-preview", json={"expected_session_revision": session["revision"]})
     assert preview.status_code == 200, preview.text
     checks = preview.json()["dataset_checks"]
     assert [c["valid"] for c in checks] == [False]

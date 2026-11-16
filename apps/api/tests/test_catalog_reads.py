@@ -3,7 +3,7 @@
 from uuid import uuid4
 
 import jsonschema
-from test_modeling import ONTOLOGY, ROOT
+from test_modeling import ONTOLOGY, ROOT, published_snapshot
 
 from ontofoundry_api.contracts.read_models import read_models_schema
 
@@ -94,7 +94,7 @@ def test_single_id_and_name_do_not_project_the_whole_space(client, monkeypatch):
 
 
 def test_element_projection_is_incomplete_and_documents_are_separate_and_scoped(client):
-    snapshot = client.get(ROOT + "/published-snapshot").json()
+    snapshot = published_snapshot(client, ROOT)
     target = snapshot["object_types"][0]
     version = client.get(ONTOLOGY + "/version").json()["version_id"]
     path = ONTOLOGY + "/types/" + target["id"]

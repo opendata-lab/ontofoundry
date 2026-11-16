@@ -11,7 +11,7 @@ from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 def preview(client, session):
     return client.post(
-        ROOT + f"/sessions/{session['id']}/preview",
+        ROOT + f"/sessions/{session['id']}/publish-preview",
         json={"expected_session_revision": session["revision"]},
     )
 

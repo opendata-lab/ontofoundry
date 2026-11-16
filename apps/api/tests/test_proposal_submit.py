@@ -56,7 +56,7 @@ def running_submit(client):
             ),
         )
         db.commit()
-    url = f"/api/v1/ontology/workspaces/{session['workspace_id']}/runs/{manifest['run_token']}/proposals"
+    url = f"/api/v1/workspaces/{session['workspace_id']}/sessions/{session['id']}/proposals"
     return session, manifest, url, {"Authorization": "Bearer " + credential}
 
 
@@ -237,12 +237,20 @@ def test_value_type_expression_submit_outcome(
 
 
 @pytest.mark.parametrize(
-    "scope", ["different-run", "different-space", "expired", "no-token"]
+    "scope", ["different-run", "different-session", "different-space", "expired", "no-token"]
 )
 def test_submit_honors_run_authorization(client, scope):
     session, manifest, url, headers = running_submit(client)
     if scope == "different-run":
-        url = url.replace(manifest["run_token"], "other")
+        with client.app.state.session_factory() as db:
+            item = db.get(ModelingSessionRecord, session["id"])
+            item.dataagent_run_token = "other"
+            db.commit()
+        response = client.post(url, json=result(manifest, []), headers=headers)
+        assert response.json()["errors"][0]["code"] == "RUN_NOT_CURRENT"
+        return
+    elif scope == "different-session":
+        url = url.replace(session["id"], "00000000-0000-4000-8000-000000000000")
     elif scope == "different-space":
         url = url.replace(session["workspace_id"], "00000000-0000-4000-8000-000000000000")
     elif scope == "expired":

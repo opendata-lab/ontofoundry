@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from core1_query_fixtures import source_database
 from test_element_save import preflight_confirmations, save_body
-from test_modeling import ONTOLOGY, ROOT, create_session, publish, save
+from test_modeling import ONTOLOGY, ROOT, create_session, publish, published_snapshot, save
 
 from ontofoundry_api.domain.bindings import binding_readiness, resolve_binding
 from ontofoundry_api.domain.canonical import element_sha256
@@ -145,7 +145,7 @@ def test_navigation_imports_effective_mappings_and_datasets(
             old = response.json()
         candidate = deepcopy(old["draft"])
         candidate["object_types"][0]["description"] = "只修改VIP说明"
-        current = client.get(ROOT + "/published-snapshot").json()
+        current = published_snapshot(client, ROOT)
         inputs = deepcopy([base, current, old["draft"], candidate])
         calculation = calculate_element_save(
             base, current, old["draft"], candidate, "object_type", vip["id"]

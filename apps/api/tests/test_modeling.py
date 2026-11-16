@@ -7,7 +7,14 @@ from dataset_binding import bind_datasets
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
-ONTOLOGY = f"/api/v1/ontology/workspaces/{DEMO_WORKSPACE_ID}"
+ONTOLOGY = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
+
+
+def published_snapshot(client, root=ROOT):
+    version = client.get(root + "/version").json()["version_id"]
+    response = client.get(root + f"/versions/{version}/presentation")
+    assert response.status_code == 200, response.text
+    return response.json()["model"]
 
 
 def create_session(client):
@@ -26,7 +33,7 @@ def save(client, session, draft):
 
 def preview(client, session):
     return client.post(
-        ROOT + f"/sessions/{session['id']}/preview",
+        ROOT + f"/sessions/{session['id']}/publish-preview",
         json={"expected_session_revision": session["revision"]},
     )
 
@@ -66,7 +73,7 @@ def test_saved_draft_and_cas(client):
     response = save(client, session, draft)
     assert response.status_code == 200, response.text
     assert client.get(ROOT + f"/sessions/{session['id']}").json()["draft"] == draft
-    assert client.get(ROOT + "/published-snapshot").json() != draft
+    assert published_snapshot(client, ROOT) != draft
     assert save(client, session, draft).status_code == 409
 
 

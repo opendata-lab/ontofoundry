@@ -14,6 +14,7 @@ from uuid import uuid4
 import pytest
 from fastapi.routing import APIRoute
 from sqlalchemy import create_engine, select
+from test_modeling import published_snapshot
 
 from ontofoundry_api.api.auth import (
     Principal,
@@ -34,21 +35,20 @@ from ontofoundry_api.services.demo import DEMO_CONNECTION_ID, DEMO_WORKSPACE_ID
 from ontofoundry_api.services.workspaces import DEV_USER_ID
 
 W = "/api/v1/workspaces/{workspace_id}"
-ONTOLOGY_ROOT = "/api/v1/ontology/workspaces/{workspace_id}"
-IMPORT_ROOT = "/api/v1/modeling/workspaces/{workspace_id}/imports/{adapter_id}"
-E = "/api/v1/modeling/workspaces/{workspace_id}/exports/{adapter_id}"
+ONTOLOGY_ROOT = "/api/v1/workspaces/{workspace_id}"
+IMPORT_ROOT = "/api/v1/workspaces/{workspace_id}/imports/{adapter_id}"
+E = "/api/v1/workspaces/{workspace_id}/exports/{adapter_id}"
 C = W + "/connections/{connection_id}"
 S = W + "/sessions/{session_id}"
 A = S + "/agent-conversation"
 
 READS = [
     ("GET", W), ("GET", W + "/overview"), ("GET", W + "/versions"),
-    ("GET", W + "/ontology"), ("GET", W + "/published-snapshot"),
     ("GET", W + "/capabilities"), ("GET", W + "/versions/{version_id}/presentation"),
     ("GET", W + "/version-comparison"), ("GET", W + "/sessions"), ("GET", S),
     ("GET", S + "/instances"), ("GET", S + "/instance-baseline"),
     ("GET", S + "/proposal-batches"), ("GET", S + "/proposal-batches/{batch_id}"),
-    ("GET", W + "/proposal-metrics"), ("GET", A), ("GET", A + "/events"),
+    ("GET", A), ("GET", A + "/events"),
     ("GET", A + "/files/{rel_path:path}"), ("GET", W + "/instances"),
     ("GET", W + "/instances/{kind}/{instance_id}/history"),
     ("GET", W + "/materials"), ("GET", W + "/materials/overview"),
@@ -67,9 +67,9 @@ READS = [
     ("POST", W + "/instance-neighborhood"), ("POST", C + "/test"),
     ("POST", W + "/mapping-preview"), ("POST", W + "/datasets/validate"),
     ("POST", W + "/datasets/preview"),
-    ("POST", "/api/v1/modeling/workspaces/{workspace_id}/metrics/preview"),
+    ("POST", "/api/v1/workspaces/{workspace_id}/metrics/preview"),
     ("POST", W + "/element-saves/preview"), ("POST", S + "/validate"),
-    ("POST", S + "/preview"),
+    ("POST", S + "/publish-preview"),
 ]
 MANAGE = [("GET", W + "/feedback"), ("GET", W + "/members"), ("GET", W + "/users/search"),
           ("GET", W + "/settings/dataagent-health"), ("PATCH", W),
@@ -81,7 +81,7 @@ MANAGE_WRITES = [("POST", W + "/connections"), ("PATCH", W + "/connections/{conn
                  ("DELETE", W + "/connections/{connection_id}"), ("DELETE", W + "/materials/{material_id}")]
 # The run endpoint uses a separately signed write credential; no browser session
 # can submit through it. GET MCP is a protocol-level 405, not a data read.
-SPECIAL = [("POST", ONTOLOGY_ROOT + "/runs/{run_token}/proposals"), ("GET", ONTOLOGY_ROOT + "/mcp")]
+SPECIAL = [("POST", S + "/proposals"), ("GET", ONTOLOGY_ROOT + "/mcp")]
 
 
 def route_key(route):
@@ -102,13 +102,13 @@ def workspace_routes(client):
 def matrix(client, monkeypatch):
     wid = str(DEMO_WORKSPACE_ID)
     root = f"/api/v1/workspaces/{wid}"
-    draft = client.get(root + "/published-snapshot").json()
-    version = client.get(f"/api/v1/ontology/workspaces/{wid}/version").json()["version_id"]
+    draft = published_snapshot(client, root)
+    version = client.get(f"/api/v1/workspaces/{wid}/version").json()["version_id"]
     session = client.post(root + "/sessions", json={"title": "虚构权限矩阵"}).json()
     material = client.post(root + "/materials?name=fiction.txt", content=b"fictional material").json()
-    export = client.get(f"/api/v1/modeling/workspaces/{wid}/exports/ontofoundry-core-1?version_id={version}").json()
+    export = client.get(f"/api/v1/workspaces/{wid}/exports/ontofoundry-core-1?version_id={version}").json()
     raw = client.get(export["download_url"]).content
-    imported = client.post(f"/api/v1/modeling/workspaces/{wid}/imports/ontofoundry-core-1?name=fiction.json", content=raw).json()
+    imported = client.post(f"/api/v1/workspaces/{wid}/imports/ontofoundry-core-1?name=fiction.json", content=raw).json()
     bid, job, uid = str(uuid4()), str(uuid4()), str(uuid4())
     with client.app.state.session_factory() as db:
         db.add(UserRecord(id=uid, username="fiction-visitor", display_name="虚构访客"))
@@ -154,7 +154,7 @@ def matrix(client, monkeypatch):
     monkeypatch.setattr("ontofoundry_api.api.instances.database_neighborhood", lambda *a, **k: {})
     monkeypatch.setattr("ontofoundry_api.services.entity_resolution.resolve_entity", lambda *a, **k: {})
     instance = client.get(root + "/instances").json()["items"][0]
-    objects = client.get(f"/api/v1/ontology/workspaces/{wid}/objects").json()["items"]
+    objects = client.get(f"/api/v1/workspaces/{wid}/objects").json()["items"]
     ref = objects[0]["ref"]
     ids = dict(workspace_id=wid, connection_id=DEMO_CONNECTION_ID, version_id=version,
                session_id=session["id"], material_id=material["id"], import_id=imported["import_id"],
@@ -185,9 +185,9 @@ def request_options(data, key):
         ("POST", W + "/datasets/validate"): {"dataset": draft["datasets"][0]},
         ("POST", W + "/datasets/preview"): {"dataset": draft["datasets"][0]},
         ("POST", W + "/mapping-preview"): {"mapping": {"id": str(uuid4()), "type_id": ids["type_id"], "binding_mode": "shared_parent"}},
-        ("POST", "/api/v1/modeling/workspaces/{workspace_id}/metrics/preview"): {"metric": draft["metrics"][0]},
+        ("POST", "/api/v1/workspaces/{workspace_id}/metrics/preview"): {"metric": draft["metrics"][0]},
         ("POST", W + "/element-saves/preview"): {"target_kind": "object_type", "target_id": ids["type_id"], "expected_current_version_id": ids["version_id"], "draft": draft},
-        ("POST", S + "/preview"): {"expected_session_revision": data["session"]["revision"]},
+        ("POST", S + "/publish-preview"): {"expected_session_revision": data["session"]["revision"]},
     }
     options = {"params": params}
     if key in bodies:
@@ -323,11 +323,11 @@ def test_visibility_directory_cache_revocation_and_platform_superuser(matrix):
         db.delete(member)
         db.commit()
     assert any(s["id"] == wid for s in client.get("/api/v1/workspaces").json()["items"])
-    assert any(s["id"] == wid for s in client.get("/api/v1/ontology/workspaces").json()["items"])
+    assert any(s["id"] == wid for s in client.get("/api/v1/mcp/workspaces").json()["items"])
     assert client.get(path).json()["role"] == "admin"
     assert client.patch(path, json={"is_public": True}).status_code == 200
     actor(data, public=True)
-    assert any(s["id"] == wid for s in client.get("/api/v1/ontology/workspaces").json()["items"])
+    assert any(s["id"] == wid for s in client.get("/api/v1/mcp/workspaces").json()["items"])
 
 
 def test_manage_routes_deny_editors_viewers_and_public_readers(matrix, monkeypatch):
@@ -336,7 +336,7 @@ def test_manage_routes_deny_editors_viewers_and_public_readers(matrix, monkeypat
     async def health(*args):
         return {"status": "ok"}
 
-    monkeypatch.setattr("ontofoundry_api.api.settings.dataagent_health", health)
+    monkeypatch.setattr("ontofoundry_api.api.workspaces.dataagent_health", health)
     for role, admin in [(None, False), ("viewer", False), ("member", False), ("admin", False), (None, True)]:
         actor(data, role, admin=admin)
         for method, template in MANAGE:
@@ -366,3 +366,20 @@ def test_public_workspace_does_not_override_service_token_scopes(matrix):
         assert can_read_mappings(db, wid, high) and can_read_instances(db, wid, high)
         physical = invoke(db, wid, high, "get_ontology", {"ids": [e["id"] for e in semantic["elements"]], "include": ["semantic", "physical"]}, client.app.state.settings)
         assert "fictional_sales" in json.dumps(physical)
+
+
+def test_removed_routes_and_prefixes_have_no_forwarding_routes(client):
+    paths = client.app.openapi()["paths"]
+    assert not any(
+        path.startswith(("/api/v1/ontology", "/api/v1/modeling")) for path in paths
+    )
+    for path in (
+        W + "/ontology", W + "/published-snapshot", W + "/proposal-metrics",
+        C + "/assets/refresh", C + "/table-material", S + "/preview",
+        W + "/runs/{run_token}/proposals",
+        S + "/proposal-items/{proposal_id}/revision",
+    ):
+        assert path not in paths
+    assert "/api/v1/mcp" in paths
+    assert "/api/v1/mcp/workspaces" in paths
+    assert "post" in paths[S + "/proposals"]

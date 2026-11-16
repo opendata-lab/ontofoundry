@@ -230,9 +230,3 @@ def retry(workspace_id: str, connection_id: str, job_id: str, request: Request, 
     job = retry_job(db, get_job(db, workspace_id, connection_id, job_id))
     background.add_task(run_job, request.app.state.session_factory, job.id, request.app.state.settings)
     return job_response(db, job)
-
-
-@router.post("/assets/refresh", status_code=202)
-def refresh(workspace_id: str, connection_id: str, request: Request, background: BackgroundTasks, body: SyncRequest, schema_name: str = Query(default="", max_length=240), db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
-    require_edit(db, str(workspace_id), user)
-    return sync_job(workspace_id, connection_id, body, request, background, schema_name, db, user)

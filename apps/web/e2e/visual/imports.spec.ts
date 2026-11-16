@@ -6,7 +6,7 @@ test("import upload, report expansion and explicit confirmation", async ({ page 
   await page.clock.setFixedTime(new Date("2026-10-18T02:00:00Z"));
   await mockCanvasApi(page, { emptySession: true });
   let confirmed = false;
-  await page.route("**/api/v1/modeling/workspaces/*/imports/**", async (route) => {
+  await page.route("**/api/v1/workspaces/*/imports/**", async (route) => {
     if (route.request().url().includes("/confirm")) { confirmed = true; await route.fulfill({ json: { session_id: "fiction-session", batch_id: "fiction-batch", report_id: importPreview.import_id } }); }
     else await route.fulfill({ json: importPreview });
   });

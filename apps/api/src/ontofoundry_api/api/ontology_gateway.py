@@ -12,17 +12,15 @@ from ontofoundry_api.api.auth import Principal, current_principal, gateway_princ
 from ontofoundry_api.api.mcp_rpc import META, execute_tool, handle_rpc, tool_error
 from ontofoundry_api.api.service_validation import ServiceValidationRoute
 from ontofoundry_api.contracts.gateway import (
-    FeedbackList,
     GatewayCallDetail,
     GatewayCallList,
 )
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import utc_now
 from ontofoundry_api.services import gateway_records, ontology_gateway
-from ontofoundry_api.services.access import require_manage
 from ontofoundry_api.services.errors import ForbiddenError
 
-router = APIRouter(prefix="/api/v1/ontology/mcp", tags=["ontology-gateway"])
+router = APIRouter(prefix="/api/v1/mcp", tags=["ontology-gateway"])
 history_router = APIRouter(
     prefix="/api/v1", tags=["gateway-history"], route_class=ServiceValidationRoute
 )
@@ -72,23 +70,6 @@ def audit_principal(request: Request, db: Session = Depends(get_db)):
     return principal
 
 
-@history_router.get(
-    "/workspaces/{workspace_id}/feedback",
-    response_model=FeedbackList,
-    response_model_exclude_unset=True,
-)
-def feedback(
-    workspace_id: str,
-    request: Request,
-    cursor: str | None = None,
-    limit: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(current_principal),
-):
-    require_manage(db, workspace_id, principal)
-    return gateway_records.list_feedback(
-        db, workspace_id, principal, request.app.state.settings, cursor=cursor, limit=limit
-    )
 
 
 @history_router.get("/admin/gateway-calls", response_model=GatewayCallList)

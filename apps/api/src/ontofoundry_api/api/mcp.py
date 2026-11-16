@@ -7,7 +7,7 @@ from ontofoundry_api.database import get_db
 from ontofoundry_api.services.access import require_read
 from ontofoundry_api.services.mcp_ontology import INPUTS, invoke
 
-router = APIRouter(prefix="/api/v1/ontology/workspaces/{workspace_id}/mcp", tags=["mcp"])
+router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/mcp", tags=["mcp"])
 INSTRUCTIONS = (
     "只读核心本体和已接受的文档事实；数据库聚合由 DataAgent 自有查询工具执行。"
     "元素 name 是必填英文标识，display_name 是可选中文名称，空时显示 name；"

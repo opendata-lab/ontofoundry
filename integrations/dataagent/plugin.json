@@ -3,7 +3,7 @@
   "version": "0.2.9",
   "description": "OntoFoundry 三个语义技能与已有 Agent 配置，管理员安装包",
   "minimum_platform_version": "0.2.9",
-  "platform_baseline": "2026-11-15 core-1：工作包带续做信息（run.resume，基线未变时保留上一轮成果）；表数据集提案可不带列，平台按本轮表结构补齐；数据库迁移 20261112_000001（用户管理）、20261113_000001（本体网关）；结果提交到 runs/{run_token}/proposals，每次运行最多修正 3 轮",
+  "platform_baseline": "2026-11-15 core-1：工作包带续做信息（run.resume，基线未变时保留上一轮成果）；表数据集提案可不带列，平台按本轮表结构补齐；数据库迁移 20261112_000001（用户管理）、20261113_000001（本体网关）；结果提交到 sessions/{session_id}/proposals，每次运行最多修正 3 轮",
   "installation": "manual-admin",
   "skills": [
     {"name": "ontology-discovery", "path": "skills/ontology-discovery"},
@@ -13,7 +13,7 @@
   "mcp_services": [
     {
       "name": "OntoFoundry",
-      "url_template": "<ONTOFOUNDRY_BASE_URL>/api/v1/ontology/workspaces/<workspace_id>/mcp",
+      "url_template": "<ONTOFOUNDRY_BASE_URL>/api/v1/workspaces/<workspace_id>/mcp",
       "tools": ["search_ontology", "get_ontology", "search_objects", "get_object", "resolve_entity"],
       "authentication": "管理员使用平台授权凭据配置；建模使用工作包中的运行级 MCP 配置，禁止把真实令牌写进包",
       "registration": "由管理员在 DataAgent 管理后台登记；安装脚本不访问后台"

@@ -223,7 +223,7 @@ function query(params: Record<string, string | number | boolean | undefined | nu
   return encoded ? "?" + encoded : "";
 }
 
-const ontologyPath = (workspaceId: string) => "/api/v1/ontology/workspaces/" + workspaceId;
+const ontologyPath = (workspaceId: string) => "/api/v1/workspaces/" + workspaceId;
 const sessionPath = (s: Pick<ModelingSession, "id" | "workspace_id">) =>
   `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}`;
 
@@ -445,11 +445,6 @@ export const catalogApi = {
   connections: (id: string) => workspaceRequest<Items<DataConnection>>(id, "/connections"),
   tables: (id: string, connectionId: string, params?: { table?: string; schema_name?: string }) =>
     workspaceRequest<Items<DataTable>>(id, `/connections/${connectionId}/tables` + query({ ...params })),
-  tableMaterial: (id: string, connectionId: string, tables: string[], schemaName?: string) =>
-    workspaceRequest<Material>(id, `/connections/${connectionId}/table-material`, {
-      tables,
-      ...(schemaName ? { schema_name: schemaName } : {}),
-    }),
   schemas: (id: string, connectionId: string) =>
     workspaceRequest<Items<string>>(id, `/connections/${connectionId}/schemas`),
   syncedAssets: (id: string, connectionId: string) =>
@@ -520,14 +515,14 @@ export const proposalsApi = {
   /** Turns a pending duplicate-fact create into an update of an existing fact. */
   reviseFact: (s: ModelingSession, proposalId: string, payload: FactProposalRevision) =>
     request<ProposalBatchDetail>(
-      sessionPath(s) + "/proposal-items/" + proposalId + "/revision",
+      sessionPath(s) + "/proposals/" + proposalId + "/fact-revision",
       json("POST", payload),
     ),
 };
 
 export const publishApi = {
   preview: (s: ModelingSession) =>
-    request<PublishPreview>(sessionPath(s) + "/preview", json("POST", { expected_session_revision: s.revision }))
+    request<PublishPreview>(sessionPath(s) + "/publish-preview", json("POST", { expected_session_revision: s.revision }))
       .then((p): PublishPreview => ({ ...p, merged_model: { ...p.merged_model, ...NO_INSTANCES } })),
   publish: (session: ModelingSession, preview: PublishPreview, message: string) =>
     request<PublishResult>(
@@ -554,11 +549,11 @@ export const publishApi = {
 export const metricsApi = {
   /** Runs the unsaved form definition read-only; nothing is stored. */
   preview: (workspaceId: string, payload: MetricPreviewRequest) =>
-    request<MetricPreview>(`/api/v1/modeling/workspaces/${workspaceId}/metrics/preview`, json("POST", payload)),
+    request<MetricPreview>(`/api/v1/workspaces/${workspaceId}/metrics/preview`, json("POST", payload)),
 };
 
 const importPath = (workspaceId: string, adapter: string, importId?: string) =>
-  `/api/v1/modeling/workspaces/${encodeURIComponent(workspaceId)}/imports/${encodeURIComponent(adapter)}${importId ? `/${encodeURIComponent(importId)}` : ""}`;
+  `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/imports/${encodeURIComponent(adapter)}${importId ? `/${encodeURIComponent(importId)}` : ""}`;
 export const importApi = {
   preview: (workspaceId: string, adapter: string, file: File) =>
     request<ImportPreview>(`${importPath(workspaceId, adapter)}?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file, headers: { "Content-Type": "application/json" } }),
@@ -571,7 +566,7 @@ export const importApi = {
 
 export const exportApi = {
   preview: (workspaceId: string, adapter: string, versionId: string) =>
-    request<ExportPreview>(`/api/v1/modeling/workspaces/${encodeURIComponent(workspaceId)}/exports/${encodeURIComponent(adapter)}?version_id=${encodeURIComponent(versionId)}`),
+    request<ExportPreview>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/exports/${encodeURIComponent(adapter)}?version_id=${encodeURIComponent(versionId)}`),
 };
 
 

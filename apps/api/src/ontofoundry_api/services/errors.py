@@ -80,3 +80,14 @@ class DatasetSourceError(ServiceError):
 class MetadataSyncError(ServiceError):
     status_code = 422
     code = "METADATA_SYNC_FAILED"
+
+
+class SessionRequestError(ServiceError):
+    """Session errors whose existing HTTP detail response is retained."""
+
+    code = "SESSION_REQUEST_FAILED"
+
+    def __init__(self, status_code: int, detail: str | dict):
+        message = detail if isinstance(detail, str) else detail["message"]
+        super().__init__(message, status_code=status_code)
+        self.detail = detail

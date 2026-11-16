@@ -34,7 +34,8 @@ def test_resources_and_graph_share_version(client):
     )
     assert client.post(ROOT + "/publish", json={}).status_code == 404
     assert client.get(ROOT + "/semantic-models").status_code == 404
-    assert client.post(ROOT + "/imports/ossie", json={}).status_code == 404
+    retired_imports = ROOT.replace("/api/v1/workspaces/", "/api/v1/modeling/workspaces/")
+    assert client.post(retired_imports + "/imports/ossie", json={}).status_code == 404
 
 
 def test_workspace_names_unique(client):

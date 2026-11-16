@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from test_core1_mcp import call
 from test_core1_ossie_roundtrip import roundtrip
-from test_modeling import create_session, publish, save
+from test_modeling import create_session, publish, published_snapshot, save
 
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.domain.dependencies import reference_index
@@ -143,7 +143,7 @@ def test_changing_a_used_types_base_kind_revises_its_properties_in_one_save(clie
     for collection in ("object_types", "value_types", "properties"):
         raw[collection] = [*raw[collection], *extra[collection]]
     assert publish(client, save(client, session, raw).json()).status_code == 200
-    latest = client.get(ROOT + "/published-snapshot").json()
+    latest = published_snapshot(client, ROOT)
     latest["value_types"][0]["value_kind"] = "decimal"
     next(p for p in latest["properties"] if p["id"] == str(LEVEL))["value_kind"] = "decimal"
     preview = client.post(
@@ -157,7 +157,7 @@ def test_changing_a_used_types_base_kind_revises_its_properties_in_one_save(clie
     level = next(p for p in saved.json()["draft"]["properties"] if p["id"] == str(LEVEL))
     assert level["value_kind"] == "decimal"
     # Anything else on the property stays outside a value type save.
-    latest = client.get(ROOT + "/published-snapshot").json()
+    latest = published_snapshot(client, ROOT)
     next(p for p in latest["properties"] if p["id"] == str(LEVEL))["description"] = "顺带修改"
     sneaky = submit(client, latest, kind="value_type", target_id=str(LEVEL_TYPE))
     assert sneaky.status_code == 422 and sneaky.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"

@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import (
     Principal,
     ontology_directory_principal,
+)
+from ontofoundry_api.api.auth import (
+    current_principal as session_principal,
 )
 from ontofoundry_api.api.auth import (
     ontology_principal as current_principal,
@@ -16,35 +20,32 @@ from ontofoundry_api.contracts.read_models import (
     OntologySearchRequest,
 )
 from ontofoundry_api.database import get_db
+from ontofoundry_api.db_models import OntologyVersionRecord
 from ontofoundry_api.services.access import (
     authorization_fingerprint,
     can_read_instances,
     can_read_mappings,
     require_instances,
-    require_mappings,
     require_read,
-)
-from ontofoundry_api.services.instance_query import (
-    ObjectSearch,
-    get_object,
-    object_neighborhood,
-    search_objects,
 )
 from ontofoundry_api.services.mcp_ontology import ResolveEntity
 from ontofoundry_api.services.ontology_query import (
     current_version,
     get_type,
     search_types,
+    snapshot_of,
     type_graph,
     version_summary,
 )
 from ontofoundry_api.services.ontology_search import search_ontology
+from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import list_accessible_workspaces
 
-router = APIRouter(prefix="/api/v1/ontology/workspaces", tags=["ontology"])
+router = APIRouter(prefix="/api/v1/workspaces", tags=["ontology"])
+directory_router = APIRouter(prefix="/api/v1/mcp/workspaces", tags=["mcp"])
 
 
-@router.get("")
+@directory_router.get("")
 def accessible_workspaces(
     session: Session = Depends(get_db),
     principal: Principal = Depends(ontology_directory_principal),
@@ -58,7 +59,7 @@ def accessible_workspaces(
         "items": [
             {
                 **item,
-                "mcp_endpoint": f"/api/v1/ontology/workspaces/{item['id']}/mcp",
+                "mcp_endpoint": f"/api/v1/workspaces/{item['id']}/mcp",
             }
             for item in items
         ]
@@ -112,74 +113,10 @@ def resolve(
     return {"workspace_id": workspace_id, "version_id": version.id, **result}
 
 
-@router.get("/{workspace_id}/objects")
-def objects(
-    workspace_id: str,
-    request: Request,
-    version_id: str | None = None,
-    options: ObjectSearch = Depends(),
-    session: Session = Depends(get_db),
-    principal: Principal = Depends(current_principal),
-):
-    require_read(session, str(workspace_id), principal)
-    require_instances(session, workspace_id, principal)
-    if options.source == "database":
-        require_mappings(session, workspace_id, principal)
-    return search_objects(
-        session,
-        current_version(session, workspace_id, version_id),
-        options,
-        request.app.state.settings,
-        permission_fingerprint=authorization_fingerprint(session, workspace_id, principal),
-    )
 
 
-@router.get("/{workspace_id}/objects/{ref}")
-def object_detail(
-    workspace_id: str,
-    ref: str,
-    request: Request,
-    version_id: str | None = None,
-    snapshot_date: str | None = None,
-    session: Session = Depends(get_db),
-    principal: Principal = Depends(current_principal),
-):
-    require_read(session, str(workspace_id), principal)
-    require_instances(session, workspace_id, principal)
-    if ref.startswith("db."):
-        require_mappings(session, workspace_id, principal)
-    return get_object(
-        session,
-        current_version(session, workspace_id, version_id),
-        ref,
-        request.app.state.settings,
-        snapshot_date=snapshot_date,
-    )
 
 
-@router.get("/{workspace_id}/objects/{ref}/neighborhood")
-def object_graph(
-    workspace_id: str,
-    ref: str,
-    request: Request,
-    version_id: str | None = None,
-    snapshot_date: str | None = None,
-    depth: int = Query(default=1, ge=1, le=3),
-    session: Session = Depends(get_db),
-    principal: Principal = Depends(current_principal),
-):
-    require_read(session, str(workspace_id), principal)
-    require_instances(session, workspace_id, principal)
-    if ref.startswith("db."):
-        require_mappings(session, workspace_id, principal)
-    return object_neighborhood(
-        session,
-        current_version(session, workspace_id, version_id),
-        ref,
-        depth,
-        request.app.state.settings,
-        snapshot_date=snapshot_date,
-    )
 
 
 @router.get("/{workspace_id}/version")
@@ -341,3 +278,91 @@ def element_documents(
     return document_context(
         session, current_version(session, workspace_id, version_id), kind, type_id
     )
+
+
+@router.get("/{workspace_id}/versions")
+def versions(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(session_principal),
+):
+    require_read(db, str(workspace_id), user)
+    from ontofoundry_api.services.access import can_read_instances, can_read_mappings
+
+    return {
+        "items": [
+            version_summary(
+                v,
+                include_mappings=can_read_mappings(db, workspace_id, user),
+                include_instances=can_read_instances(db, workspace_id, user),
+            )
+            for v in db.scalars(
+                select(OntologyVersionRecord)
+                .where(OntologyVersionRecord.workspace_id == workspace_id)
+                .order_by(OntologyVersionRecord.version_number.desc())
+            ).all()
+        ]
+    }
+
+
+@router.get("/{workspace_id}/versions/{version_id}/presentation")
+def presentation(
+    workspace_id: str,
+    version_id: str,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(session_principal),
+):
+    require_read(db, str(workspace_id), user)
+    from ontofoundry_api.services.access import (
+        authorization_fingerprint,
+        can_read_instances,
+        can_read_mappings,
+    )
+    from ontofoundry_api.services.http_reads import conditional, validator
+    from ontofoundry_api.services.ontology_query import version_read_key
+    from ontofoundry_api.services.public_projection import authorized_snapshot
+
+    version = current_version(db, workspace_id, version_id, lightweight=True)
+    permission = authorization_fingerprint(db, workspace_id, user)
+    response.headers["X-Ontology-Authorization"] = permission
+    tag = validator([*version_read_key(version), permission, "presentation-1"])
+    unchanged = conditional(request, response, tag)
+    if unchanged is not None:
+        unchanged.headers["X-Ontology-Authorization"] = permission
+        return unchanged
+    return {
+        "version": version_summary(
+            version,
+            include_mappings=can_read_mappings(db, workspace_id, user),
+            include_instances=can_read_instances(db, workspace_id, user),
+        ),
+        "model": authorized_snapshot(
+            snapshot_of(version),
+            mappings=can_read_mappings(db, workspace_id, user),
+            instances=can_read_instances(db, workspace_id, user),
+        ),
+    }
+
+
+@router.get("/{workspace_id}/version-comparison")
+def compare_versions(
+    workspace_id: str,
+    right_id: str,
+    left_id: str | None = None,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(session_principal),
+):
+    require_read(db, str(workspace_id), user)
+    left = current_version(db, workspace_id, left_id) if left_id else None
+    right = current_version(db, workspace_id, right_id)
+    if left and left.id == right.id:
+        raise HTTPException(422, "请选择不同的版本进行比较")
+    if left and left.version_number > right.version_number:
+        left, right = right, left
+    return {
+        "left": version_summary(left) if left else None,
+        "right": version_summary(right),
+        **compare_snapshots(snapshot_of(left) if left else {}, snapshot_of(right)),
+    }

@@ -18,11 +18,6 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import (
-    get_modeling_session,
-    session_draft,
-    version_snapshot_sha256,
-)
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
@@ -68,6 +63,11 @@ from ontofoundry_api.services.run_credentials import (
     issue as issue_run_credential,
 )
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES, to_run_status
+from ontofoundry_api.services.sessions import (
+    get_modeling_session,
+    session_draft,
+    version_snapshot_sha256,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,8 +113,8 @@ def run_mcp_access(
     settings = request.app.state.settings
     base = (settings.public_base_url or str(request.base_url)).rstrip("/")
     return {
-        "url": f"{base}/api/v1/ontology/workspaces/{workspace_id}/mcp",
-        "submit_url": f"{base}/api/v1/ontology/workspaces/{workspace_id}/runs/{run_token}/proposals",
+        "url": f"{base}/api/v1/workspaces/{workspace_id}/mcp",
+        "submit_url": f"{base}/api/v1/workspaces/{workspace_id}/sessions/{session_id}/proposals",
         "version_id": item.base_version_id,
         "credential": issue_run_credential(
             settings.session_secret,

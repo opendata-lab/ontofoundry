@@ -68,9 +68,9 @@ def inputs(tmp_path, monkeypatch, origin):
         json.dumps(
             {
                 "url": origin
-                + f"/prefix/api/v1/ontology/workspaces/{batch['workspace_id']}/mcp",
+                + f"/prefix/api/v1/workspaces/{batch['workspace_id']}/mcp",
                 "submit_url": origin
-                + f"/prefix/api/v1/ontology/workspaces/{batch['workspace_id']}/runs/fictional-run/proposals",
+                + f"/prefix/api/v1/workspaces/{batch['workspace_id']}/sessions/fictional-session/proposals",
                 "headers": {"Authorization": "Bearer ofrun.fictional-secret"},
             }
         )
@@ -90,7 +90,7 @@ def test_platform_success_uses_pinned_url_headers_and_exact_result(
     )
     assert handler.requests == [
         (
-            f"/prefix/api/v1/ontology/workspaces/{batch['workspace_id']}/runs/fictional-run/proposals",
+            f"/prefix/api/v1/workspaces/{batch['workspace_id']}/sessions/fictional-session/proposals",
             "Bearer ofrun.fictional-secret",
             batch,
         )
@@ -228,7 +228,7 @@ def assert_transport_failure(output, origin):
     assert "copyable-retry-command" in output
     assert "最终文件未替换" in output and "结果未入库" in output
     assert "沙箱可能无法访问平台：检查 DataAgent 沙箱网络是否开启，以及 OntoFoundry 的 ONTOFOUNDRY_PUBLIC_BASE_URL 是否为沙箱可达地址" in output
-    for sensitive in ("/prefix", "/proposals", "fictional-run", "ofrun.fictional-secret", "Authorization"):
+    for sensitive in ("/prefix", "/proposals", "fictional-session", "ofrun.fictional-secret", "Authorization"):
         assert sensitive not in output
 
 
@@ -285,7 +285,7 @@ def test_platform_reason_redacts_url_tokens_and_bounds_output(
     Path("mcp.json").write_text(json.dumps(config))
     reason = (
         f"timed out {config['submit_url']} "
-        "/prefix/api/v1 fictional-run Bearer ofrun.fictional-secret "
+        "/prefix/api/v1 fictional-session Bearer ofrun.fictional-secret "
         "fictional-query-secret fictional-fragment\n" + "x" * 1000
     )
 

@@ -447,7 +447,7 @@ def test_fixed_token_searches_like_a_member_within_its_workspace(client, publish
     # A workspace without an admin (here: one that does not exist) is refused.
     assert (
         client.post(
-            f"/api/v1/ontology/workspaces/{uid(999)}/search",
+            f"/api/v1/workspaces/{uid(999)}/search",
             json={"query": ""},
             headers=headers,
         ).status_code

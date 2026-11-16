@@ -5,6 +5,7 @@ import json
 from uuid import uuid4
 
 from sqlalchemy import func, select
+from test_modeling import published_snapshot
 
 from ontofoundry_api.adapters.archive import read_ossie
 from ontofoundry_api.api.auth import Principal, ontology_principal
@@ -12,7 +13,7 @@ from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.workspaces import DEV_USER_ID
 
-ROOT = f"/api/v1/modeling/workspaces/{DEMO_WORKSPACE_ID}/exports"
+ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/exports"
 
 
 def version(client):
@@ -22,7 +23,7 @@ def version(client):
 
 def test_report_download_and_repeated_get_share_bytes_without_model_writes(client):
     vid = version(client)
-    before = client.get(f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/published-snapshot").json()
+    before = published_snapshot(client, f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}")
     response = client.get(ROOT + f"/ontofoundry-core-1?version_id={vid}")
     assert response.status_code == 200, response.text
     result = response.json()
@@ -45,7 +46,7 @@ def test_report_download_and_repeated_get_share_bytes_without_model_writes(clien
     assert download.headers["x-content-sha256"] == result["content_sha256"]
     assert client.get(ROOT + f"/ontofoundry-core-1?version_id={vid}").json() == result
     assert (
-        client.get(f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/published-snapshot").json()
+        published_snapshot(client, f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}")
         == before
     )
     with client.app.state.session_factory() as db:
@@ -72,7 +73,7 @@ def test_no_artifact_for_empty_ossie_and_native_is_explicitly_available(client):
         )
         wid = workspace.id
         vid = published.id
-    root = f"/api/v1/modeling/workspaces/{wid}/exports"
+    root = f"/api/v1/workspaces/{wid}/exports"
     response = client.get(root + f"/ossie-0.2?version_id={vid}")
     assert response.status_code == 200, response.text
     result = response.json()
@@ -195,3 +196,26 @@ def test_export_scopes_follow_each_dataset_connection(client):
     # Unbound datasets never share a scope.
     _, unbound = scopes([None, None])
     assert len(unbound["ontology_mappings"]) == len(model.datasets)
+
+
+def test_cached_export_rebuilds_download_url_after_route_upgrade(client):
+    vid = version(client)
+    preview_url = ROOT + f"/ontofoundry-core-1?version_id={vid}"
+    response = client.get(preview_url)
+    assert response.status_code == 200, response.text
+    expected = response.json()
+    directory = (
+        client.app.state.settings.data_dir / str(DEMO_WORKSPACE_ID)
+        / "exports" / vid / "ontofoundry-core-1"
+    )
+    cached = next(directory.glob("preview-*.json"))
+    old = json.loads(cached.read_bytes())
+    old["download_url"] = old["download_url"].replace(
+        "/api/v1/workspaces/", "/api/v1/modeling/workspaces/"
+    )
+    cached.write_text(json.dumps(old))
+
+    rebuilt = client.get(preview_url)
+    assert rebuilt.status_code == 200, rebuilt.text
+    assert rebuilt.json() == expected
+    assert client.get(rebuilt.json()["download_url"]).status_code == 200
