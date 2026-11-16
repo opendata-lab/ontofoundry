@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from check_result import atomic_write
+from materials import material_lines, quote
 from runpaths import PARTS, HintParser, command, error, plan_not_approved
 from table_summary import comment_values, load_tables
 
@@ -61,17 +62,6 @@ def split_comment(comment, covered=False):
     return head or comment, "" if covered else rest
 
 
-def material_lines(pack):
-    lines = {}
-    for material in pack.get("materials") or []:
-        if material.get("path") and material.get("id"):
-            try:
-                lines[material["id"]] = Path(material["path"]).read_text(encoding="utf-8").splitlines()
-            except (OSError, UnicodeError):
-                lines[material["id"]] = []
-    return lines
-
-
 def evidence(basis, table, texts, tables):
     found = []
     for entry in basis if isinstance(basis, list) else []:
@@ -85,9 +75,9 @@ def evidence(basis, table, texts, tables):
             text = texts.get(entry["material_id"], [])
             if text and not 0 < start <= end <= len(text):
                 raise SpecError(f"basis 行号 {entry['line']} 超出材料 {entry['material_id']} 的 {len(text)} 行")
-            quote = " ".join(line.strip() for line in text[start - 1:end]) if text else ""
+            quoted = quote(text, start, end) if text else ""
             found.append({"kind": "material", "material_id": entry["material_id"],
-                          "locator": {"line_start": start, "line_end": end}, "quote": quote[:2000]})
+                          "locator": {"line_start": start, "line_end": end}, "quote": quoted})
         elif entry.get("table"):
             source = resolve_table(entry["table"], tables)
             if source is None:

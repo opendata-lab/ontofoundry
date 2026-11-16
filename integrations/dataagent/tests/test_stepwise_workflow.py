@@ -369,3 +369,10 @@ def test_result_scripts_wait_for_an_approved_plan(tmp_path, monkeypatch, capsys,
     monkeypatch.setenv("DATAAGENT_PLAN_STATE", "approved")
     invoke(monkeypatch, module, "--work-pack", pack, "01")
     assert "PLAN_NOT_APPROVED" not in capsys.readouterr().out
+
+
+def test_part_lookup_accepts_hand_written_fragment_names():
+    for part in ("01b", "02b", "03b"):
+        result = lookup("--part", part)
+        assert result.returncode == 0
+        assert result.stdout == lookup("--part", part[:2]).stdout

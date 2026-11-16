@@ -93,7 +93,7 @@ def archive_work(previous):
 
 
 def settle_previous_work(pack, restart=False):
-    """Return ("same" | "resume" | "archived" | "fresh", archive dir or None)."""
+    """Return ("same" | "resume" | "plan_kept" | "archived" | "fresh", archive dir or None)."""
     token = run_token(pack)
     previous = RUN_MARK.read_text().strip() if RUN_MARK.exists() else ""
     if not has_work():
@@ -105,8 +105,18 @@ def settle_previous_work(pack, restart=False):
     if previous == token:
         return "same", None
     if previous and previous in resume_tokens(pack):
-        return "resume", None
+        return ("resume" if wrote_fragments() else "plan_kept"), None
     return "archived", archive_work(previous)
+
+
+def wrote_fragments():
+    """Extraction had started: a fragment, a check or an issue list exists.
+
+    A plan round leaves only plan.md, notes.md and possibly entities.json; the
+    approval arrives as a new run, which is the plan's next step, not a resume.
+    """
+    parts = ROOT / "parts"
+    return (parts.is_dir() and any(parts.glob("*.json"))) or LATEST_CHECK.exists() or (ROOT / "issues.json").exists()
 
 
 def point_plan_at(work_pack):
@@ -182,7 +192,7 @@ def main():
             Path(pack["result_file"]).parent.mkdir(parents=True, exist_ok=True)
         step = "整理上一轮的成果"
         state, archived = settle_previous_work(pack, restart=args.restart)
-        if state == "resume":
+        if state in ("resume", "plan_kept"):
             point_plan_at(args.work_pack)
         step = "创建 modeling/ 与输出目录"
         for folder in (ROOT, ROOT / "parts", ROOT / "checks", ROOT / "tmp"):
@@ -218,6 +228,10 @@ def main():
         print(resume_summary())
         print(notice("PREVIOUS_WORK_KEPT", "本轮可在上一轮成果上继续",
                      f"先读 {steps}/resume.md，按用户这条消息决定：修正后提交、补写缺少的部分、按新要求改受影响的部分，或运行 init_workflow.py --restart 从头开始"))
+    elif state == "plan_kept":
+        steps = relative(Path(__file__).resolve().parents[1] / "references" / "steps")
+        print(notice("PLAN_KEPT", "上一轮的计划已保留，尚未写片段",
+                     f"计划已获批准就读 {steps}/extract.md 接着抽取；用户要调整则改 modeling/plan.md 后重新提交计划"))
     elif archived:
         print(notice("PREVIOUS_PARTS_MOVED", f"上一轮的成果已移到 {archived}/，本轮从空的 modeling/ 开始",
                      "只写本轮的变化；已入库的定义用 show_element.py 查，不必读该目录"))

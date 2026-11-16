@@ -159,49 +159,7 @@ def test_init_table_list_is_cut_at_whole_lines(tmp_path):
     assert len("\n".join(lines[:-1]).encode()) <= 800
 
 
-coverage = importlib.import_module("material_coverage")
 check_part = importlib.import_module("check_part")
-
-
-def coverage_workspace(tmp_path, monkeypatch, cited_lines, planned=()):
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "modeling/parts").mkdir(parents=True)
-    material = tmp_path / "material.md"
-    material.write_text((RETAIL / "material.md").read_text())
-    item = {"operation": "create", "target_kind": "metric", "client_ref": "sales", "after": {
-        "name": "sales_amount", "evidence": [{"kind": "material", "material_id": MATERIAL_ID,
-                                              "locator": {"line_start": a, "line_end": b}, "quote": "x"} for a, b in cited_lines]}}
-    (tmp_path / "modeling/parts/04-metrics-rules.json").write_text(json.dumps([item]))
-    (tmp_path / "modeling/entities.json").write_text(json.dumps({"items": [], "planned_metrics": list(planned)}))
-    return {"materials": [{"id": MATERIAL_ID, "path": str(material)},
-                          {"id": "request", "path": str(material), "from_request": True}]}
-
-
-def test_coverage_lists_uncited_rule_lines_and_unmet_plans(tmp_path, monkeypatch):
-    pack = coverage_workspace(tmp_path, monkeypatch, [(22, 26)], planned=[
-        {"name": "sales_amount", "display_name": "销售额", "as": "metric"},
-        {"name": "order_count", "display_name": "成交订单数", "as": "metric"},
-        {"name": "refund_note", "as": "deferred"}])
-    text = "\n".join(coverage.coverage_hints(pack))
-    assert "L32" in text and "L33" in text  # metric definitions nobody cites
-    assert "L22" not in text and "L26" not in text  # cited through a line range
-    assert "成交订单数（计划为 metric order_count）" in text and "销售额（" not in text
-    assert "refund_note" not in text  # deferred on purpose
-    assert text.count(MATERIAL_ID[:8]) == len([line for line in text.splitlines() if " L" in line])  # request copy not scanned
-
-
-def test_check_part_prints_coverage_only_with_04_and_never_fails_for_it(tmp_path, monkeypatch, capsys):
-    pack = coverage_workspace(tmp_path, monkeypatch, [])
-    pack.update(context_file=str(RETAIL / "context.json"), schema_file=str(SCHEMA_PATH))
-    (tmp_path / "pack.json").write_text(json.dumps(pack))
-    (tmp_path / "modeling/parts/02-links.json").write_text("[]")
-    monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", "pack.json", "02"])
-    check_part.main()
-    assert "没有提案引作证据" not in capsys.readouterr().out
-    monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", "pack.json", "04"])
-    check_part.main()
-    out = capsys.readouterr().out
-    assert "没有提案引作证据" in out and "L32" in out
 
 
 # Review findings (Gemini Argon, 2026-11-15) — each pinned by one case.

@@ -356,6 +356,21 @@ def test_a_continuation_keeps_the_work_and_prints_what_is_there(tmp_path, monkey
     assert (tmp_path / "modeling/parts/01-types.json").exists()
 
 
+def test_an_approved_plan_continues_to_extraction_not_resume(tmp_path, monkeypatch, capsys):
+    # The plan round wrote only plan.md and notes.md; approval arrives as a new run.
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    (tmp_path / "modeling/plan.md").write_text("场景：全量\n工作包：uploads/old-pack.json\n")
+    out = _init(tmp_path, monkeypatch, capsys, "second", "first")
+    assert "PLAN_KEPT" in out and "extract.md" in out
+    assert "PREVIOUS_WORK_KEPT" not in out and "resume.md" not in out
+    assert "工作包：uploads/pack.json" in (tmp_path / "modeling/plan.md").read_text()
+    # Once a fragment exists, the same chain is a real resume.
+    write_json(tmp_path / "modeling/parts/01-types.json", [])
+    assert "PREVIOUS_WORK_KEPT" in _init(tmp_path, monkeypatch, capsys, "third", "second")
+
+
 def test_a_resume_naming_another_run_does_not_keep_the_work(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "uploads").mkdir()

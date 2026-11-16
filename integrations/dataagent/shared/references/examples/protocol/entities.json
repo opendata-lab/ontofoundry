@@ -9,9 +9,5 @@
 "links": [
  {"name": "order_member", "display_name": "下单会员", "from": "order", "to": "member", "multiplicity": "many_to_one", "on": "member_id", "reads": ["{source}由会员{target}下单", "{target}下了{source}"]},
  {"name": "member_tags", "display_name": "会员标签", "from": "member", "to": "tag", "multiplicity": "many_to_many", "via": "t5", "via_from": "member_id", "via_to": "tag_code"}
-],
-"planned_metrics": [{"name": "sales_amount", "display_name": "销售额", "line": 40, "as": "metric"}],
-"planned_rules": [
- {"name": "completed_orders_only", "display_name": "只有已完成订单计入销售", "line": 28, "as": "filter"},
- {"name": "fresh_in_cold_storage", "display_name": "生鲜只能存冷链仓", "line": 9, "as": "rule"}
-]}
+]
+}

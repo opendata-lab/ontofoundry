@@ -13,6 +13,7 @@ from check_result import (
 )
 from column_refs import local_column_messages
 from function_refs import function_messages
+from materials import fill_quotes, material_lines
 from runpaths import (
     PARTS,
     HintParser,
@@ -434,6 +435,7 @@ def main():
         fragments, origins, context = load_inputs(raw_fragments, args.context)
         candidate = output.with_suffix(".pending.json")
         batch = assemble(context, fragments)
+        fill_quotes(batch["items"], material_lines(pack))
         atomic_write(candidate, encode(batch))
     except (InputProblem, PrepareInputError) as exc:
         message = (

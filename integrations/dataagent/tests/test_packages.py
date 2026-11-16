@@ -14,7 +14,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
-from build_packages import SKILLS, build
+from build_packages import MODELING, SKILLS, build
 from generate_output_schemas import SOURCE, TARGETS, generate
 from test_workflow import MATERIAL_HASHES, SCHEMA, pinned
 from test_platform_submit import platform as platform
@@ -35,7 +35,14 @@ def run(script, cwd, *args):
     return result.stdout
 
 
-@pytest.mark.parametrize("name", SKILLS)
+def test_question_answering_package_carries_no_modeling_files(packages, tmp_path):
+    with ZipFile(packages / "semantic-grounding.zip") as archive:
+        names = archive.namelist()
+    assert not any(path.startswith(("semantic-grounding/scripts/", "semantic-grounding/references/examples/")) for path in names)
+    assert {"semantic-grounding/SKILL.md", "semantic-grounding/LICENSE", "semantic-grounding/NOTICE"} <= set(names)
+
+
+@pytest.mark.parametrize("name", MODELING)
 def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
     _configure_check(tmp_path, platform[0])
     with ZipFile(packages / f"{name}.zip") as archive:
@@ -202,7 +209,7 @@ def test_plugin_install_only_copies_skills_and_reports_admin_work(packages, tmp_
     assert installed.returncode == 0, installed.stderr.decode()
     assert {p.name for p in target.iterdir()} == set(SKILLS)
     assert "管理员后续步骤" in installed.stdout.decode()
-    for name in SKILLS:
+    for name in MODELING:
         assert (target / name / "scripts/check_result.py").is_file()
     # Validate the entire source before copying anything into a fresh destination.
     (root / "skills/entity-extraction/scripts/check_result.py").unlink()
@@ -249,7 +256,7 @@ def _configure_check(tmp_path, origin):
     }))
 
 
-@pytest.mark.parametrize("name", SKILLS)
+@pytest.mark.parametrize("name", MODELING)
 def test_packaged_readers_run_without_network(name, packages, tmp_path):
     with ZipFile(packages / f"{name}.zip") as archive:
         archive.extractall(tmp_path)

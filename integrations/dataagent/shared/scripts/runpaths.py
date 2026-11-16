@@ -84,7 +84,7 @@ def usage(work_pack="<工作包>"):
     """The commands every step uses, filled with this run's work pack when known."""
     return [
         f"检查片段（不写片段名则检查 modeling/parts/ 全部）：{command('check_part.py', '--work-pack', work_pack, '01')}",
-        f"按 entities.json 展开 01、03（抽取时）：{command('expand_tables.py', '--work-pack', work_pack)}",
+        f"按 entities.json 展开 01、02、03（抽取时）：{command('expand_tables.py', '--work-pack', work_pack)}",
         f"合并：{command('prepare_result.py', '--work-pack', work_pack, 'modeling/parts/')}",
         f"读材料：{command('read_input.py', '<材料路径>')}",
         f"读已有元素（一次可查多个）：{command('show_element.py', '--work-pack', work_pack, '<名称或id>', '<名称2>')}",

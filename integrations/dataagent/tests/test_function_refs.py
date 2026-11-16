@@ -68,3 +68,28 @@ def test_examples_have_no_rejected_calls():
         items = json.loads(example.read_bytes())
         if isinstance(items, list):
             assert function_refs.function_errors(items) == [], example
+
+
+materials = importlib.import_module("materials")
+check_part = importlib.import_module("check_part")
+
+
+def test_quotes_are_filled_from_cited_lines_and_written_quotes_kept():
+    texts = {"m1": ["第一行", "  第二行 ", "第三行"]}
+    items = [item("rule", {"evidence": [
+        {"kind": "material", "material_id": "m1", "locator": {"line_start": 2, "line_end": 3}},
+        {"kind": "material", "material_id": "m1", "locator": {"line_start": 1, "line_end": 1}, "quote": "第一"},
+        {"kind": "material", "material_id": "m1", "locator": {"line_start": 3, "line_end": 9}},
+        {"kind": "table", "ref": "t1", "quote": "表"}]})]
+    materials.fill_quotes(items, texts)
+    evidence = items[0]["after"]["evidence"]
+    assert evidence[0]["quote"] == "第二行 第三行"
+    assert evidence[1]["quote"] == "第一"
+    assert "quote" not in evidence[2]  # out of range: left for the platform to report
+
+
+def test_a_malformed_mapping_is_reported_not_crashed():
+    schema = json.loads((BASE / "skills/ontology-discovery/output-schema.json").read_bytes())
+    context = json.loads((BASE / "tests/fixtures/extract-retail/context.json").read_bytes())
+    report = check_part.check_fragment([item("mapping", {"sources": [{}]})], context, schema)
+    assert report["errors"] and all("/items/0" in e for e in report["errors"])

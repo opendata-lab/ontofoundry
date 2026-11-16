@@ -324,7 +324,7 @@ def test_skill_incremental_instructions_and_guide_are_bounded():
     assert len(skill) <= 1100
     step = (BASE / "skills/ontology-discovery/references/steps/incremental.md").read_text()
     assert "references/steps/incremental.md" in skill.decode()
-    assert "context_file 全文、脚本源码或 Schema" in step and "sha256 由脚本补" in step
+    assert "context_file 全文、脚本源码或 Schema" in step and "sha256 由平台补" in step and "原文可省" in step
     for args in [("--incremental-guide",), ("--part", "edit"), ("--part", "update")]:
         result = lookup(*args)
         assert result.returncode == 0 and len(result.stdout) <= 8192

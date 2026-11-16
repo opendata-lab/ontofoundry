@@ -9,6 +9,9 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 BASE = Path(__file__).resolve().parent
 SKILLS = ("ontology-discovery", "entity-extraction", "semantic-grounding")
+# Only the modeling skills run the shared scripts and read the shared references;
+# question answering gets the licence files alone.
+MODELING = ("ontology-discovery", "entity-extraction")
 EXCLUDED = shutil.ignore_patterns("__pycache__", "*.pyc", ".pytest_cache", ".DS_Store", "tests", "offline_budget.py")
 
 
@@ -16,7 +19,12 @@ def assemble_skill(name, destination):
     if name not in SKILLS:
         raise ValueError(f"Unknown skill: {name}")
     shutil.copytree(BASE / "skills" / name, destination, ignore=EXCLUDED)
-    shutil.copytree(BASE / "shared", destination, dirs_exist_ok=True, ignore=EXCLUDED)
+    if name in MODELING:
+        shutil.copytree(BASE / "shared", destination, dirs_exist_ok=True, ignore=EXCLUDED)
+    else:
+        for path in (BASE / "shared").iterdir():
+            if path.is_file() and path.name != ".DS_Store":
+                shutil.copy2(path, destination / path.name)
 
 
 def archive(directory, output):
