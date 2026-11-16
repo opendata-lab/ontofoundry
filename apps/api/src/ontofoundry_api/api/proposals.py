@@ -15,6 +15,7 @@ from ontofoundry_api.contracts.proposal_reviews import ProposalBatchSummary
 from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.contracts.read_models import ElementSaveImpact
 from ontofoundry_api.contracts.session_writes import (
+    ChangeEventPageRead,
     ElementSave,
     ElementSavePreview,
     SessionRead,
@@ -28,7 +29,7 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.core import MaterialObject, Strict
 from ontofoundry_api.domain.models import PROPOSAL_COLLECTIONS
-from ontofoundry_api.services import changes, instance_store
+from ontofoundry_api.services import change_log, changes, instance_store
 from ontofoundry_api.services.access import can_edit_workspace, require_edit, require_read
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
 from ontofoundry_api.services.errors import ServiceError
@@ -360,6 +361,7 @@ def revise_proposal_content(
         body.fields,
         body.expected_session_revision,
         request.app.state.settings,
+        actor_id=user.id,
     )
 
 
@@ -389,6 +391,7 @@ def revise_dataset_source(
         body.dataset,
         body.expected_session_revision,
         request.app.state.settings,
+        actor_id=user.id,
     )
 
 
@@ -453,5 +456,33 @@ async def submit_proposals(
     if len(raw) > MAX_RESULT_BYTES:
         raise ServiceError("建模结果超过 8 MB", code="RESULT_TOO_LARGE", status_code=413)
     return submit_result(
-        db, request.app.state.settings, workspace_id, session_id, grant.run_token, raw
+        db,
+        request.app.state.settings,
+        workspace_id,
+        session_id,
+        grant.run_token,
+        raw,
+        actor_id=grant.user_id,
+    )
+
+
+@router.get("/change-events", response_model=ChangeEventPageRead)
+def list_change_events(
+    workspace_id: str,
+    session_id: str,
+    target_id: str | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = None,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_read(db, str(workspace_id), user)
+    get_modeling_session(db, workspace_id, session_id)
+    return change_log.list_events(
+        db,
+        workspace_id,
+        session_id,
+        target_id=target_id,
+        limit=limit,
+        cursor=cursor,
     )

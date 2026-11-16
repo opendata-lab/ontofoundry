@@ -297,5 +297,11 @@ describe("api client endpoint routes (step 1)", () => {
     expect(saveBody.idempotency_key.length).toBeLessThanOrEqual(64);
     expect(saveBody.draft).not.toHaveProperty("material_objects");
     expect(saveBody.draft).not.toHaveProperty("material_links");
+
+    await proposalsApi.changeEvents("ws-1", "session-1", { target_id: "obj-1", limit: 20 });
+    expect(fetcher).toHaveBeenCalledWith(
+      "/api/v1/workspaces/ws-1/sessions/session-1/change-events?target_id=obj-1&limit=20",
+      expect.anything(),
+    );
   });
 });

@@ -4,6 +4,7 @@ import type { Dataset, DuplicateCandidate, Draft, MaterialObject, ProposalItem }
 import { byId, effectiveProperties } from "../../lib/coreModel";
 import { SectionTitle, StatusMark } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
+import { ElementChangeHistory } from "./ElementChangeHistory";
 import { ProposalActions, ProposalStatusMark, type CardActions } from "./ProposalCard";
 import { OPERATION } from "./elementMeta";
 import { FieldDiff } from "./FieldDiff";
@@ -92,6 +93,8 @@ export function ProposalDetail({
   onReviseDataset,
   onReviseContent,
   workspaceId,
+  sessionId,
+  sessionRevision,
   onClose,
 }: {
   item: ProposalItem;
@@ -106,6 +109,8 @@ export function ProposalDetail({
   onReviseDataset: (dataset: Dataset) => Promise<boolean>;
   onReviseContent: (fields: Record<string, unknown>) => Promise<boolean>;
   workspaceId: string;
+  sessionId?: string;
+  sessionRevision?: number;
   onClose: () => void;
 }) {
   const [revising, setRevising] = useState<DuplicateCandidate | null>(null);
@@ -261,6 +266,18 @@ export function ProposalDetail({
             <Text type="secondary">本提案无依赖，可独立审核。</Text>
           )}
         </section>
+        {sessionId && (
+          <section className="flex flex-col gap-2 pb-2">
+            <SectionTitle title="修改记录" />
+            <ElementChangeHistory
+              workspaceId={workspaceId}
+              sessionId={sessionId}
+              targetId={item.target_id}
+              refreshKey={sessionRevision}
+              names={new Map([...connectionNames, ...elementNames(draft, items)])}
+            />
+          </section>
+        )}
         {error && <Alert type="error" showIcon message={error} />}
       </div>
       {revising && (

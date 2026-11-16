@@ -85,7 +85,15 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
             proposal.after = walk_references(proposal.target_kind, proposal.after,
                 lambda value: body.target_id if str(value) == item.target_id else value)
     trial = check_proposal(db, workspace_id, session, pending, settings)
-    save_pending(db, session, item.batch_id, trial)
+    save_pending(
+        db,
+        session,
+        item.batch_id,
+        trial,
+        actor_id=actor.id,
+        actor_kind="human",
+        primary_proposal_id=item.id,
+    )
     session.revision += 1
     db.commit()
     return item.batch_id

@@ -47,6 +47,7 @@ import type {
   NeighborhoodRequest,
   ProposalBatch,
   ProposalBatchDetail,
+  ChangeEventPage,
   PublishPreview,
   PublishResult,
   Resolution,
@@ -539,6 +540,15 @@ export const proposalsApi = {
     request<ProposalBatchDetail>(
       sessionPath(s) + "/proposals/" + proposalId + "/fact-revision",
       json("POST", payload),
+    ),
+  changeEvents: (
+    workspaceId: string,
+    sessionId: string,
+    params?: { target_id?: string; limit?: number; cursor?: string },
+  ) =>
+    request<ChangeEventPage>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/change-events` +
+        query({ ...params }),
     ),
 };
 

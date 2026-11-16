@@ -548,7 +548,14 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
     for item in parsed.items:
         item.depends_on = [remap.get(dep, dep) for dep in item.depends_on]
     trial = check_proposal(db, workspace_id, session, parsed.items, settings)
-    save_pending(db, session, batch_id, trial)
+    save_pending(
+        db,
+        session,
+        batch_id,
+        trial,
+        actor_id=actor_id,
+        actor_kind="human",
+    )
     session.revision += 1
     record.completions_json = [
         *record.completions_json,

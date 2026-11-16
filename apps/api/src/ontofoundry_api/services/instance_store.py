@@ -252,6 +252,7 @@ def write(
     lookup=None,
     model=None,
     validated=False,
+    cascades=None,
 ):
     """Compare-and-set content, evidence and history. Deleted IDs are never reused."""
     if kind not in INSTANCE_KINDS:
@@ -436,7 +437,7 @@ def write(
                 ),
             )
         ).all():
-            write(
+            link_result = write(
                 db,
                 workspace_id,
                 link.session_id,
@@ -447,7 +448,19 @@ def write(
                 actor=actor,
                 proposal_item_id=proposal_item_id,
                 operation="endpoint_deleted",
+                cascades=cascades,
             )
+            if cascades is not None:
+                cascades.append(
+                    {
+                        "action": "removed",
+                        "target_kind": "material_link",
+                        "target_id": link.id,
+                        "proposal_id": proposal_item_id,
+                        "before": deepcopy(link_result["element"]),
+                        "after": None,
+                    }
+                )
     return result
 
 

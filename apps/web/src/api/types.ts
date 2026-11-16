@@ -599,6 +599,54 @@ export type FactProposalRevision = {
   reason?: string;
 };
 
+export type ChangeActorKind = "human" | "agent" | "import";
+export type ChangeSubject = "proposal" | "draft" | "version";
+export type ChangeAction =
+  | "created"
+  | "revised"
+  | "superseded"
+  | "accepted"
+  | "rejected"
+  | "restored"
+  | "back_to_pending"
+  | "added"
+  | "updated"
+  | "removed"
+  | "published";
+
+export type ProposalChangeSnapshot = {
+  status: string;
+  operation: "create" | "update" | "delete";
+  before: CoreElement | null;
+  after: CoreElement | null;
+};
+
+export type ChangeEvent = {
+  id: UUID;
+  workspace_id: UUID;
+  session_id: UUID;
+  at: ISOTime;
+  actor_id: UUID;
+  actor_display_name?: string | null;
+  actor_kind: ChangeActorKind;
+  run_token?: string | null;
+  subject: ChangeSubject;
+  action: ChangeAction;
+  target_kind: TargetKind | null;
+  target_id: UUID | null;
+  proposal_id?: UUID | null;
+  batch_id?: UUID | null;
+  version_id?: UUID | null;
+  before: Json | null;
+  after: Json | null;
+  cause_id?: UUID | null;
+};
+
+export type ChangeEventPage = {
+  items: ChangeEvent[];
+  next_cursor: string | null;
+};
+
 // --- data catalog, datasets, mapping preview ------------------------------
 
 export type DataConnection = {

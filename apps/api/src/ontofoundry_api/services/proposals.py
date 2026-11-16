@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.contracts.proposals import SCHEMA_VERSION, ParsedBatch
+from ontofoundry_api.contracts.session_writes import ActorKind
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
     ProposalBatchRecord,
@@ -18,6 +19,7 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.instances import definitions
 from ontofoundry_api.domain.models import PROPOSAL_COLLECTIONS, ElementKind
+from ontofoundry_api.services import change_log
 
 
 def submitted_batch(db: Session, workspace_id: str, session_id: str, run_token: str | None):
@@ -51,10 +53,13 @@ def store_batch(
     task_id: str | None,
     manifest: dict[str, Any],
     parsed: ParsedBatch,
+    actor_id: str | None = None,
+    actor_kind: ActorKind | None = None,
 ) -> ProposalBatchRecord:
     """Insert an already trial-applied batch and its dependencies in the
     caller's transaction (SC-04: nothing is checked or rewritten here; the
     submit endpoint and import confirmation own their guards)."""
+    now = utc_now()
     batch = ProposalBatchRecord(
         id=parsed.id,
         workspace_id=workspace_id,
@@ -70,10 +75,19 @@ def store_batch(
         producer_json=manifest.get("producer") or {},
         result_sha256=parsed.result_sha256,
         status="available",
-        created_at=utc_now(),
+        created_at=now,
     )
     db.add(batch)
     db.flush()
+    resolved_kind: ActorKind = actor_kind or (
+        "import" if (manifest.get("producer") or {}).get("kind") == "import" else "agent"
+    )
+    resolved_actor = actor_id or manifest.get("started_by") or (
+        ((manifest.get("input_files") or {}).get("mcp_access") or {}).get("user_id")
+    )
+    if not resolved_actor:
+        session = db.get(ModelingSessionRecord, session_id)
+        resolved_actor = session.created_by if session is not None else ""
     for item in parsed.items:
         db.add(
             ProposalItemRecord(
@@ -97,7 +111,7 @@ def store_batch(
                 reason=item.reason,
                 status=item.status,
                 status_reason=item.status_reason or None,
-                created_at=utc_now(),
+                created_at=now,
             )
         )
     db.flush()
@@ -111,6 +125,29 @@ def store_batch(
                     item_id=item.id,
                     depends_on_item_id=dependency,
                 )
+            )
+    if resolved_actor:
+        for item in parsed.items:
+            change_log.record_proposal_event(
+                db,
+                workspace_id=workspace_id,
+                session_id=session_id,
+                actor_id=resolved_actor,
+                actor_kind=resolved_kind,
+                run_token=manifest["run_token"] if resolved_kind == "agent" else None,
+                action="created",
+                target_kind=item.target_kind,
+                target_id=item.target_id,
+                proposal_id=item.id,
+                batch_id=batch.id,
+                before=None,
+                after=change_log.proposal_snapshot(
+                    status=item.status,
+                    operation=item.operation,
+                    before=item.before,
+                    after=item.after,
+                ),
+                at=now,
             )
     return batch
 

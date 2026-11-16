@@ -130,6 +130,7 @@ export default tseslint.config(
       "src/components/proposals/ProposalPanel.tsx",
       "src/components/proposals/ProposalCard.tsx",
       "src/components/proposals/ProposalDetail.tsx",
+      "src/components/proposals/ElementChangeHistory.tsx",
       "src/components/proposals/EvidencePopover.tsx",
       "src/components/ModelResults.tsx",
       "src/components/DatasetPicker.tsx",

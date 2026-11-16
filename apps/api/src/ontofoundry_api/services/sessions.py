@@ -187,7 +187,7 @@ def session_data(item):
     }
 
 
-def revise(db, item, revision, **values):
+def revise(db, item, revision, *, commit: bool = True, **values):
     item = lock_session(db, item.workspace_id, item.id)
     if "draft_json" in values:
         if values["draft_json"].get("schema_version") != "core-1":
@@ -224,6 +224,10 @@ def revise(db, item, revision, **values):
             code="SESSION_REVISION_CHANGED",
             status_code=409,
         )
+    if not commit:
+        db.flush()
+        db.refresh(item)
+        return None
     db.commit()
     db.refresh(item)
     return session_response(db, item)
@@ -311,6 +315,8 @@ def resolve_merge(
     session_id: str,
     body,
     db: Session,
+    *,
+    user_id: str | None = None,
 ):
     space = get_workspace(db, workspace_id)
     item = lock_session(db, workspace_id, session_id)
@@ -351,13 +357,56 @@ def resolve_merge(
         )
     # The draft now starts from the current version: resolved conflicts are
     # its content, and the base moves so they are never asked again.
-    return revise(
+    draft_diffs = element_changes(draft, merge.merged)
+    revise(
         db,
         item,
         revision,
+        commit=False,
         draft_json=merge.merged,
         base_version_id=space.current_version_id,
     )
+    _record_draft_diffs(
+        db,
+        workspace_id=workspace_id,
+        session_id=session_id,
+        actor_id=user_id or item.created_by,
+        diffs=draft_diffs,
+        at=utc_now(),
+    )
+    db.commit()
+    db.refresh(item)
+    return session_response(db, item)
+
+
+def _record_draft_diffs(
+    db: Session,
+    *,
+    workspace_id: str,
+    session_id: str,
+    actor_id: str,
+    diffs: list[dict[str, Any]],
+    at,
+) -> None:
+    from ontofoundry_api.services import change_log
+
+    for change in diffs:
+        action = {"created": "added", "updated": "updated", "deleted": "removed"}[
+            change["change"]
+        ]
+        change_log.record_draft_event(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            actor_id=actor_id,
+            actor_kind="human",
+            action=action,
+            target_kind=change["element_kind"],
+            target_id=change["element_id"],
+            before=change["before"],
+            after=change["after"],
+            at=at,
+        )
 
 
 def sessions(
@@ -645,6 +694,12 @@ def publish_session(
             "发布草稿校验失败：" + str(exc), code="VALIDATION_FAILED", status_code=422
         ) from exc
     try:
+        from ontofoundry_api.services import change_log
+
+        old_base_version_id = item.base_version_id
+        before_draft = session_draft(item)
+        final_draft = model.model_dump(mode="json")
+        draft_diffs = element_changes(before_draft, final_draft)
         version = publish_draft(
             db,
             workspace_id=workspace_id,
@@ -656,13 +711,36 @@ def publish_session(
         )
         item.human_batch_id = None
         item.base_version_id = version.id
-        item.base_version_sha256 = snapshot_sha256(model.model_dump(mode="json"))
+        item.base_version_sha256 = snapshot_sha256(final_draft)
         # The session continues from exactly what was published: same
         # normalized form, so its draft hash equals the new base hash.
-        item.draft_json = model.model_dump(mode="json")
+        item.draft_json = final_draft
         item.draft_sha256 = item.base_version_sha256
         item.revision += 1
         item.updated_at = utc_now()
+        _record_draft_diffs(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            actor_id=user.id,
+            diffs=draft_diffs,
+            at=item.updated_at,
+        )
+        change_log.record_version_event(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            actor_id=user.id,
+            actor_kind="human",
+            version_id=version.id,
+            before={"base_version_id": old_base_version_id} if old_base_version_id else None,
+            after={
+                "version_id": version.id,
+                "version_number": version.version_number,
+                "message": version.message,
+            },
+            at=item.updated_at,
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()

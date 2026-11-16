@@ -199,11 +199,17 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     by_id = {item.id: item for item in batch_items}
     explicit = {d.proposal_id: d.decision for d in body.decisions}
     expanded = dict(explicit)
+    expansion_order = list(explicit.keys())
+    triggered_by: dict[str, str] = {}
 
-    def include(identity, decision):
-        if identity in expanded and expanded[identity] != decision:
-            raise _fail(409, "PROPOSAL_CONFLICT", "依赖组不能收到相反决定")
+    def include(identity, decision, source_id):
+        if identity in expanded:
+            if expanded[identity] != decision:
+                raise _fail(409, "PROPOSAL_CONFLICT", "依赖组不能收到相反决定")
+            return
         expanded[identity] = decision
+        triggered_by[identity] = source_id
+        expansion_order.append(identity)
 
     changed = True
     while changed:
@@ -213,20 +219,20 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             if item.atomic_group_id:
                 for peer in batch_items:
                     if peer.atomic_group_id == item.atomic_group_id:
-                        include(peer.id, decision)
+                        include(peer.id, decision, identity)
             if decision in {"accept", "restore"}:
                 for dep in dependency_group(identity, dependencies):
                     if dep == identity or by_id[dep].status == "accepted":
                         continue
                     required = "pending" if decision == "accept" else "rejected"
                     if by_id[dep].status == required:
-                        include(dep, decision)
+                        include(dep, decision, identity)
                     elif decision == "accept":
                         raise _fail(409, "PROPOSAL_NOT_DECIDABLE", "依赖提案已拒绝，请先恢复")
             else:
                 for dep in dependent_group(identity, dependencies):
                     if by_id[dep].status in {"pending", "accepted"}:
-                        include(dep, decision)
+                        include(dep, decision, identity)
         changed = previous_expanded != expanded
     if len(expanded) > 500:
         raise _fail(422, "DEPENDENCY_INCOMPLETE", "展开后的依赖组超过决定数量上限")
@@ -309,11 +315,13 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
                              draft=definitions(draft))
         draft = trial.candidate
     changed_items = [*undone_items, *accepted_items]
+    instance_cascades: list[dict[str, Any]] = []
     if changed_items:
         from ontofoundry_api.services.materials_lookup import material_lookup
         if trial is not None and not undone_items:
             draft = apply_trial(db, workspace_id, session_id, trial, accepted_items, actor_id,
-                                material_lookup(db, settings, workspace_id))
+                                material_lookup(db, settings, workspace_id),
+                                cascades_out=instance_cascades)
         else:
             from ontofoundry_api.services.join_validation import validate_join_columns
             try:
@@ -324,7 +332,8 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             validate_join_columns(db, workspace_id, definitions(before_mapping_write), checked_draft, settings, probe=False)
             draft = {**draft, **checked_draft}
             draft = instance_proposals.apply_changes(db, workspace_id, session_id, draft,
-                accepted_items, undone_items, actor_id, material_lookup(db, settings, workspace_id))
+                accepted_items, undone_items, actor_id, material_lookup(db, settings, workspace_id),
+                cascades_out=instance_cascades)
             check_identities(db, workspace_id, element_kinds(draft))
 
     now = utc_now()
@@ -347,6 +356,7 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             db.rollback()
             raise _fail(409, "SESSION_REVISION_CHANGED", "草稿已更新，请刷新后重新确认")
         db.refresh(session)
+    before_statuses = {identity: items[identity].status for identity in expanded}
     results = []
     for decision in body.decisions:
         item = items[decision.proposal_id]
@@ -359,6 +369,109 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             item.status = "pending"
         item.decided_by, item.decided_at = actor_id, now
     db.flush()
+    from ontofoundry_api.services import change_log
+
+    proposal_event_ids: dict[str, str] = {}
+    action_by_decision = {"accept": "accepted", "reject": "rejected", "restore": "restored"}
+    for identity in expansion_order:
+        item = items[identity]
+        decision_name = expanded[identity]
+        event = change_log.record_proposal_event(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            actor_id=actor_id,
+            actor_kind="human",
+            action=action_by_decision[decision_name],
+            target_kind=item.target_kind,
+            target_id=item.target_id,
+            proposal_id=item.id,
+            batch_id=item.batch_id,
+            before=change_log.proposal_snapshot(
+                status=before_statuses[identity],
+                operation=item.operation,
+                before=item.before_json,
+                after=item.after_json,
+            ),
+            after=change_log.proposal_snapshot(
+                status=item.status,
+                operation=item.operation,
+                before=item.before_json,
+                after=item.after_json,
+            ),
+            cause_id=proposal_event_ids[triggered_by[identity]] if identity in triggered_by else None,
+            at=now,
+        )
+        proposal_event_ids[identity] = event.id
+    draft_elements = _session_elements(draft)
+    for item in undone_items:
+        draft_before = deepcopy(item.after_json)
+        draft_after = deepcopy(item.before_json)
+        draft_action = (
+            "removed" if draft_after is None else ("added" if draft_before is None else "updated")
+        )
+        change_log.record_draft_event(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            actor_id=actor_id,
+            actor_kind="human",
+            action=draft_action,
+            target_kind=item.target_kind,
+            target_id=item.target_id,
+            proposal_id=item.id,
+            batch_id=item.batch_id,
+            before=draft_before,
+            after=draft_after,
+            cause_id=proposal_event_ids[item.id],
+            at=now,
+        )
+    for item in accepted_items:
+        draft_before = deepcopy(item.before_json)
+        if item.operation == "delete":
+            draft_after = None
+        elif item.target_kind in INSTANCE_KINDS:
+            draft_after = deepcopy(item.after_json)
+        else:
+            found = draft_elements.get(item.target_id)
+            draft_after = deepcopy(found[1]) if found else deepcopy(item.after_json)
+        draft_action = (
+            "removed" if draft_after is None else ("added" if draft_before is None else "updated")
+        )
+        change_log.record_draft_event(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            actor_id=actor_id,
+            actor_kind="human",
+            action=draft_action,
+            target_kind=item.target_kind,
+            target_id=item.target_id,
+            proposal_id=item.id,
+            batch_id=item.batch_id,
+            before=draft_before,
+            after=draft_after,
+            cause_id=proposal_event_ids[item.id],
+            at=now,
+        )
+    for cascade in instance_cascades:
+        trigger_item = items[cascade["proposal_id"]]
+        change_log.record_draft_event(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            actor_id=actor_id,
+            actor_kind="human",
+            action=cascade["action"],
+            target_kind=cascade["target_kind"],
+            target_id=cascade["target_id"],
+            proposal_id=trigger_item.id,
+            batch_id=trigger_item.batch_id,
+            before=cascade["before"],
+            after=cascade["after"],
+            cause_id=proposal_event_ids[trigger_item.id],
+            at=now,
+        )
     if any(d.decision == "restore" for d in body.decisions):
         for batch_id in batch_ids:
             trial_pending(db, session, batch_id, settings)

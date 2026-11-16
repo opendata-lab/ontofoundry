@@ -27,7 +27,17 @@ def _strings(value):
             yield from _strings(item)
 
 
-def revise_proposal(db, workspace_id, session_id, proposal_id, fields, expected_revision, settings):
+def revise_proposal(
+    db,
+    workspace_id,
+    session_id,
+    proposal_id,
+    fields,
+    expected_revision,
+    settings,
+    *,
+    actor_id=None,
+):
     """Merge reviewed field values into the proposal's current content."""
 
     def fail(code, message, status=409, details=None):
@@ -76,6 +86,14 @@ def revise_proposal(db, workspace_id, session_id, proposal_id, fields, expected_
     if changed.rowcount != 1:
         db.rollback()
         fail("SESSION_REVISION_CHANGED", "草稿已更新，请刷新后重试")
-    save_pending(db, session, item.batch_id, trial)
+    save_pending(
+        db,
+        session,
+        item.batch_id,
+        trial,
+        actor_id=actor_id or session.created_by,
+        actor_kind="human",
+        primary_proposal_id=item.id,
+    )
     db.commit()
     return {"proposal_id": item.id, "session_revision": expected_revision + 1}
