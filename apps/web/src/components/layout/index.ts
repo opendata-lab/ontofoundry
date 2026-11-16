@@ -7,6 +7,7 @@ export { PageTabs } from "./PageTabs";
 export { SectionTitle } from "./SectionTitle";
 export { StatusMark, type StatusState } from "./StatusMark";
 export { ApplicationFrame } from "./ApplicationFrame";
+export { navLinkClass } from "./navLinkClass";
 export { AsyncSurface } from "./AsyncSurface";
 export { DirectoryFrame } from "./DirectoryFrame";
 export { DetailWorkbench } from "./DetailWorkbench";

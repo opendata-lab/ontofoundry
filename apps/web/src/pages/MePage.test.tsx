@@ -94,7 +94,7 @@ afterEach(() => {
 });
 
 describe("个人中心", () => {
-  it("展示只读个人信息、所在空间及角色，并支持切换到启用的个人令牌页签", async () => {
+  it("展示只读个人信息、所在空间及角色，并可从侧栏切换到个人令牌", async () => {
     const router = show("/me");
 
     expect(await screen.findByText("zhangsan")).toBeInTheDocument();
@@ -107,15 +107,18 @@ describe("个人中心", () => {
     expect(screen.getByText("可查看")).toBeInTheDocument();
     expect(screen.queryByText("全部空间（超级管理员）")).toBeNull();
 
-    const tokensTab = screen.getByRole("tab", { name: "个人令牌" });
-    expect(tokensTab).not.toHaveAttribute("aria-disabled", "true");
-    expect(within(tokensTab).queryByText("随外部智能体网关上线")).toBeNull();
+    // Account sidebar: personal links for everyone, the platform group only for admins.
+    const nav = screen.getByRole("navigation", { name: "账号导航" });
+    expect(within(nav).getByRole("link", { name: "返回工作空间" })).toHaveAttribute("href", "/");
+    expect(within(nav).queryByRole("group", { name: "平台管理" })).toBeNull();
+    const tokensLink = within(nav).getByRole("link", { name: "个人令牌" });
 
-    fireEvent.click(tokensTab);
+    fireEvent.click(tokensLink);
     await waitFor(() => expect(router.state.location.pathname).toBe("/me/tokens"));
     expect(await screen.findByText("家里电脑")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "个人令牌" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "个人信息" }));
+    fireEvent.click(within(nav).getByRole("link", { name: "个人信息" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/me"));
     fireEvent.click(screen.getAllByRole("button", { name: "进入空间" })[0]);
     expect(router.state.location.pathname).toBe("/workspaces/w1/view");
@@ -131,6 +134,9 @@ describe("个人中心", () => {
 
     expect(await screen.findByText("全部空间（超级管理员）")).toBeInTheDocument();
     expect(screen.getByText("否")).toBeInTheDocument();
+    const platform = screen.getByRole("group", { name: "平台管理" });
+    expect(within(platform).getByRole("link", { name: "用户管理" })).toHaveAttribute("href", "/admin/users");
+    expect(within(platform).getByRole("link", { name: "用户审计" })).toHaveAttribute("href", "/admin/audit");
   });
 
   it("个人令牌列表展示权限标签和最近使用时间，新建令牌仅展示一次且支持非 HTTPS 降级复制", async () => {
