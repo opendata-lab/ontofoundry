@@ -46,7 +46,7 @@ def test_seed_passes_schema_graph_and_publication_validation(acceptance_inputs):
     report = validation_report(raw)
     assert report["publishable"], report
     assert report["schema_status"] == report["semantic_status"] == "passed"
-    assert report["instance_status"] == "passed"
+    assert report["instance_status"] == "not_checked"
     assert report["errors"] == report["warnings"] == []
     draft, questions = acceptance_inputs
     assert {obj.display_name for obj in draft.object_types} >= {

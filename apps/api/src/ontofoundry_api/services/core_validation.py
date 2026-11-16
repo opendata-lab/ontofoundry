@@ -1,13 +1,13 @@
 """Core publication validation independent of exchange formats."""
 
-from ontofoundry_api.domain.instance_validation import include_instance_validation
+from ontofoundry_api.domain.instance_validation import add_definition_warnings
 from ontofoundry_api.domain.models import OntologyDraft
 
 
 def validation_report(data):
     try:
         model = OntologyDraft.model_validate(data)
-        return include_instance_validation(
+        return add_definition_warnings(
             {
                 "standard": "core-1",
                 "schema_status": "passed",

@@ -6,7 +6,7 @@ from uuid import uuid4
 from test_modeling import ROOT
 
 from ontofoundry_api.api.agent_conversation import present_messages
-from ontofoundry_api.domain.instance_validation import include_instance_validation
+from ontofoundry_api.domain.instance_validation import add_definition_warnings
 from ontofoundry_api.domain.models import OntologyDraft
 
 
@@ -52,14 +52,14 @@ def test_object_without_properties_is_a_warning(client):
         "title_property_id": None,
     }
     draft["object_types"].append(bare)
-    report = include_instance_validation(
+    report = add_definition_warnings(
         {"errors": [], "warnings": [], "publishable": True},
         OntologyDraft.model_validate(draft),
     )
     codes = {w["code"]: w["message"] for w in report["warnings"]}
     assert "退货单" in codes["OBJECT_WITHOUT_PROPERTIES"]
     # Neither blocks publishing.
-    assert report["publishable"] and report["instance_status"] == "passed"
+    assert report["publishable"] and report["instance_status"] == "not_checked"
 
 
 def test_abstract_parents_are_not_flagged(client):
@@ -82,7 +82,7 @@ def test_abstract_parents_are_not_flagged(client):
         "title_property_id": None,
     }
     draft["object_types"] += [parent, child]
-    report = include_instance_validation(
+    report = add_definition_warnings(
         {"errors": [], "warnings": [], "publishable": True},
         OntologyDraft.model_validate(draft),
     )
