@@ -500,11 +500,16 @@ def visible(db, workspace_id, model):
         for i in current["items"]
         if i["target_kind"] == "material_object"
     }
+    # Validate the definitions once; each instance below is then checked on its own.
+    try:
+        checked = validate_instances(model, [], [])
+    except (ValueError, KeyError):
+        checked = model  # every check below fails and filters, as before
     for item in current["items"]:
         if item["target_kind"] != "material_object":
             continue
         try:
-            validate_instances(model, [item["element"]], [])
+            validate_instances(checked, [item["element"]], [])
             if interpretation(
                 model, "material_object", item["element"], all_objects
             ) != interpretation(published, "material_object", item["element"], all_objects):
@@ -513,11 +518,16 @@ def visible(db, workspace_id, model):
             filtered += 1
         else:
             objects.append(item)
+    valid = {str(o["target_id"]): o["element"] for o in objects}
     for item in current["items"]:
         if item["target_kind"] != "material_link":
             continue
         try:
-            validate_instances(model, [o["element"] for o in objects], [item["element"]])
+            # Only the endpoints matter, and every visible object was checked above.
+            ends = {item["element"]["source_id"], item["element"]["target_id"]}
+            validate_instances(
+                checked, [valid[str(i)] for i in ends if str(i) in valid], [item["element"]]
+            )
             if (
                 interpretation(model, "material_link", item["element"], all_objects)["link"]
                 != interpretation(published, "material_link", item["element"], all_objects)[

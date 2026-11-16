@@ -237,12 +237,7 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     draft = instance_store.session_snapshot(
         db, workspace_id, session_id, deepcopy(session.draft_json)
     )
-    statuses = effective_statuses(
-        batch_items,
-        dependencies,
-        draft,
-        instance_store.baseline(db, workspace_id, session_id),
-    )
+    statuses = effective_statuses(batch_items)
     by_id = {item.id: item for item in batch_items}
 
     accepts = [d.proposal_id for d in body.decisions if d.decision == "accept"]
@@ -367,12 +362,7 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     if any(d.decision == "restore" for d in body.decisions):
         for batch_id in batch_ids:
             trial_pending(db, session, batch_id, settings)
-    after_statuses = effective_statuses(
-        _batch_items(db, batch_ids, workspace_id, session_id),
-        dependencies,
-        session.draft_json,
-        instance_store.baseline(db, workspace_id, session_id),
-    )
+    after_statuses = effective_statuses(_batch_items(db, batch_ids, workspace_id, session_id))
     for decision in body.decisions:
         status, reason = after_statuses[decision.proposal_id]
         results.append(
