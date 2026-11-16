@@ -197,7 +197,7 @@ describe("proposal review", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
-  it("groups pending proposals by kind under 全部 and filters by category tiles", () => {
+  it("groups each object with its properties under 全部 and filters by category tiles", () => {
     panel();
     const tiles = screen.getByLabelText("提案分类");
     // Counts follow the status tab: the rejected object is not counted under 待审.
@@ -206,20 +206,25 @@ describe("proposal review", () => {
     expect(within(tiles).getByRole("button", { name: "属性 1" })).toBeInTheDocument();
     expect(within(tiles).getByRole("button", { name: "指标 1" })).toBeInTheDocument();
     expect(within(tiles).queryByRole("button", { name: /^关系/ })).toBeNull();
-    // Sections follow the tile order: 实体, 属性, 指标.
+    // One group per object holding the object and its properties, then the other kinds.
     const sections = screen.getAllByRole("region");
-    expect(sections.map((section) => section.getAttribute("aria-label"))).toEqual(["实体提案", "属性提案", "指标提案"]);
-    expect(within(sections[0]).getAllByRole("article")).toHaveLength(2);
-    // Collapsing a section hides its cards, not the others.
-    fireEvent.click(within(sections[0]).getByRole("button", { name: /实体/ }));
-    expect(within(screen.getByRole("region", { name: "实体提案" })).queryAllByRole("article")).toHaveLength(0);
+    expect(sections.map((section) => section.getAttribute("aria-label"))).toEqual(["采购订单提案", "供应商提案", "指标提案"]);
+    const order = within(sections[0]).getAllByRole("article").map((card) => card.getAttribute("aria-label") ?? "");
+    expect(order).toHaveLength(2);
+    expect(order[0]).toMatch(/purchase_order/);
+    expect(order[1]).toMatch(/order_no/);
+    // Collapsing a group hides its cards, not the others.
+    fireEvent.click(within(sections[0]).getByRole("button", { name: /^采购订单/ }));
+    expect(within(screen.getByRole("region", { name: "采购订单提案" })).queryAllByRole("article")).toHaveLength(0);
     expect(screen.getAllByRole("article")).toHaveLength(2);
-    // A tile shows only that kind, without section headings.
+    fireEvent.click(within(screen.getByRole("region", { name: "采购订单提案" })).getByRole("button", { name: /^采购订单/ }));
+    // 属性 keeps the object groups but lists properties only; 实体 is a plain list.
     fireEvent.click(within(tiles).getByRole("button", { name: "属性 1" }));
-    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(screen.getAllByRole("region").map((section) => section.getAttribute("aria-label"))).toEqual(["采购订单提案"]);
     expect(screen.getAllByRole("article")).toHaveLength(1);
-    fireEvent.click(within(tiles).getByRole("button", { name: "全部 4" }));
-    expect(screen.getAllByRole("region")).toHaveLength(3);
+    fireEvent.click(within(tiles).getByRole("button", { name: "实体 2" }));
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
   it("accepts everything acceptable regardless of filters and asks before rejecting all", async () => {

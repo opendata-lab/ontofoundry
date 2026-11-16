@@ -1,9 +1,10 @@
 import { Alert, Button, Checkbox, Dropdown, Empty, Flex, Input, Modal, Spin, Tabs, Tooltip, Typography } from "antd";
 import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ModelingSession, ProposalItem, TargetKind } from "../../api/types";
+import type { Draft, ModelingSession, ProposalItem, TargetKind } from "../../api/types";
 import type { ProposalsState } from "../../hooks/useProposals";
-import { ELEMENT_CATEGORIES } from "../../lib/elementCategories";
+import { byId } from "../../lib/coreModel";
+import { ELEMENT_CATEGORIES, type ElementCategory } from "../../lib/elementCategories";
 import { ElementCategoryTiles } from "../ElementCategoryTiles";
 import { ImportReportDialog } from "../ImportReportDialog";
 import { PanelToolbar } from "../layout";
@@ -34,6 +35,45 @@ const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
 // produce, so a run that produced none says why here, not in the conversation.
 const failedRun = (session: ModelingSession | null | undefined) =>
   session?.result_state === "failed_permanent" ? session.task_detail || "本轮没有产出提案" : "";
+
+type ProposalGroup = { key: string; title: string; tone: string; members: ProposalItem[] };
+
+const elementField = (item: ProposalItem, key: string) => {
+  const value = (item.after ?? item.before) as unknown as Record<string, unknown> | null;
+  return value?.[key];
+};
+
+/** The object an object or property proposal belongs to: its own target, or the property's owner. */
+const ownerOf = (item: ProposalItem) =>
+  item.target_kind === "object_type" ? item.target_id : (elementField(item, "owner_type_id") as string | undefined) ?? item.owner_label ?? "";
+
+function ownerTitle(id: string, items: ProposalItem[], draft: Draft, fallback: string) {
+  const proposal = items.find((candidate) => candidate.target_kind === "object_type" && candidate.target_id === id);
+  if (proposal) return String(elementField(proposal, "display_name") || proposal.display_name || elementField(proposal, "name") || fallback);
+  const existing = byId(draft.object_types, id);
+  return existing?.display_name || existing?.name || fallback || "未知对象";
+}
+
+function proposalGroups(visible: ProposalItem[], others: ElementCategory[], items: ProposalItem[], draft: Draft): ProposalGroup[] {
+  const byOwner = new Map<string, ProposalItem[]>();
+  for (const item of visible) {
+    if (item.target_kind !== "object_type" && item.target_kind !== "property") continue;
+    const owner = ownerOf(item);
+    byOwner.set(owner, [...(byOwner.get(owner) ?? []), item]);
+  }
+  const objectGroups = [...byOwner].map(([owner, members]) => ({
+    key: `object:${owner}`,
+    title: ownerTitle(owner, items, draft, members.find((m) => m.owner_label)?.owner_label ?? ""),
+    tone: "text-object",
+    // The object first, then its properties.
+    members: [...members].sort((a, b) => Number(a.target_kind !== "object_type") - Number(b.target_kind !== "object_type")),
+  }));
+  const kindGroups = others
+    .filter((category) => category.key !== "object_type" && category.key !== "property")
+    .map((category) => ({ key: category.key, title: category.text, tone: category.tone, members: visible.filter((item) => item.target_kind === category.key) }))
+    .filter((group) => group.members.length);
+  return [...objectGroups, ...kindGroups];
+}
 
 export function ProposalPanel(props: Props) {
   if (props.loading || (props.proposals.loading && !props.proposals.batches.length))
@@ -73,7 +113,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const categories = ELEMENT_CATEGORIES.filter((category) => items.some((item) => item.target_kind === category.key));
   const [kind, setKind] = useState<TargetKind | null>(null);
-  const [collapsed, setCollapsed] = useState(new Set<TargetKind>());
+  const [collapsed, setCollapsed] = useState(new Set<string>());
   const [status, setStatus] = useState<StatusFilter>("pending");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(new Set<string>());
@@ -99,10 +139,9 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const selectedIds = [...selected].filter((id) => byId.has(id));
   const selectedVisible = visible.filter((item) => selected.has(item.id)).length;
   const hasFilters = !!kind || !!terms.length || status !== "pending";
-  // Under 全部 the list is grouped by kind, in the same order as the tiles.
-  const groups = kind ? null : categories
-    .map((category) => ({ category, members: visible.filter((item) => item.target_kind === category.key) }))
-    .filter((group) => group.members.length);
+  // Under 全部 and 属性, each object is a group holding its own proposal and its
+  // properties; the other kinds follow as one group per kind, in tile order.
+  const groups = kind && kind !== "property" ? null : proposalGroups(visible, kind ? [] : categories, items, session.draft);
   const openItem = openId ? byId.get(openId) : undefined;
   useEffect(() => {
     if (!toast || undoBusy) return;
@@ -305,10 +344,10 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
         )}
         {visible.length || proposals.loading ? (
           groups ? (
-            groups.map(({ category, members }) => {
-              const open = !collapsed.has(category.key);
+            groups.map(({ key, title, tone, members }) => {
+              const open = !collapsed.has(key);
               return (
-                <section key={category.key} aria-label={`${category.text}提案`}>
+                <section key={key} aria-label={`${title}提案`}>
                   <button
                     type="button"
                     aria-expanded={open}
@@ -316,14 +355,14 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
                     onClick={() =>
                       setCollapsed((current) => {
                         const next = new Set(current);
-                        if (open) next.add(category.key);
-                        else next.delete(category.key);
+                        if (open) next.add(key);
+                        else next.delete(key);
                         return next;
                       })
                     }
                   >
                     {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <span className={category.tone}>{category.text}</span>
+                    <span className={`min-w-0 truncate ${tone}`}>{title}</span>
                     <span className="tabular-nums text-muted">{members.length}</span>
                   </button>
                   {open && members.map(renderCard)}
