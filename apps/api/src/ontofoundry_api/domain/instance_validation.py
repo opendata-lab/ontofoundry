@@ -7,24 +7,35 @@ from decimal import Decimal
 
 from ontofoundry_api.domain.models import OntologyDraft
 
+KIND_NAMES = {"string": "文本", "boolean": "布尔值", "date": "日期", "datetime": "日期时间"}
+NUMBER_KINDS = {"integer", "decimal", "float"}
 
-def valid_value(kind: str, value) -> bool:
+
+def valid_value(kind: str, value, *, strict: bool = False) -> bool:
+    """Whether `value` fits `kind`.
+
+    `strict` is the rule for accepting a document instance: numbers as numbers and
+    a datetime with its time. Reads and proposals stay lenient, because database
+    rows carry decimals as text to keep their precision and stored instances must
+    not disappear when the rule tightens."""
     if kind == "string":
         return isinstance(value, str)
     if kind == "boolean":
         return type(value) is bool
-    # Documents state numbers as text; a plain numeral is unambiguous, so it is
-    # a valid value as written (checked, never converted). "约240元" is not.
     if kind == "integer":
         return type(value) is int or (
-            isinstance(value, str) and bool(re.fullmatch(r"-?\d+", value))
+            not strict and isinstance(value, str) and bool(re.fullmatch(r"-?\d+", value))
         )
     if kind in ("decimal", "float"):
         return (
             type(value) is int
             or (type(value) is float and math.isfinite(value))
             or (isinstance(value, Decimal) and value.is_finite())
-            or (isinstance(value, str) and bool(re.fullmatch(r"-?\d+(?:\.\d+)?", value)))
+            or (
+                not strict
+                and isinstance(value, str)
+                and bool(re.fullmatch(r"-?\d+(?:\.\d+)?", value))
+            )
         )
     if kind == "date" and type(value) is date:
         return True
@@ -38,21 +49,20 @@ def valid_value(kind: str, value) -> bool:
                 date.fromisoformat(value)
             )
         if kind == "datetime":
-            # Documents write "2026-01-20 10:12" or just the day; both are a
-            # point in time at the precision the text gives.
+            # Documents write "2026-01-20 10:12" or just the day. Reads keep the
+            # day alone; an accepted datetime states its time (to the minute).
+            time = r"[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?"
             return bool(
-                re.fullmatch(
-                    r"\d{4}-\d{2}-\d{2}"
-                    r"(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?",
-                    value,
-                )
+                re.fullmatch(r"\d{4}-\d{2}-\d{2}" + (time if strict else f"(?:{time})?"), value)
             ) and bool(datetime.fromisoformat(value.replace("Z", "+00:00")))
     except ValueError:
         return False
     return False
 
 
-def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list[dict]:
+def value_issues(
+    draft: OntologyDraft, type_id, values: dict, path: str, *, strict: bool = False
+) -> list[dict]:
     issues = []
     for attribute in draft.effective_properties(type_id):
         value = values.get(attribute.name)
@@ -60,20 +70,28 @@ def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list
         # A fact taken from a document is identified by what the text says and
         # where; documents rarely carry system numbers. A missing value is
         # something to complete later, not a reason to block the model. A value
-        # of the wrong kind, though, is wrong.
-        if (attribute.required or attribute.identifier) and (
-            value is None or (isinstance(value, str) and not value.strip())
-        ):
+        # of the wrong kind, though, is wrong. A blank string is a missing value,
+        # never a type error.
+        missing = value is None or (isinstance(value, str) and not value.strip())
+        if missing and (attribute.required or attribute.identifier):
             code, severity, message = (
                 "INSTANCE_REQUIRED",
                 "warning",
                 f"{attribute.display_name or attribute.name} 待补全：原文未提供",
             )
-        elif value is not None and not valid_value(attribute.value_kind, value):
+        elif not missing and not valid_value(
+            attribute.value_kind, value, strict=strict
+        ):
+            kind = attribute.value_kind.value
+            expected = {"integer": "整数", "decimal": "数字", "float": "数字"}.get(kind) or KIND_NAMES.get(kind, kind)
+            if kind in NUMBER_KINDS and isinstance(value, str):
+                expected += f"，不能写成文本 {value!r}"
+            elif kind == "datetime" and valid_value(kind, value):
+                expected += f"，缺少时间：{value!r}"
             code, severity, message = (
                 "INSTANCE_VALUE_TYPE",
                 "error",
-                f"{attribute.display_name or attribute.name} 必须是 {attribute.value_kind} 类型",
+                f"{attribute.display_name or attribute.name}（{attribute.name}）必须是{expected}",
             )
         if code:
             issues.append(

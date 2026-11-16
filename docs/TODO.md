@@ -109,6 +109,18 @@
   - 前端提案卡片和搜索对整个列表重复 `find`／`some`，尚未在浏览器中测量，先测再改。
 - **来源**：2026-11-15 Codex 性能审查（`~/.agents/handoffs/2026-11-15-codex-performance-review/`）。
 
+### 5. 多元关系改用多键关联
+
+- **现状**（2026-11-15）：多元关系导入为中间对象，并为每个参与角色生成编号属性（`docs/concepts/identifiers.md`、`link-types.md`）。外键指向物理键时编号绑定只能待补全，按 `docs/design/2026-11-15-accept-completeness.md` AC-04 这类属性无法接受。
+- **要做**：不再生成角色编号属性，中间对象直接用表上的多个键列关联参与对象（例：排班 → 医生 用 `schedules.doctor_pk = doctors.doctor_pk`）；同步修改概念文档和 Ossie 导入。
+- **来源**：用户 2026-11-15 决定。
+
+### 6. 校验阶段余项
+
+- **现状**（2026-11-15）：Codex 校验阶段审查（`~/.agents/handoffs/2026-11-15-codex-validation-review/`）列出的缺口已由用户逐项决定，见 `docs/design/2026-11-15-accept-completeness.md` AC-09 至 AC-12；相同业务标识的实例保留只提示。
+- **要做**：按该设计第 8 节的顺序实施。
+- **来源**：2026-11-15 Codex 校验阶段审查。
+
 ## 已完成
 
 （暂无）

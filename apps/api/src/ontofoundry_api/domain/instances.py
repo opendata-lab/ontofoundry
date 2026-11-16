@@ -54,9 +54,9 @@ def validate_instances(draft, objects, links):
         names = {p.name for p in index.effective_properties(obj.type_id)}
         if set(obj.values) - names:
             raise ValueError("实例引用了无效属性")
-        issues = value_issues(model, obj.type_id, obj.values, str(obj.id))
-        if any(i["severity"] == "error" for i in issues):
-            raise ValueError("实例属性值类型不符")
+        errors = _value_errors(model, obj)
+        if errors:
+            raise ValueError("；".join(errors))
     for value in links:
         link = MaterialLink.model_validate(value)
         definition = index.links.get(link.type_id)
@@ -70,6 +70,32 @@ def validate_instances(draft, objects, links):
         ):
             raise ValueError("关系实例端点类型不兼容")
     return model
+
+
+def check_accepted_values(model, objects):
+    """Stricter than `validate_instances`: what an accepted document instance must state.
+
+    Proposals and reads stay lenient so stored instances are never hidden; only the
+    instances being accepted must state numbers as numbers and datetimes with a time."""
+    errors = [e for obj in objects for e in _value_errors(model, MaterialObject.model_validate(obj), strict=True)]
+    if errors:
+        raise ValueError("；".join(errors))
+
+
+def _value_errors(model, obj, *, strict=False):
+    """Value errors of one instance, each naming the instance so a reviewer can find it."""
+    errors = [
+        issue["message"]
+        for issue in value_issues(model, obj.type_id, obj.values, str(obj.id), strict=strict)
+        if issue["severity"] == "error"
+    ]
+    if not errors:
+        return []
+    from ontofoundry_api.domain.instance_display import document_display_text
+
+    owner = draft_index(model).objects[obj.type_id]
+    where = f"{owner.display_name or owner.name}「{document_display_text(model, obj)}」"
+    return [f"{where}：{message}" for message in errors]
 
 
 def interpretation(draft, kind, element, objects):
