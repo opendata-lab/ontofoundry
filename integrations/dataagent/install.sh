@@ -6,8 +6,11 @@ PACKAGE_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 validate_skill() {
     skill_dir=$1
-    for file in SKILL.md output-schema.json requirements.txt LICENSE NOTICE PROVENANCE.md \
-        references/core-model.md references/principles.md references/quick-reference.md \
+    for file in SKILL.md output-schema.json LICENSE NOTICE PROVENANCE.md; do
+        [ -f "$skill_dir/$file" ] || { echo "缺少文件：$skill_dir/$file" >&2; exit 1; }
+    done
+    case "$(basename "$skill_dir")" in semantic-grounding) return 0 ;; esac
+    for file in requirements.txt references/core-model.md references/principles.md \
         references/examples/protocol/entities.json references/extract-kit/01.json \
         scripts/init_workflow.py scripts/read_input.py scripts/show_element.py \
         scripts/show_example.py scripts/check_part.py scripts/check_result.py scripts/prepare_result.py \
@@ -24,7 +27,6 @@ for skill in ontology-discovery entity-extraction semantic-grounding; do
 done
 for file in ontology-discovery/references/steps/plan.md ontology-discovery/references/steps/extract.md \
     ontology-discovery/references/steps/incremental.md ontology-discovery/references/steps/optimize.md \
-    ontology-discovery/references/extract-tables.md \
     entity-extraction/references/steps/facts.md entity-extraction/references/extract-facts.md \
     semantic-grounding/references/steps/ground.md semantic-grounding/references/steps/answer.md; do
     [ -f "$PACKAGE_ROOT/skills/$file" ] || { echo "缺少专属方法：$file" >&2; exit 1; }

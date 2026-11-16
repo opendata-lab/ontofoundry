@@ -9,6 +9,7 @@ Repair budgets are never touched.
 """
 
 import json
+import re
 from pathlib import Path
 
 from check_result import (
@@ -20,7 +21,6 @@ from check_result import (
 )
 from column_refs import local_column_messages
 from function_refs import function_messages
-from material_coverage import coverage_hints
 from prepare_result import PrepareInputError, assemble, effective_ref
 from runpaths import (
     PARTS,
@@ -80,7 +80,9 @@ def check_fragment(items, context, schema):
                 f"{after.get('display_name') or after.get('name')}（{after.get('name')}）未设标题属性（可不设）："
                 "若材料给出名称属性请设置，否则按标识显示，按名称解析会找不到；无需仅为此提示修正。"
             )
-        errors += [diagnostic(f"/items/{n}" + path, *rest, item) for path, *rest in mapping_local_errors(item)]
+        # Structural helpers assume a schema-valid item; a malformed one is already reported above.
+        if not any(re.search(rf"：/items/{n}(?:/|\s|$)", e) for e in errors):
+            errors += [diagnostic(f"/items/{n}" + path, *rest, item) for path, *rest in mapping_local_errors(item)]
     return {
         "errors": errors,
         "pending_refs": sorted(used - defined),
@@ -190,9 +192,6 @@ def main():
         if report["pending_refs"]:
             lines.append("  待合并检查的跨片段引用：" + "、".join(report["pending_refs"]))
         lines += ["  " + h for h in report["hints"][:5]]
-    if args.work_pack and any(p.name.startswith("04") for p in checked):
-        # Semantic coverage is a reminder once metrics and rules exist (MS-04), never an error.
-        lines += coverage_hints(pack)
     # Cut at whole lines so a path or command is never half printed.
     kept, size = [], 0
     for line in lines:

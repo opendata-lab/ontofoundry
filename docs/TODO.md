@@ -82,6 +82,18 @@
 - **要做**：暂无。若以后要改进，只考虑通用机制（如审阅界面展示指标口径与引用的材料行并排对照），先写设计。
 - **来源**：2026-11-15 第二次回归的质量核对（`quality.md`）。
 
+### 2. 技能评审余项
+
+- **现状**（2026-11-15）：Codex、Gemini 对建模技能的评审（`~/.agents/handoffs/2026-11-15-codex-skill-method-review/`、`2026-11-15-gemini-skill-method-review/`）中，主要项已在 MS-08–MS-10 处理，以下未做。
+- **要做**（按价值排序，均以删减或合并为主）：
+  - 本地检查同一归属下的重名、规则表达式里的关系路径（两次回归各因此用掉一次平台修正轮次），按平台代码生成或比对；
+  - 两个连接下同名 schema.table 时，展开脚本与列检查按连接区分表；
+  - `check_part`、`prepare_result` 加载但不用 context，`--context/--schema/--output` 路线无法提交，可删；
+  - `init_workflow` 与 `prepare_result` 各有一份工作文件清单和归档遍历，合为一处；`read_input` 的 `fit_lines`、`resolve_pointer` 无调用者；
+  - 示例目录：11 个 `delete-*.json` 只差 target_kind；`catalog.json` 的 examples 数组同时是测试清单，需先把测试元数据移到 tests 再精简；
+  - 部分测试断言说明文字原句，改为断言行为和输出。
+- **来源**：2026-11-15 技能评审。
+
 ## 已完成
 
 （暂无）

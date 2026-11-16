@@ -103,7 +103,7 @@ def main():
     )
     parser.add_argument("target_kinds", nargs="*", metavar="target_kind")
     fixed = parser.add_mutually_exclusive_group()
-    fixed.add_argument("--part", choices=["01", "02", "03", "04", "05", "update", "edit"], help="裸 items 数组；01–05 全量，update 增量补齐，edit 修改删除")
+    fixed.add_argument("--part", choices=["01", "02", "03", "04", "05", "01b", "02b", "03b", "update", "edit"], help="裸 items 数组；01–05 全量（01b–03b 同 01–03），update 增量补齐，edit 修改删除")
     fixed.add_argument("--incremental-guide", action="store_true", help="增量查询与写法说明")
     fixed.add_argument("--values", action="store_true", help="契约取值速查")
     fixed.add_argument("--guide", action="store_true", help="固定包说明与确定的读取参数")
@@ -127,7 +127,7 @@ def main():
         if args.part or args.values or args.guide or args.incremental_guide:
             if args.target_kinds or args.variant or args.with_deps or args.operation != "create":
                 raise ValueError("固定包入口不能与类型、操作或分支查询混用")
-            filename = f"{args.part}.json" if args.part else "values.json" if args.values else "incremental.md" if args.incremental_guide else "guide.md"
+            filename = f"{args.part.rstrip('b')}.json" if args.part else "values.json" if args.values else "incremental.md" if args.incremental_guide else "guide.md"
             content = (KIT / filename).read_text().rstrip("\n")
             if filename.endswith(".json"):
                 content = json.dumps(without_material_hashes(json.loads(content)), ensure_ascii=False, separators=(",", ":"))

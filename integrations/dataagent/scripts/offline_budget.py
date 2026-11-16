@@ -214,7 +214,6 @@ def byte_report():
     system_body = agent_file.split("系统提示词：", 1)[1].strip() + "\n"
     common = {
         "技能入口": "SKILL.md",
-        "速查": "references/quick-reference.md",
         "原则": "references/principles.md",
         "计划步骤": "references/steps/plan.md",
     }
@@ -266,7 +265,6 @@ def byte_report():
         "每轮提示": (len(prompt.encode()), 600),
         # Entries only route; each run reads the one step file it needs.
         "技能入口": (components["技能入口"]["bytes"], 1100),
-        "速查": (components["速查"]["bytes"], 1800),
         "原则": (components["原则"]["bytes"], 2400),
         "计划步骤": (components["计划步骤"]["bytes"], 1500),
         "优化步骤": (len(resource("references/steps/optimize.md").read_bytes()), 900),
