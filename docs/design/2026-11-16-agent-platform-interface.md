@@ -32,7 +32,7 @@
 
 ## 3. 接口
 
-工作空间内统一前缀 `/api/v1/workspaces/{w}`（下表省略）；跨空间 MCP 网关 `/api/v1/ontology/mcp` 不变。
+工作空间内统一前缀 `/api/v1/workspaces/{w}`（下表省略）。`/api/v1/ontology/…` 前缀整体取消，MCP 也一并调整（用户 2026-11-16）：跨空间网关 `/api/v1/ontology/mcp` → `/api/v1/mcp`；可访问空间目录 `/api/v1/ontology/workspaces` → `/api/v1/mcp/workspaces`；单空间 `/api/v1/ontology/workspaces/{w}/mcp` → `/api/v1/workspaces/{w}/mcp`。
 
 | 分组 | 端点 | 归属模块 |
 |---|---|---|
@@ -46,6 +46,8 @@
 | 工作空间 | `GET/PATCH ""`、`/overview`、`/capabilities`、`/members…`、`/users/search`、`/feedback`、`/settings/dataagent-health` | `api/workspaces.py`（并入 `settings.py`） |
 
 鉴权：人工端点只接受登录；`POST /sessions/{s}/proposals` 另接受运行凭据，校验凭据中的工作空间、会话与用户编辑权限，保留“当前运行 → 同内容回执 → 活动状态 → 轮次与待审规则”的顺序，运行结束后仍可重取回执（迁自现有提交端点）。
+
+MCP 不留转发：建模运行从运行输入取地址，交付页同步修改；外部客户端（`plugins/ontofoundry/` 由用户填写完整地址）需更新配置，发布说明写明“MCP 地址改为 /api/v1/mcp”，并同步插件与根 README。
 
 直接删除（不留转发）：`runs/{run_token}/proposals`（技能只读 `submit_url`，平台改发新地址即可；发布说明注明升级时不要有进行中的建模）、工作空间级 `element-saves`、前端未用的 `/ontology`、`/published-snapshot`、`/proposal-metrics`、`/assets/refresh`、废弃的 `/connections/{c}/table-material`（同时删前端引用）。以后可选：`PUT/DELETE /sessions/{s}/elements/{kind}/{id}` 取代 `element-saves`。
 
