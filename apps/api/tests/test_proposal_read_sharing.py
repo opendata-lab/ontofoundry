@@ -40,10 +40,28 @@ def two_types(workspace_id):
     return CoreDraft.model_validate(data).model_dump(mode="json")
 
 
-def install(client, objects, links=()):
+def identifier_kinds(workspace_id):
+    """门店订单 identified by two properties; 采购单 inherits 单据号 from 单据."""
+    data = empty_snapshot(workspace_id)
+    store_order, document, purchase = str(uuid4()), str(uuid4()), str(uuid4())
+    data["object_types"] += [
+        {"id": store_order, "name": "store_order"},
+        {"id": document, "name": "document"},
+        {"id": purchase, "name": "purchase", "extends": document},
+    ]
+    data["properties"] += [
+        {"id": str(uuid4()), "owner_type_id": store_order, "name": name,
+         "value_kind": "string", "identifier": True}
+        for name in ("store_no", "order_no")
+    ] + [{"id": str(uuid4()), "owner_type_id": document, "name": "doc_no",
+          "value_kind": "string", "identifier": True, "unique": True}]
+    return CoreDraft.model_validate(data).model_dump(mode="json")
+
+
+def install(client, objects, links=(), make_draft=None):
     """A session and published version on `two_types`, with the given active instances."""
     session = create_session(client)
-    draft = two_types(session["workspace_id"])
+    draft = (make_draft or two_types)(session["workspace_id"])
     with client.app.state.session_factory() as db:
         record = db.get(ModelingSessionRecord, session["id"])
         record.draft_json, record.draft_sha256 = draft, snapshot_sha256(draft)
@@ -97,6 +115,40 @@ def test_duplicates_match_by_type_and_identity_and_read_instances_once(client, m
     assert reads == [1]
 
 
+def test_duplicates_use_composite_and_inherited_identifiers(client):
+    session, types, ids = install(client, [
+        ("store_order", {"store_no": "S01", "order_no": "1001"}),
+        ("purchase", {"doc_no": "P-7"}),
+    ], make_draft=identifier_kinds)
+    with client.app.state.session_factory() as db:
+        duplicates = DuplicateCandidates(db, session["workspace_id"], db.get(ModelingSessionRecord, session["id"]))
+        order = types["store_order"]
+        assert [m["id"] for m in duplicates(proposed(order, {"store_no": "S01", "order_no": "1001"}))] == [ids[0]]
+        assert duplicates(proposed(order, {"store_no": "S02", "order_no": "1001"})) == []
+        assert duplicates(proposed(order, {"order_no": "1001"})) == []  # incomplete identifier
+        assert [m["id"] for m in duplicates(proposed(types["purchase"], {"doc_no": "P-7"}))] == [ids[1]]
+
+
+def test_duplicates_stay_in_their_workspace_and_session(client):
+    session, types, ids = install(client, [("order", {"code": "A-1"})])
+    other_session = create_session(client)
+    with client.app.state.session_factory() as db:
+        other_space = WorkspaceRecord(id=str(uuid4()), slug="fiction-other", name="虚构白鹭空间", created_by=DEV_USER_ID)
+        db.add(other_space)
+        db.flush()
+        for workspace_id, state, session_id in (
+            (other_space.id, "active", None),  # same type and code, another workspace
+            (session["workspace_id"], "staged", other_session["id"]),  # staged by another session
+        ):
+            db.add(DocumentInstanceRecord(
+                id=str(uuid4()), workspace_id=workspace_id, state=state, session_id=session_id, revision=1,
+                created_by=DEV_USER_ID, updated_by=DEV_USER_ID, type_id=types["order"], values={"code": "A-1"}))
+        db.commit()
+        session_reads.clear()
+        duplicates = DuplicateCandidates(db, session["workspace_id"], db.get(ModelingSessionRecord, session["id"]))
+        assert [m["id"] for m in duplicates(proposed(types["order"], {"code": "A-1"}))] == [ids[0]]
+
+
 def test_visible_checks_each_link_against_its_endpoints(client):
     # Object 2 has a value of the wrong type and is filtered, so the link that ends at it is too.
     session, _, ids = install(
@@ -132,6 +184,16 @@ def test_batch_read_reads_atomic_peers_in_one_query(client):
         read = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}").json()
     finally:
         event.remove(engine, "before_cursor_execute", listen)
+    # The same group id in another session never joins this batch's groups.
+    other = create_session(client)
+    other_batch = seed_batch(client, other, chain(other))
+    with client.app.state.session_factory() as db:
+        db.execute(update(ProposalItemRecord).where(ProposalItemRecord.batch_id == other_batch["id"])
+                   .values(atomic_group_id="g1"))
+        db.commit()
+        foreign = set(db.scalars(select(ProposalItemRecord.id).where(ProposalItemRecord.batch_id == other_batch["id"])))
+    again = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}").json()
+    assert not foreign & {d for i in again["items"] for d in i["dependency_group"]}
     peer_queries = [s for s in statements if "atomic_group_id IN" in s or "atomic_group_id =" in s]
     assert len(peer_queries) == 1
     by_ref = {i["client_ref"]: i for i in read["items"]}
