@@ -46,7 +46,7 @@ def test_fixed_token_reads_the_workspace_with_mappings_and_instances(static_clie
 
 def test_wrong_token_and_directory_reads_are_refused(static_client):
     assert mcp_request(static_client, "tools/list", headers=bearer(TOKEN + "x")).status_code == 401
-    assert static_client.get("/api/v1/ontology/workspaces", headers=bearer(TOKEN)).status_code == 401
+    assert static_client.get("/api/v1/mcp/workspaces", headers=bearer(TOKEN)).status_code == 401
 
 
 def test_default_fixed_token_works_out_of_the_box(client):

@@ -64,7 +64,7 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 
 ## 2026-10-23 平台提案预检
 
-`prepare_result.py` 本地检查通过后，读取工作包 `platform_check_file` 中的 `submit_url` 与 Authorization，把结果提交到同空间、同运行的 `runs/{run_token}/proposals`。平台在同一事务里检查并入库：通过即成为待审提案，未通过不入库，全部错误直接进入工具输出，当场修正后重新提交。平台不可达或配置缺失时直接报错。最多修正两轮，仍未通过则不交付结果并说明原因。运行结束后平台不再下载结果文件；结果文件只作留档。入库不表示提案已接受或本体已发布。
+`prepare_result.py` 本地检查通过后，读取工作包 `platform_check_file` 中的 `submit_url` 与 Authorization，把结果提交到同空间、同会话的 `sessions/{session_id}/proposals`（运行由凭据标识）。平台在同一事务里检查并入库：通过即成为待审提案，未通过不入库，全部错误直接进入工具输出，当场修正后重新提交。平台不可达或配置缺失时直接报错。最多修正两轮，仍未通过则不交付结果并说明原因。运行结束后平台不再下载结果文件；结果文件只作留档。入库不表示提案已接受或本体已发布。
 
 部署时需先升级平台、执行迁移，再重新打包技能并按上述步骤复制到 `SKILLS_ROOT_DIR`、重启 DataAgent；本次未修改 Agent 提示词。仓库验证不替代后台安装和真实运行验收。
 
@@ -81,3 +81,9 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 文本输出“行号→内容”，按下一页命令续读，长行有截断标记。JSON 大文件默认 --outline；可 --pointer /items/0-4 或 --query 'key=value'／'关键词'。CSV 默认 --outline（最多扫描 10000 行，统计注明扫描范围）；可 --rows 1-20 --cols a,b 或 --query 'col=value'／'关键词'。结构化材料可加 --ref m1，引用同时标记原物理行号；材料证据仍填原材料 id、locator 行号与原文，不能把渲染标签当引文。不用 jq。table_format.py 由平台纯格式化模块自动生成，确保读取描述与收据逐行一致。
 
 重新打包安装并重启 DataAgent 后生效；本次离线任务不连接后台或真实模型。
+
+## 2026-11-16 接口地址升级
+
+MCP 地址改为 `/api/v1/mcp`，单空间入口改为 `/api/v1/workspaces/{workspace_id}/mcp`，空间目录改为 `/api/v1/mcp/workspaces`。旧地址已删除。升级前结束所有进行中的建模运行，升级后重新发起运行以取得新的提交地址与运行凭据。外部客户端需更新完整 MCP 地址。
+
+在 DataAgent 管理后台按 `plugin.json` 重新登记地址模板 `<ONTOFOUNDRY_BASE_URL>/api/v1/workspaces/<workspace_id>/mcp`，刷新工具列表并核对问数 Agent 挂载。后台登记需由部署人员完成。

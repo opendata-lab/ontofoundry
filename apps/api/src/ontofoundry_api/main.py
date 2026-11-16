@@ -21,14 +21,11 @@ from ontofoundry_api.api import (
     materials,
     mcp,
     metrics,
-    modeling,
     ontology,
     ontology_gateway,
     proposals,
+    sessions,
     workspaces,
-)
-from ontofoundry_api.api import (
-    settings as settings_api,
 )
 from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
@@ -46,7 +43,11 @@ from ontofoundry_api.services.demo import (
     DEMO_WORKSPACE_ID,
     build_demo_draft,
 )
-from ontofoundry_api.services.errors import PublishValidationError, ServiceError
+from ontofoundry_api.services.errors import (
+    PublishValidationError,
+    ServiceError,
+    SessionRequestError,
+)
 from ontofoundry_api.services.workspaces import (
     DEV_USER_ID,
     create_workspace,
@@ -184,6 +185,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ],
     )
 
+    @app.exception_handler(SessionRequestError)
+    async def session_request_error_handler(_: Request, exc: SessionRequestError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
     @app.exception_handler(ServiceError)
     async def service_error_handler(_: Request, exc: ServiceError) -> JSONResponse:
         extra = {k: v for k, v in exc.details.items() if k not in ("code", "message")}
@@ -211,23 +216,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(users.me_router)
     app.include_router(auth.router)
     app.include_router(workspaces.router)
+    app.include_router(workspaces.feedback_router)
     app.include_router(ontology.router)
-    app.include_router(modeling.router)
+    app.include_router(ontology.directory_router)
+    app.include_router(sessions.router)
     app.include_router(metrics.router)
     app.include_router(proposals.router)
-    app.include_router(proposals.metrics_router)
+    app.include_router(proposals.element_router)
     app.include_router(materials.router)
     app.include_router(imports.router)
     app.include_router(exports.router)
     app.include_router(agent_conversation.router)
     app.include_router(connections.router)
     app.include_router(instances.router)
-    app.include_router(settings_api.router)
     app.include_router(mcp.router)
     app.include_router(ontology_gateway.router)
     app.include_router(ontology_gateway.history_router)
-    from ontofoundry_api.api import proposal_submit
-    app.include_router(proposal_submit.router)
     if app_settings.web_dist:
         from ontofoundry_api.web import FrontendFiles
 

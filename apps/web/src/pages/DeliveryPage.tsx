@@ -73,7 +73,7 @@ export function DeliveryPage() {
   useEffect(() => {
     loadVersions().catch((e: Error) => setError(e.message));
   }, [loadVersions, setError]);
-  const serviceRoot = window.location.origin + "/api/v1/ontology/workspaces/" + workspace.id;
+  const serviceRoot = window.location.origin + "/api/v1/workspaces/" + workspace.id;
   const session = model.session;
   const picker = (
     <SessionPicker session={session} sessionId={model.sessionId} sessions={model.sessions} onSelect={model.select} />

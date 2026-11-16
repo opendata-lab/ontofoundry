@@ -201,8 +201,8 @@ def test_health_reports_missing_agent_without_using_topic_filter(client, monkeyp
 def test_empty_dataagent_base_url_does_not_block_app_or_ontology(client):
     assert client.app.state.settings.dataagent_base_url == ""
 
-    response = client.get(f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/ontology")
+    response = client.get(f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/version")
 
     assert response.status_code == 200
     assert response.json()["workspace_id"] == str(DEMO_WORKSPACE_ID)
-    assert response.json()["object_types"]
+    assert response.json()["version_id"]

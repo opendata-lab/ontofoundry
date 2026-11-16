@@ -173,7 +173,7 @@ def test_configured_platform_admin_without_membership_sees_and_manages_private_s
     assert me["is_platform_admin"] and me["local_account"]
     root = f"/api/v1/workspaces/{wid}"
     assert any(s["id"] == wid for s in login_client.get("/api/v1/workspaces").json()["items"])
-    assert any(s["id"] == wid for s in login_client.get("/api/v1/ontology/workspaces").json()["items"])
+    assert any(s["id"] == wid for s in login_client.get("/api/v1/mcp/workspaces").json()["items"])
     assert login_client.get("/api/v1/me/workspaces").json()["items"] == []
     assert login_client.get(root).json()["role"] == "admin"
     assert all(m["user_id"] != me["id"] for m in login_client.get(root + "/members").json()["items"])
@@ -182,7 +182,7 @@ def test_configured_platform_admin_without_membership_sees_and_manages_private_s
     assert created.status_code == 201
     session = created.json()
     session_root = root + f"/sessions/{session['id']}"
-    preview = login_client.post(session_root + "/preview", json={"expected_session_revision": session["revision"]})
+    preview = login_client.post(session_root + "/publish-preview", json={"expected_session_revision": session["revision"]})
     assert preview.status_code == 200, preview.text
     report = preview.json()
     published = login_client.post(session_root + "/publish", json={
@@ -201,7 +201,7 @@ def test_actual_session_directory_visibility_and_revocation(login_client, oauth_
     login_client.patch(root, json={"is_public": True})
     login_client.post("/api/v1/auth/logout")
     complete_oauth(login_client, start_oauth(login_client))
-    for directory in ("/api/v1/workspaces", "/api/v1/ontology/workspaces"):
+    for directory in ("/api/v1/workspaces", "/api/v1/mcp/workspaces"):
         item = next(s for s in login_client.get(directory).json()["items"] if s["id"] == wid)
         assert item["role"] is None and item["visibility"] == "public" and item["is_public"]
     assert login_client.get(root + "/sessions").status_code == 200
@@ -211,7 +211,7 @@ def test_actual_session_directory_visibility_and_revocation(login_client, oauth_
     with login_client.app.state.session_factory() as db:
         db.get(WorkspaceRecord, wid).is_public = False
         db.commit()
-    for directory in ("/api/v1/workspaces", "/api/v1/ontology/workspaces"):
+    for directory in ("/api/v1/workspaces", "/api/v1/mcp/workspaces"):
         assert login_client.get(directory).json()["items"] == []
     response = login_client.get(root)
     assert response.status_code == 404 and response.json()["error"]["code"] == "WORKSPACE_NOT_FOUND"

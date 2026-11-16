@@ -10,7 +10,7 @@ from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.db_models import UserRecord, WorkspaceMemberRecord, WorkspaceRecord
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
-GATEWAY = "/api/v1/ontology/mcp"
+GATEWAY = "/api/v1/mcp"
 TOKENS = "/api/v1/auth/tokens"
 WID = str(DEMO_WORKSPACE_ID)
 VERSIONS = "io.github.opendata-lab.ontofoundry/versions"

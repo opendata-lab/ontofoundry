@@ -4,7 +4,7 @@ import { mockMappingsApi, WORKSPACE_ID } from "./fixtures";
 
 test("export selected history version, report hash and unavailable Ossie", async ({ page }) => {
   await mockMappingsApi(page);
-  await page.route("**/api/v1/modeling/workspaces/*/exports/**", async (route) => {
+  await page.route("**/api/v1/workspaces/*/exports/**", async (route) => {
     const url = new URL(route.request().url());
     const unavailable = url.pathname.endsWith("ossie-0.2");
     await route.fulfill({ json: {

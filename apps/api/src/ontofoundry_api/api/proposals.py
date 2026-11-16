@@ -11,22 +11,25 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import get_modeling_session, session_draft
 from ontofoundry_api.contracts.proposal_reviews import ProposalBatchSummary
+from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
+from ontofoundry_api.contracts.read_models import AffectedItem, ElementSaveImpact
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
     MaterialRecord,
     ModelingSessionRecord,
     ProposalBatchRecord,
-    ProposalDecisionItemRecord,
     ProposalItemRecord,
 )
 from ontofoundry_api.domain.core import MaterialObject, Strict
 from ontofoundry_api.domain.models import PROPOSAL_COLLECTIONS
 from ontofoundry_api.services import instance_store
-from ontofoundry_api.services.access import require_edit, require_read
+from ontofoundry_api.services import sessions as session_service
+from ontofoundry_api.services.access import can_edit_workspace, require_edit, require_read
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
+from ontofoundry_api.services.element_save import preview_element_save
 from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.proposal_submit import submit_result
 from ontofoundry_api.services.proposals import (
     batch_items as _batch_items,
 )
@@ -35,12 +38,14 @@ from ontofoundry_api.services.proposals import (
     dependency_map,
     effective_statuses,
 )
+from ontofoundry_api.services.run_credentials import verify
 from ontofoundry_api.services.session_gate import batch_read_only
+from ontofoundry_api.services.sessions import get_modeling_session, session_draft
 
 router = APIRouter(
     prefix="/api/v1/workspaces/{workspace_id}/sessions/{session_id}", tags=["proposals"]
 )
-metrics_router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["proposals"])
+element_router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["proposals"])
 
 
 def _fail(status: int, code: str, message: str, **details: Any) -> ServiceError:
@@ -297,53 +302,6 @@ def decide(
     )
 
 
-@metrics_router.get("/proposal-metrics")
-def proposal_metrics(
-    workspace_id: str,
-    db: Session = Depends(get_db),
-    user: Principal = Depends(current_principal),
-):
-    """What T8 watches before legacy code can go: legacy runs still active,
-    batch outcomes, how often proposals go stale, and what users decide."""
-    require_read(db, str(workspace_id), user)
-
-    sessions = db.scalars(
-        select(ModelingSessionRecord).where(
-            ModelingSessionRecord.workspace_id == workspace_id
-        )
-    ).all()
-    batches = db.scalars(
-        select(ProposalBatchRecord).where(ProposalBatchRecord.workspace_id == workspace_id)
-    ).all()
-    by_status: dict[str, int] = {}
-    for batch in batches:
-        by_status[batch.status] = by_status.get(batch.status, 0) + 1
-    effective: dict[str, int] = dict.fromkeys(
-        ("pending", "accepted", "rejected"), 0
-    )
-    for session in sessions:
-        ids = [b.id for b in batches if b.session_id == session.id]
-        items = _batch_items(db, ids, workspace_id, session.id)
-        for status, _ in effective_statuses(items).values():
-            effective[status] += 1
-    decisions: dict[str, int] = {"accept": 0, "reject": 0, "restore": 0}
-    for row in db.scalars(
-        select(ProposalDecisionItemRecord).where(
-            ProposalDecisionItemRecord.workspace_id == workspace_id
-        )
-    ):
-        decisions[row.decision] = decisions.get(row.decision, 0) + 1
-    total_batches = len(batches)
-    return {
-        "batches": {"total": total_batches, **by_status},
-        "batch_failure_rate": round(by_status.get("failed", 0) / total_batches, 4)
-        if total_batches
-        else 0.0,
-        "items": effective,
-        "decisions": decisions,
-    }
-
-
 class FactProposalRevision(Strict):
     expected_session_revision: int
     target_id: str
@@ -352,7 +310,7 @@ class FactProposalRevision(Strict):
     reason: str | None = None
 
 
-@router.post("/proposal-items/{proposal_id}/revision")
+@router.post("/proposals/{proposal_id}/fact-revision")
 def revise_fact_proposal(
     workspace_id: str,
     session_id: str,
@@ -428,4 +386,85 @@ def revise_dataset_source(
         body.dataset,
         body.expected_session_revision,
         request.app.state.settings,
+    )
+
+
+class ElementSave(Strict):
+    target_kind: Literal[
+        "object_type", "link_type", "metric", "dataset", "mapping", "value_type"
+    ]
+    target_id: str
+    expected_current_version_id: str | None
+    session_id: str | None = None
+    expected_session_revision: int | None = None
+    draft: dict
+    affected_items: list[AffectedItem] = Field(default_factory=list)
+    expected_instance_change_sequence: int | None = None
+
+
+@element_router.post("/element-saves/preview", response_model=ElementSaveImpact)
+def preview_element(
+    workspace_id: str,
+    body: ElementSave,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_read(db, str(workspace_id), user)
+    return preview_element_save(db, workspace_id, body)
+
+
+@element_router.post("/element-saves")
+def save_element(
+    workspace_id: str,
+    body: ElementSave,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_edit(db, str(workspace_id), user)
+    return session_service.save_element(
+        workspace_id=workspace_id,
+        body=body,
+        settings=request.app.state.settings,
+        db=db,
+        user=user,
+    )
+
+
+MAX_RESULT_BYTES = 8 * 1024 * 1024
+
+
+def _invalid():
+    return ServiceError(
+        "错误 [RUN_CREDENTIAL_INVALID]：需要本轮运行凭据。未提交。同参重试无效，请重新发起建模。",
+        code="RUN_CREDENTIAL_INVALID",
+        status_code=401,
+    )
+
+
+@router.post("/proposals", response_model=ProposalSubmitResponse)
+async def submit_proposals(
+    workspace_id: str,
+    session_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    # Not mcp_principal: that one ends with the run, but a submitter whose
+    # response was lost must still be able to fetch its receipt.
+    token = request.headers.get("authorization", "").partition(" ")[2]
+    grant = verify(request.app.state.settings.session_secret, token)
+    if grant is None or grant.session_id != session_id or grant.workspace_id != workspace_id:
+        raise _invalid()
+    session = db.get(ModelingSessionRecord, grant.session_id)
+    if (
+        session is None
+        or session.workspace_id != workspace_id
+        or not can_edit_workspace(db, workspace_id, grant.user_id)
+    ):
+        raise _invalid()
+    raw = await request.body()
+    if len(raw) > MAX_RESULT_BYTES:
+        raise ServiceError("建模结果超过 8 MB", code="RESULT_TOO_LARGE", status_code=413)
+    return submit_result(
+        db, request.app.state.settings, workspace_id, session_id, grant.run_token, raw
     )

@@ -5,20 +5,20 @@ from __future__ import annotations
 from sqlalchemy import update
 from test_modeling import ROOT, create_session, save
 
-from ontofoundry_api.api import modeling
 from ontofoundry_api.db_models import ProposalItemRecord
+from ontofoundry_api.services import sessions
 from ontofoundry_api.services.read_cache import ReadCache, session_reads
 
 
 def _count(monkeypatch, name: str) -> list[int]:
     calls = [0]
-    original = getattr(modeling, name)
+    original = getattr(sessions, name)
 
     def counted(*args, **kwargs):
         calls[0] += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(modeling, name, counted)
+    monkeypatch.setattr(sessions, name, counted)
     return calls
 
 

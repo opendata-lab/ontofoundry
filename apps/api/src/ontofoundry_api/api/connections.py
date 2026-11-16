@@ -10,7 +10,7 @@ from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.domain.models import DataMapping
-from ontofoundry_api.services.access import require_edit, require_manage, require_read
+from ontofoundry_api.services.access import require_manage, require_read
 from ontofoundry_api.services.connections import delete_connection
 from ontofoundry_api.services.readonly import connect_readonly
 
@@ -209,24 +209,8 @@ def tables(
         return {"items": [{"name": n, "schema": schema_name, "columns": []} for n in names]}
 
 
-class TableMaterialRequest(BaseModel):
-    schema_name: str | None = Field(default=None, max_length=120)
-    tables: list[str] = Field(min_length=1, max_length=20)
 
 
-@router.post("/connections/{connection_id}/table-material", status_code=201)
-def table_material(
-    workspace_id: str,
-    connection_id: str,
-    body: TableMaterialRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Principal = Depends(current_principal),
-):
-    require_edit(db, str(workspace_id), user)
-    get_connection(db, workspace_id, connection_id)
-    from ontofoundry_api.services.errors import DatasetSourceError
-    raise DatasetSourceError("请在本体目录创建数据集，并在构建页直接关联到会话；不再生成重复表结构材料", code="DATASET_ASSOCIATION_REQUIRED")
 
 
 class PreviewRequest(BaseModel):
@@ -241,9 +225,9 @@ class PreviewRequest(BaseModel):
 
 
 def query_mapping(db, workspace_id, body, settings, draft=None):
-    from ontofoundry_api.api.modeling import get_modeling_session, version_snapshot
     from ontofoundry_api.domain.models import OntologyDraft
     from ontofoundry_api.services.instance_plan import query_instances
+    from ontofoundry_api.services.sessions import get_modeling_session, version_snapshot
     from ontofoundry_api.services.workspaces import get_workspace
 
     if draft is None:

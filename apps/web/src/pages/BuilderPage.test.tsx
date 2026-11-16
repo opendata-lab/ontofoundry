@@ -41,7 +41,6 @@ vi.mock("../api/client", () => ({
   catalogApi: {
     connections: vi.fn().mockResolvedValue({ items: [] }),
     tables: vi.fn().mockResolvedValue({ items: [] }),
-    tableMaterial: vi.fn(),
   },
   datasetApi: {
     registeredTables: vi.fn().mockResolvedValue({ items: [] }),

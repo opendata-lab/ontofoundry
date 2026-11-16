@@ -115,6 +115,11 @@ def test_permission_mode_reaches_dataagent(client, fake_agent, settings, expecte
     manifest = send(client, session["id"], settings=settings)
     assert fake_agent_deliveries[0][-1]["permission_mode"] == expected
     pack = work_pack(uploads, manifest)
+    access = json.loads(uploads[pack["platform_check_file"]])
+    base = (client.app.state.settings.public_base_url or str(client.base_url)).rstrip("/")
+    workspace_url = f"{base}/api/v1/workspaces/{session['workspace_id']}"
+    assert access["url"] == workspace_url + "/mcp"
+    assert access["submit_url"] == workspace_url + f"/sessions/{session['id']}/proposals"
     assert "needs_input_file" not in pack and "prior_plan_file" not in pack
     assert "待确认" not in prompts[-1]
     assert "工作流：modeling/" in prompts[-1]

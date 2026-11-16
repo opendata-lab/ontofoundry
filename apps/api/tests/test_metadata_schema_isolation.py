@@ -174,7 +174,7 @@ def test_omitted_schema_never_falls_back_to_legacy_config(client, server):
     response = client.post(base + "/assets/sync-jobs", json={"scope": "all"})
     assert response.status_code == 422 and response.json()["error"]["code"] == "SCHEMA_REQUIRED"
     response = client.post(base + "/assets/refresh", json={"scope": "all"})
-    assert response.status_code == 422 and response.json()["error"]["code"] == "SCHEMA_REQUIRED"
+    assert response.status_code == 404
     response = client.delete(base + "/assets/tables", params={"table_name": "fiction_shared"})
     assert response.status_code == 422 and response.json()["error"]["code"] == "SCHEMA_REQUIRED"
     assert not server.opened
@@ -232,8 +232,7 @@ def test_new_server_connection_through_sync_details_dataset_edit_and_builder_lin
         used = [t for t in catalog.json()["items"] if t["connection_id"] == server.id and t["datasets"]]
         assert [(t["schema_name"], t["table_name"]) for t in used] == [(schema, "fiction_shared")]
     legacy = client.post(base + "/table-material", json={"tables": ["fiction_shared"]})
-    assert legacy.status_code == 422
-    assert legacy.json()["error"]["code"] == "DATASET_ASSOCIATION_REQUIRED"
+    assert legacy.status_code == 404
 
 
 def test_postgresql_connection_requires_database_even_when_mysql_does_not(client, server):

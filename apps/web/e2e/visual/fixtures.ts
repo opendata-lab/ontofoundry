@@ -267,11 +267,11 @@ const FIXTURE_VERSIONS: VersionSummary[] = [3, 2, 1].map((version) => ({
 
 export async function mockMappingsApi(page: Page) {
   const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
+  const syncJob = { id: "visual-sync", connection_id: "conn-visual-retail", schema_name: "public", scope: "all", state: "succeeded", total: 3, processed: 3, available: 3, failed: 0, duration_ms: 240, error: null, batches: [{ id: "visual-batch", ordinal: 0, state: "succeeded", attempt: 1, duration_ms: 240, error: null, tables: ["parties", "daily_sales", "fiction_stores"], results: [{ table_name: "parties", state: "succeeded" }, { table_name: "daily_sales", state: "succeeded" }, { table_name: "fiction_stores", state: "succeeded" }] }] };
   const responses: Record<string, unknown> = {
     "/api/v1/auth/me": { id: "user-visual-demo", username: "linxiao", display_name: "林晓", email: null, is_platform_admin: false, local_account: true },
     "/api/v1/workspaces": { items: FIXTURE_WORKSPACES },
     [base]: FIXTURE_WORKSPACE,
-    [`${base}/published-snapshot`]: FIXTURE_DRAFT,
     [`${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`]: { version: FIXTURE_VERSIONS[0], model: FIXTURE_DRAFT },
     [`${base}/connections`]: { items: FIXTURE_CONNECTIONS },
     [`${base}/members`]: { items: FIXTURE_MEMBERS },
@@ -279,7 +279,8 @@ export async function mockMappingsApi(page: Page) {
     [`${base}/versions`]: { items: FIXTURE_VERSIONS },
     [`${base}/connections/conn-visual-retail/schemas`]: { items: ["public", "fiction_archive"] },
     [`${base}/connections/conn-visual-retail/tables`]: { items: [{ name: "parties" }, { name: "daily_sales" }, { name: "fiction_stores" }] },
-    [`${base}/connections/conn-visual-retail/assets/sync-jobs`]: { id: "visual-sync", connection_id: "conn-visual-retail", schema_name: "public", scope: "all", state: "succeeded", total: 3, processed: 3, available: 3, failed: 0, duration_ms: 240, error: null, batches: [{ id: "visual-batch", ordinal: 0, state: "succeeded", attempt: 1, duration_ms: 240, error: null, tables: ["parties", "daily_sales", "fiction_stores"], results: [{ table_name: "parties", state: "succeeded" }, { table_name: "daily_sales", state: "succeeded" }, { table_name: "fiction_stores", state: "succeeded" }] }] },
+    [`${base}/connections/conn-visual-retail/assets/sync-jobs`]: syncJob,
+    [`${base}/connections/conn-visual-retail/assets/sync-jobs/visual-sync`]: syncJob,
     [`${base}/connections/conn-visual-retail/assets`]: {
       connection_id: "conn-visual-retail",
       version_id: null,
@@ -301,9 +302,7 @@ export async function mockMappingsApi(page: Page) {
     (url) => url.pathname.startsWith("/api/"),
     async (route) => {
       const { pathname, searchParams } = new URL(route.request().url());
-      if (pathname.endsWith("/assets/sync-jobs") && route.request().method() === "GET") {
-        await route.fulfill({ json: { items: [] } });
-      } else if (pathname.endsWith("/assets/synced")) {
+      if (pathname.endsWith("/assets/synced")) {
         // Only the synced schema is registered; fiction_archive exists on the server but was never synced.
         await route.fulfill({ json: { items: [{ schema: "public", assets: responses[pathname.replace(/\/synced$/, "")] }] } });
       } else if (pathname.endsWith("/assets") && searchParams.get("schema_name") === "fiction_archive") {
@@ -519,7 +518,7 @@ export async function mockReviewApi(page: Page, options: { conflicts?: boolean }
   const responses: Record<string, unknown> = {
     [`${base}/sessions`]: { items: [{ ...REVIEW_SESSION, has_unpublished_changes: true }] },
     [sessionPath]: REVIEW_SESSION,
-    [`${sessionPath}/preview`]: REVIEW_PREVIEW,
+    [`${sessionPath}/publish-preview`]: REVIEW_PREVIEW,
     [`${sessionPath}/proposal-batches`]: { items: [REVIEW_BATCH], next_cursor: null },
     [`${sessionPath}/proposal-batches/${REVIEW_BATCH.id}`]: REVIEW_BATCH,
     [`${sessionPath}/agent-conversation`]: { messages: [], run: null },
@@ -531,7 +530,7 @@ export async function mockReviewApi(page: Page, options: { conflicts?: boolean }
     (url) => url.pathname.startsWith("/api/"),
     async (route) => {
       const { pathname, searchParams } = new URL(route.request().url());
-      if (pathname === `${sessionPath}/preview` && options.conflicts) {
+      if (pathname === `${sessionPath}/publish-preview` && options.conflicts) {
         await route.fulfill({
           status: 409,
           json: { error: { code: "MERGE_CONFLICTS", message: "合并存在冲突", conflicts: REVIEW_CONFLICTS, current_version_id: "ver-visual-demo-3" } },
@@ -591,9 +590,7 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
       const { pathname } = new URL(route.request().url());
       if (pathname === `${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`) {
         await route.fulfill({ json: { version: FIXTURE_VERSIONS[0], model: ELEMENT_DRAFT } });
-      } else if (pathname === `${base}/published-snapshot`) {
-        await route.fulfill({ json: ELEMENT_DRAFT });
-      } else if (pathname === `/api/v1/modeling/workspaces/${WORKSPACE_ID}/metrics/preview`) {
+      } else if (pathname === `/api/v1/workspaces/${WORKSPACE_ID}/metrics/preview`) {
         await route.fulfill({ json: preview });
       } else if (pathname === `${base}/element-saves/preview`) {
         const impact: import("../../src/api/types").ElementSaveImpact = {
@@ -659,7 +656,6 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
   };
   const responses: Record<string, unknown> = {
     [`${base}/overview`]: overview,
-    [`${base}/published-snapshot`]: ELEMENT_DRAFT,
     [`${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`]: { version: FIXTURE_VERSIONS[0], model: ELEMENT_DRAFT },
     [`${base}/materials`]: { items: [{ id: "material-visual-guide", name: "星河采购业务说明.md", byte_size: 1280, chunk_count: 6, sha256: "b".repeat(64) }] },
   };
@@ -687,7 +683,7 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
 
 
 async function mockFocusedReads(page: Page, draft: Draft) {
-  await page.route(url => url.pathname.includes("/ontology/workspaces/") && (/\/catalog$/.test(url.pathname) || /\/(presentation|document-context)$/.test(url.pathname)), async route => {
+  await page.route(url => url.pathname.includes(`/api/v1/workspaces/${WORKSPACE_ID}`) && (/\/catalog$/.test(url.pathname) || /\/types\/[^/]+\/(presentation|document-context)$/.test(url.pathname)), async route => {
     const url = new URL(route.request().url());
     const version_id = url.searchParams.get("version_id") ?? FIXTURE_WORKSPACE.version_id;
     const envelope = { workspace_id: WORKSPACE_ID, version_id };

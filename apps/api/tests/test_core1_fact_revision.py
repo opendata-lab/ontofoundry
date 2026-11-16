@@ -15,7 +15,7 @@ def test_fact_revision_only_revises_pending_proposal(client):
     proposal = create_instance(session, target["element"]["values"]["label"])
     batch = seed_batch(client, session, [proposal])
     item = batch["items"][0]
-    endpoint = ROOT + f"/sessions/{session['id']}/proposal-items/{item['id']}/revision"
+    endpoint = ROOT + f"/sessions/{session['id']}/proposals/{item['id']}/fact-revision"
     body = {
         "expected_session_revision": session["revision"],
         "target_id": target["target_id"],
@@ -87,7 +87,7 @@ def test_revision_rejects_invalid_evidence_before_any_change(client, invalid):
     after["evidence"].append(extra)
     response = client.post(
         ROOT
-        + f"/sessions/{session['id']}/proposal-items/{batch['items'][0]['id']}/revision",
+        + f"/sessions/{session['id']}/proposals/{batch['items'][0]['id']}/fact-revision",
         json={
             "expected_session_revision": session["revision"],
             "target_id": target["target_id"],
@@ -157,7 +157,7 @@ def test_fact_revision_preserves_upstream_dependencies_and_rewrites_endpoints(cl
     )
     response = client.post(
         ROOT
-        + f"/sessions/{session['id']}/proposal-items/{batch['items'][0]['id']}/revision",
+        + f"/sessions/{session['id']}/proposals/{batch['items'][0]['id']}/fact-revision",
         json={
             "expected_session_revision": session["revision"],
             "target_id": target["target_id"],

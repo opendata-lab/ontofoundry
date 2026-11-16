@@ -1,8 +1,9 @@
+
 from copy import deepcopy
 
 import pytest
 from dataset_binding import bind_datasets
-from test_modeling import ONTOLOGY, ROOT, create_session, save
+from test_modeling import ONTOLOGY, ROOT, create_session, published_snapshot, save
 
 
 def submit(
@@ -25,12 +26,12 @@ def submit(
 
 def test_save_immediately_creates_version_and_preserves_history(client):
     old = client.get(ONTOLOGY + "/version").json()
-    draft = client.get(ROOT + "/published-snapshot").json()
+    draft = published_snapshot(client, ROOT)
     draft["object_types"][0]["description"] = "当前弹窗修改"
     response = submit(client, draft)
     assert response.status_code == 200, response.text
     assert response.json()["version"]["version"] == 2
-    assert client.get(ROOT + "/published-snapshot").json() == response.json()["draft"]
+    assert published_snapshot(client, ROOT) == response.json()["draft"]
     historical = client.get(ROOT + f"/versions/{old['version_id']}/presentation").json()[
         "model"
     ]
@@ -45,7 +46,7 @@ def test_only_selected_aggregate_is_committed_from_session(client):
     edited["object_types"][0]["description"] = "保存当前元素"
     response = submit(client, edited, session=session)
     assert response.status_code == 200, response.text
-    current = client.get(ROOT + "/published-snapshot").json()
+    current = published_snapshot(client, ROOT)
     assert current["object_types"][0]["description"] == "保存当前元素"
     assert current["object_types"][1]["description"] != "其他未处理的草稿"
     updated = client.get(ROOT + f"/sessions/{session['id']}").json()
@@ -55,7 +56,7 @@ def test_only_selected_aggregate_is_committed_from_session(client):
 
 def test_stale_version_refuses_overwrite(client):
     version = client.get(ONTOLOGY + "/version").json()["version_id"]
-    draft = client.get(ROOT + "/published-snapshot").json()
+    draft = published_snapshot(client, ROOT)
     draft["object_types"][0]["description"] = "第一次"
     assert submit(client, draft).status_code == 200
     draft["object_types"][0]["description"] = "旧窗口"
@@ -63,7 +64,7 @@ def test_stale_version_refuses_overwrite(client):
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "VERSION_CHANGED"
     assert (
-        client.get(ROOT + "/published-snapshot").json()["object_types"][0]["description"]
+        published_snapshot(client, ROOT)["object_types"][0]["description"]
         == "第一次"
     )
 
@@ -85,7 +86,7 @@ def test_stale_session_and_validation_failure_are_atomic(client):
 
 
 def test_out_of_scope_changes_are_rejected(client):
-    draft = client.get(ROOT + "/published-snapshot").json()
+    draft = published_snapshot(client, ROOT)
     draft["object_types"][1]["description"] = "额外修改"
     response = submit(client, draft)
     assert response.status_code == 422
@@ -93,7 +94,7 @@ def test_out_of_scope_changes_are_rejected(client):
 
 
 def test_relation_description_preserves_readings_and_other_metadata(client):
-    draft = client.get(ROOT + "/published-snapshot").json()
+    draft = published_snapshot(client, ROOT)
     original = deepcopy(draft)
     relation = draft["link_types"][0]
     relation["description"] = "统一描述"
@@ -108,7 +109,7 @@ def test_selected_session_conflict_does_not_commit(client):
     session = create_session(client)
     session["draft"]["object_types"][0]["description"] = "旧草稿修改"
     session = save(client, session, session["draft"]).json()
-    latest = client.get(ROOT + "/published-snapshot").json()
+    latest = published_snapshot(client, ROOT)
     latest["object_types"][0]["description"] = "另一个窗口保存"
     assert submit(client, latest).status_code == 200
     response = submit(client, session["draft"], session=session)
@@ -121,7 +122,7 @@ def test_selected_session_conflict_does_not_commit(client):
 
 
 def test_cannot_take_another_types_property_by_changing_owner(client):
-    draft = client.get(ROOT + "/published-snapshot").json()
+    draft = published_snapshot(client, ROOT)
     selected = draft["object_types"][0]["id"]
     other = next(p for p in draft["properties"] if p["owner_type_id"] != selected)
     other["owner_type_id"] = selected
@@ -135,7 +136,7 @@ def test_saved_session_displays_latest_merged_values_of_selected_element(client)
     session = create_session(client)
     session["draft"]["object_types"][0]["description"] = "会话中的描述"
     session = save(client, session, session["draft"]).json()
-    current = client.get(ROOT + "/published-snapshot").json()
+    current = published_snapshot(client, ROOT)
     current["object_types"][0]["display_name"] = "新的供应商名称"
     assert submit(client, current).status_code == 200
     response = submit(client, session["draft"], session=session)
@@ -291,7 +292,7 @@ def test_object_description_cannot_smuggle_dependent_relation_edit(client):
         response = client.post(ROOT + "/element-saves" + suffix, json=body)
         assert response.status_code == 422, response.text
         assert response.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"
-    assert client.get(ROOT + "/published-snapshot").json() == session["draft"]
+    assert published_snapshot(client, ROOT) == session["draft"]
     assert (
         client.get(ROOT + f"/sessions/{session['id']}").json()["revision"]
         == session["revision"]
@@ -453,12 +454,12 @@ def test_existing_members_cannot_cross_aggregate_boundaries(
         session = response.json()
     body = save_body(client, session, candidate, target_id=target["id"])
     before_session = client.get(ROOT + f"/sessions/{session['id']}").json()
-    before_published = client.get(ROOT + "/published-snapshot").json()
+    before_published = published_snapshot(client, ROOT)
     for suffix in ("/preview", ""):
         response = client.post(ROOT + "/element-saves" + suffix, json=body)
         assert response.status_code == 422, response.text
         assert response.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"
-    assert client.get(ROOT + "/published-snapshot").json() == before_published
+    assert published_snapshot(client, ROOT) == before_published
     assert client.get(ROOT + f"/sessions/{session['id']}").json() == before_session
 
 
@@ -804,7 +805,7 @@ def test_example06_old_session_imports_effective_inheritance_and_bindings(
     candidate["object_types"][0]["description"] = "仅修改当前对象说明"
     body = save_body(client, old, candidate, target_id=target["id"])
     confirmations = preflight_confirmations(client, body)
-    current = client.get(ROOT + "/published-snapshot").json()
+    current = published_snapshot(client, ROOT)
     calculation = calculate_element_save(
         base, current, old["draft"], candidate, "object_type", target["id"]
     )

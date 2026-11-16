@@ -109,7 +109,7 @@ it("shows only history and service access to readers", async () => {
   expect(modelingApi.sessions).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole("tab", { name: "服务接入" }));
-  expect(await screen.findByText(`${window.location.origin}/api/v1/ontology/workspaces/w1/mcp`)).toBeInTheDocument();
+  expect(await screen.findByText(`${window.location.origin}/api/v1/workspaces/w1/mcp`)).toBeInTheDocument();
   for (const tool of ["search_ontology", "get_ontology", "search_objects", "get_object"])
     expect(screen.getByText(tool)).toBeInTheDocument();
 });

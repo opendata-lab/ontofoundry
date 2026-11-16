@@ -13,7 +13,6 @@ from pydantic import ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from ontofoundry_api.api.modeling import session_response
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
     ProposalDecisionItemRecord,
@@ -36,6 +35,7 @@ from ontofoundry_api.services.proposals import (
     dependent_group,
     effective_statuses,
 )
+from ontofoundry_api.services.sessions import session_response
 
 
 def _fail(status, code, message, **details):

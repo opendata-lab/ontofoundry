@@ -9,10 +9,10 @@
 
 ## 准备
 
-- **地址**：`https://<平台域名>/api/v1/ontology/mcp`（外部智能体网关）。
+- **地址**：`https://<平台域名>/api/v1/mcp`（外部智能体网关）。
 - **令牌**：登录平台，页头用户名 →“个人中心”→“个人令牌”签发，只显示一次。
 
-> 网关和个人令牌随实施计划步骤二上线。上线前只在隔离环境试点：地址填单空间入口 `/api/v1/ontology/workspaces/<空间 ID>/mcp`，令牌用部署时设置的 `ONTOFOUNDRY_MCP_TOKEN`。
+> 网关和个人令牌随实施计划步骤二上线。上线前只在隔离环境试点：地址填单空间入口 `/api/v1/workspaces/<空间 ID>/mcp`，令牌用部署时设置的 `ONTOFOUNDRY_MCP_TOKEN`。
 
 ## Claude Code
 
@@ -39,7 +39,7 @@ opencode 不读取插件包，分别配置 Skill 和 MCP：
     "servers": {
       "ontofoundry": {
         "type": "remote",
-        "url": "https://<平台域名>/api/v1/ontology/mcp",
+        "url": "https://<平台域名>/api/v1/mcp",
         "oauth": false,
         "headers": { "Authorization": "Bearer {env:ONTOFOUNDRY_TOKEN}" }
       }
@@ -59,10 +59,14 @@ Codex 不读取插件包，分别配置 Skill 和 MCP：
 
 ```toml
 [mcp_servers.ontofoundry]
-url = "https://<平台域名>/api/v1/ontology/mcp"
+url = "https://<平台域名>/api/v1/mcp"
 bearer_token_env_var = "ONTOFOUNDRY_TOKEN"
 ```
 
 ## 更新
 
 修改插件内容后同步提高 `.claude-plugin/plugin.json` 的 `version`，客户端据此提示更新。
+
+## 2026-11-16 接口地址升级
+
+MCP 地址改为 `/api/v1/mcp`，单空间入口改为 `/api/v1/workspaces/{workspace_id}/mcp`，空间目录改为 `/api/v1/mcp/workspaces`。旧地址已删除。升级前结束所有进行中的建模运行，升级后重新发起运行以取得新的提交地址与运行凭据。外部客户端需更新完整 MCP 地址。

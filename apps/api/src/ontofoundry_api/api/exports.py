@@ -17,7 +17,7 @@ from ontofoundry_api.services.access import (
 from ontofoundry_api.services.exports import download_export, export_snapshot
 
 router = APIRouter(
-    prefix="/api/v1/modeling/workspaces/{workspace_id}/exports/{adapter_id}",
+    prefix="/api/v1/workspaces/{workspace_id}/exports/{adapter_id}",
     tags=["exports"],
 )
 

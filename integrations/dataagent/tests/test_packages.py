@@ -250,8 +250,8 @@ def _configure_check(tmp_path, origin):
     context = pinned(BASE / "shared/references/examples/create-object_type.json")
     wid = context["run"]["workspace_id"]
     (tmp_path / "platform-check.json").write_text(json.dumps({
-        "url": f"{origin}/api/v1/ontology/workspaces/{wid}/mcp",
-        "submit_url": f"{origin}/api/v1/ontology/workspaces/{wid}/runs/{context['run']['run_token']}/proposals",
+        "url": f"{origin}/api/v1/workspaces/{wid}/mcp",
+        "submit_url": f"{origin}/api/v1/workspaces/{wid}/sessions/fictional-session/proposals",
         "headers": {"Authorization": "Bearer ofrun.fictional"},
     }))
 

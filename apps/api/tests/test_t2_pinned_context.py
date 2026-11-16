@@ -56,7 +56,7 @@ def test_empty_pin_returns_empty_directory_and_deleted_grant_fails(client):
     ).json()["id"]
     s = client.post(f"/api/v1/workspaces/{wid}/sessions", json={}).json()
     credential = start_run(client, s)
-    path = f"/api/v1/ontology/workspaces/{wid}/mcp"
+    path = f"/api/v1/workspaces/{wid}/mcp"
     response = client.post(
         path,
         json={

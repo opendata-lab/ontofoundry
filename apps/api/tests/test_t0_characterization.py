@@ -33,7 +33,7 @@ def test_old_publish_envelope_rejected(client):
     )
     assert (
         client.post(
-            ROOT + f"/sessions/{s['id']}/preview",
+            ROOT + f"/sessions/{s['id']}/publish-preview",
             json={"expected_session_revision": s["revision"] - 1},
         ).status_code
         == 409

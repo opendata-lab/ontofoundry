@@ -10,12 +10,12 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import JSON, DateTime, String, create_engine, inspect, text, update
 
-from ontofoundry_api.api.modeling import revise, session_data
 from ontofoundry_api.database import Base, build_session_factory
 from ontofoundry_api.db_models import ModelingSessionRecord, WorkspaceRecord
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.sessions import revise, session_data
 
 MIGRATION = (
     Path(__file__).parents[1]

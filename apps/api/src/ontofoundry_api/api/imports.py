@@ -24,7 +24,7 @@ from ontofoundry_api.services.imports import (
 )
 
 router = APIRouter(
-    prefix="/api/v1/modeling/workspaces/{workspace_id}/imports/{adapter_id}",
+    prefix="/api/v1/workspaces/{workspace_id}/imports/{adapter_id}",
     tags=["imports"],
 )
 

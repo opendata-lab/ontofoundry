@@ -1,13 +1,13 @@
 {
   "name": "ontofoundry",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ground data questions in published OntoFoundry ontology definitions over MCP; no local tool code.",
   "author": { "name": "opendata-lab" },
   "userConfig": {
     "ontofoundry_mcp_url": {
       "type": "string",
       "title": "OntoFoundry MCP URL",
-      "description": "MCP endpoint, e.g. https://ontofoundry.example.com/api/v1/ontology/mcp"
+      "description": "MCP endpoint, e.g. https://ontofoundry.example.com/api/v1/mcp"
     },
     "ontofoundry_token": {
       "type": "string",

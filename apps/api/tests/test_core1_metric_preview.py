@@ -100,7 +100,7 @@ def test_preview_unsaved_ratio_is_readonly_and_guarded(client, tmp_path, monkeyp
             "components": components,
             "trend_grain": "month",
         }
-        path = f"/api/v1/modeling/workspaces/{s['workspace_id']}/metrics/preview"
+        path = f"/api/v1/workspaces/{s['workspace_id']}/metrics/preview"
         response = client.post(path, json=body)
         assert response.status_code == 200, response.text
         assert response.json()["status"] == "ok", response.text
@@ -215,7 +215,7 @@ def test_snapshot_without_business_time_returns_total_and_warning(
         metric = draft.metrics[0].model_dump(mode="json")
         metric["time_field"] = None
         response = client.post(
-            f"/api/v1/modeling/workspaces/{s['workspace_id']}/metrics/preview",
+            f"/api/v1/workspaces/{s['workspace_id']}/metrics/preview",
             json={
                 "session_id": s["id"],
                 "expected_session_revision": s["revision"],
@@ -285,7 +285,7 @@ def test_same_simple_component_covers_both_ratio_references(client, tmp_path, mo
             "components": [component],
             "trend_grain": "month",
         }
-        path = f"/api/v1/modeling/workspaces/{s['workspace_id']}/metrics/preview"
+        path = f"/api/v1/workspaces/{s['workspace_id']}/metrics/preview"
         response = client.post(path, json=body)
         assert response.status_code == 200, response.text
         assert response.json()["status"] == "ok" and float(response.json()["value"]) == 1

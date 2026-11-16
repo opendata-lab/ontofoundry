@@ -16,7 +16,7 @@ import threading
 
 import pytest
 import sqlalchemy as sa
-from test_modeling import ROOT, create_session, preview, publish, save
+from test_modeling import ROOT, create_session, preview, publish, published_snapshot, save
 
 from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
@@ -90,7 +90,7 @@ def test_concurrent_independent_changes_require_fresh_preview_then_both_land(pg_
     assert numbers == [1, 2, 3]
     assert current == 3
     assert retried.json()["version"]["version"] == 3
-    snapshot = pg_client.get(ROOT + "/published-snapshot").json()
+    snapshot = published_snapshot(pg_client, ROOT)
     assert {"A 并发修改", "B 并发修改"} <= {
         t["description"] for t in snapshot["object_types"]
     }
@@ -112,7 +112,7 @@ def test_concurrent_publishes_of_the_same_field_let_exactly_one_win(pg_client):
     # The loser leaves no orphan version and the pointer is the winner's.
     assert numbers == [1, 2]
     assert current == 2 == winner["version"]["version"]
-    snapshot = pg_client.get(ROOT + "/published-snapshot").json()
+    snapshot = published_snapshot(pg_client, ROOT)
     winner_value = next(
         t["description"]
         for t in winner["session"]["draft"]["object_types"]

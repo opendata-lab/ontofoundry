@@ -35,6 +35,14 @@ def export_root(settings, workspace_id, version_id, adapter):
     return settings.data_dir / workspace_id / "exports" / version_id / adapter
 
 
+def export_download_url(workspace_id, adapter_id, version_id, digest):
+    return (
+        f"/api/v1/workspaces/{workspace_id}/exports/{adapter_id}/artifacts/{digest}?version_id={version_id}"
+        if digest
+        else None
+    )
+
+
 def export_snapshot(db, settings, workspace_id, adapter_id, version_id):
     adapter = adapter_for(adapter_id)
     version = current_version(db, workspace_id, version_id)
@@ -69,6 +77,9 @@ def export_snapshot(db, settings, workspace_id, adapter_id, version_id):
                 artifact_bytes(
                     settings, workspace_id, adapter.id, version.id, preview.content_sha256
                 )
+            preview.download_url = export_download_url(
+                workspace_id, adapter.id, version.id, preview.content_sha256
+            )
             return preview
         except (ValueError, OSError, ServiceError):
             pass
@@ -90,11 +101,7 @@ def export_snapshot(db, settings, workspace_id, adapter_id, version_id):
     digest = (
         hashlib.sha256(result.document).hexdigest() if result.document is not None else None
     )
-    url = (
-        f"/api/v1/modeling/workspaces/{workspace_id}/exports/{adapter.id}/artifacts/{digest}?version_id={version.id}"
-        if digest
-        else None
-    )
+    url = export_download_url(workspace_id, adapter.id, version.id, digest)
     preview = ExportPreview(
         version_id=version.id,
         adapter=adapter.id,

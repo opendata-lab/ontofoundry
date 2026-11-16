@@ -83,7 +83,7 @@ def test_credential_entry_points_are_isolated(client):
     headers = {"Authorization": "Bearer " + item["token"]}
     assert client.get(TOKENS, headers=headers).status_code == 401
     assert client.post(TOKENS, json={"name": "虚构", "permissions": ["ontology:read"]}, headers=headers).status_code == 401
-    assert client.post(f"/api/v1/ontology/workspaces/{WID}/mcp", headers=headers, json={}).status_code == 401
+    assert client.post(f"/api/v1/workspaces/{WID}/mcp", headers=headers, json={}).status_code == 401
     assert client.get(GATEWAY).status_code == 405
 
 

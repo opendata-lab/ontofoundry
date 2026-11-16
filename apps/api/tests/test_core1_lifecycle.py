@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from core1_fixtures import example_draft_json, example_names
 from dataset_binding import bind_datasets
-from test_modeling import create_session
+from test_modeling import create_session, published_snapshot
 from test_t4_proposal_decisions import decide, seed_batch, update
 
 
@@ -38,7 +38,7 @@ def test_all_examples_save_publish_read(client, name):
     assert saved.status_code == 200, saved.text
     session = saved.json()
     preview = client.post(
-        root + f"/sessions/{session['id']}/preview",
+        root + f"/sessions/{session['id']}/publish-preview",
         json={"expected_session_revision": session["revision"]},
     )
     assert preview.status_code == 200, preview.text
@@ -55,7 +55,7 @@ def test_all_examples_save_publish_read(client, name):
     )
     assert response.status_code == 200, response.text
     assert (
-        client.get(root + "/published-snapshot").json()
+        published_snapshot(client, root)
         == response.json()["session"]["draft"]
     )
 

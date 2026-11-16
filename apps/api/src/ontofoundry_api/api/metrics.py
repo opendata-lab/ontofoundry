@@ -12,7 +12,7 @@ from ontofoundry_api.services.access import require_read
 from ontofoundry_api.services.metric_preview import preview_metric
 
 router = APIRouter(
-    prefix="/api/v1/modeling/workspaces/{workspace_id}/metrics", tags=["metrics"]
+    prefix="/api/v1/workspaces/{workspace_id}/metrics", tags=["metrics"]
 )
 
 

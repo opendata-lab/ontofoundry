@@ -171,7 +171,7 @@ REST API 的路由、请求和响应可在运行实例的 `/docs` 中查看。�
 每个空间的 MCP 地址为：
 
 ```text
-POST /api/v1/ontology/workspaces/{workspace_id}/mcp
+POST /api/v1/workspaces/{workspace_id}/mcp
 ```
 
 使用固定令牌访问：平台环境变量 `ONTOFOUNDRY_MCP_TOKEN`（至少 24 个字符，默认 `ontofoundry-mcp-default-token`，正式环境请改为自定义值），调用方填 `Authorization: Bearer <同一个值>`。该令牌只读，可读定义、数据绑定和实例，按所访问空间的管理员身份做成员检查；显式设为空时外部无法访问 MCP。建模运行由平台自动签发临时凭据，不需要配置。当前实现包含 `server/discover`、`tools/list`、`tools/call`，以及旧版客户端的 `initialize` 兼容协商；尚未提供 MCP OAuth 动态发现。
@@ -244,3 +244,7 @@ cp .env.example .env
 OntoFoundry 采用 [Apache License 2.0](LICENSE)。允许商业使用、修改和分发，具体授权与义务以许可证正文为准。
 
 第三方依赖和内置资源保留各自的许可证。Apache Ossie 的 [LICENSE](apps/api/src/ontofoundry_api/adapters/ossie/assets/vendor/apache-ossie/LICENSE) 和 [NOTICE](apps/api/src/ontofoundry_api/adapters/ossie/assets/vendor/apache-ossie/NOTICE) 位于内置资源目录；`ontofoundry-modeling` 的 [LICENSE](integrations/dataagent/skills/ontofoundry-modeling/LICENSE) 和 [NOTICE](integrations/dataagent/skills/ontofoundry-modeling/NOTICE) 位于技能源码目录。
+
+## 2026-11-16 接口地址升级
+
+MCP 地址改为 `/api/v1/mcp`，单空间入口改为 `/api/v1/workspaces/{workspace_id}/mcp`，空间目录改为 `/api/v1/mcp/workspaces`。旧地址已删除。升级前结束所有进行中的建模运行，升级后重新发起运行以取得新的提交地址与运行凭据。外部客户端需更新完整 MCP 地址。

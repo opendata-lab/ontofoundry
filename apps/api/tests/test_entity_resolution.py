@@ -6,7 +6,7 @@ from test_modeling import ROOT, create_session
 
 from ontofoundry_api.services import entity_resolution
 
-ONTOLOGY = ROOT.replace("/api/v1/workspaces/", "/api/v1/ontology/workspaces/")
+ONTOLOGY = ROOT
 
 
 def customer_type(session):

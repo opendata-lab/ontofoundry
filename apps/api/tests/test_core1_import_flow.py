@@ -35,7 +35,7 @@ def space(client):
 
 
 def import_root(wid, adapter="ontofoundry-core-1"):
-    return f"/api/v1/modeling/workspaces/{wid}/imports/{adapter}"
+    return f"/api/v1/workspaces/{wid}/imports/{adapter}"
 
 
 def prepare_sources(client, wid, raw, adapter):
@@ -154,7 +154,7 @@ def accept(client, wid, result):
 def publish(client, wid, current):
     root = f"/api/v1/workspaces/{wid}/sessions/{current['id']}"
     response = client.post(
-        root + "/preview", json={"expected_session_revision": current["revision"]}
+        root + "/publish-preview", json={"expected_session_revision": current["revision"]}
     )
     assert response.status_code == 200, response.text
     p = response.json()
