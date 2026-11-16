@@ -384,7 +384,7 @@ def _resolve(
 # Roots that yield a number, text or other non-boolean value. Columns, CASE,
 # COALESCE and unknown functions may well be boolean, so they are not rejected.
 _NOT_A_CONDITION = (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.IntDiv, exp.Mod, exp.Neg, exp.DPipe)
-_MAYBE_A_CONDITION = (exp.Case, exp.If, exp.Coalesce, exp.Anonymous, exp.Cast, exp.RegexpLike)
+_MAYBE_A_CONDITION = (exp.Case, exp.If, exp.Coalesce, exp.Nullif, exp.Anonymous, exp.Cast, exp.RegexpLike)
 # Checked first: sqlglot models AND/OR (and some predicates) as functions too.
 _CONDITION = (exp.Predicate, exp.Connector, exp.Not, exp.Boolean, exp.In, exp.Between, exp.Is)
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from ontofoundry_api.domain.bindings import resolve_binding
+from ontofoundry_api.domain.bindings import _used_columns, resolve_binding
 from ontofoundry_api.domain.core import CoreDraft, MaterialObject, Multiplicity
 from ontofoundry_api.domain.graph import draft_index
 
@@ -61,9 +61,16 @@ def _touched_types(draft: CoreDraft, changes: list[Change]) -> set[UUID]:
     return found
 
 
-def _unsynced(index, dataset_id) -> str | None:
-    dataset = index.datasets.get(dataset_id)
-    if dataset is not None and not dataset.columns:
+def _unsynced(index, dataset_id, used=()) -> str | None:
+    """The dataset's name when its columns, or the types of the columns used,
+    are unknown: then nothing that reads it can be verified (AC-04, AC-10)."""
+    from ontofoundry_api.domain.validation import physical_value_kind
+
+    dataset = index.datasets.get(UUID(str(dataset_id)))
+    if dataset is None:
+        return None
+    kinds = {c.name: physical_value_kind(c.physical_type) for c in dataset.columns or []}
+    if not kinds or any(kinds.get(column) is None for column in used):
         return dataset.name
     return None
 
@@ -83,18 +90,30 @@ def definition_issues(draft: CoreDraft, changes: list[Change]) -> list[str]:
         for prop in index.effective_properties(type_id):
             if prop.name not in binding.fields:
                 issues.append(f"{_label(obj)}：属性 {_label(prop)}（{prop.name}）未绑定")
-        for source in binding.sources.values():
-            name = _unsynced(index, source.dataset_id)
+        used, _ = _used_columns(draft, binding)
+        datasets = {str(s.dataset_id): used.get(source_id, ()) for source_id, s in binding.sources.items()}
+        for join in binding.link_bindings.values():  # relation tables read through this binding
+            datasets.update({d: () for d in _dataset_ids(join.model_dump(mode="json")) if d not in datasets})
+        for dataset_id, columns in datasets.items():
+            name = _unsynced(index, dataset_id, columns)
             if name:
                 issues.append(f"{_label(obj)}：请先同步数据集 {name} 的表结构，列无法验证")
+    metrics = {str(m.id): m.model_dump(mode="json") for m in draft.metrics}
     for change in changes:
-        if change.kind != "metric" or change.after is None:
+        if change.after is None or change.kind not in ("metric", "link_type"):
             continue
-        for dataset_id in sorted(_dataset_ids(change.after)):
-            name = _unsynced(index, UUID(dataset_id))
+        found = _dataset_ids(change.after)
+        # A ratio names its parts by metric id; their datasets are what it reads.
+        for key in ("numerator_id", "denominator_id"):
+            part = metrics.get(str(change.after.get(key)))
+            if part:
+                found |= _dataset_ids(part)
+        label = change.after.get("display_name") or change.after.get("name")
+        what = "指标" if change.kind == "metric" else "关系"
+        for dataset_id in sorted(found):
+            name = _unsynced(index, dataset_id)
             if name:
-                label = change.after.get("display_name") or change.after.get("name")
-                issues.append(f"指标 {label}：请先同步数据集 {name} 的表结构，列无法验证")
+                issues.append(f"{what} {label}：请先同步数据集 {name} 的表结构，列无法验证")
     return list(dict.fromkeys(issues))
 
 

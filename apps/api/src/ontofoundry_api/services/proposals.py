@@ -206,6 +206,19 @@ def dependency_map(
                         result.setdefault(item.id, []).append(parent.id)
         except (ValueError, KeyError):
             pass
+        # A property of a bound object is accepted with the mapping update that
+        # binds it (AC-04): the mapping already depends on the property, and this
+        # edge makes accepting either one take both.
+        live = [i for i in items if i.status in {"pending", "accepted"} and i.after_json]
+        mappings = [i for i in live if i.target_kind == "mapping"]
+        for prop in (i for i in live if i.target_kind == "property"):
+            for mapping in mappings:
+                if (
+                    str(mapping.after_json.get("type_id")) == str(prop.after_json.get("owner_type_id"))
+                    and prop.after_json.get("name") in (mapping.after_json.get("fields") or {})
+                    and (not prop.atomic_group_id or mapping.atomic_group_id != prop.atomic_group_id)
+                ):
+                    result.setdefault(prop.id, []).append(mapping.id)
     result = {key: sorted(set(value)) for key, value in result.items()}
     return result
 

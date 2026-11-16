@@ -135,9 +135,13 @@ def _instances(model, candidate, items, accepting=False):
     validate_instances(model, [objects[key] for key in ids if key in objects], links)
     if accepting:
         check_accepted_values(model, [objects[key] for key in changed if key in objects])
-        issues = link_count_issues(
-            model, objects, [*candidate.get("material_links", [])], changed - deleted
-        )
+        # Relations whose endpoint this accept deletes go with it.
+        surviving = [
+            link for link in candidate.get("material_links", [])
+            if link["source_id"] in objects and link["target_id"] in objects
+            and not {link["source_id"], link["target_id"]} & deleted
+        ]
+        issues = link_count_issues(model, objects, surviving, changed - deleted)
         if issues:
             raise ValueError("；".join(issues))
 

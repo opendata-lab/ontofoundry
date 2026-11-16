@@ -196,3 +196,88 @@ def test_constraints_must_be_conditions(kind, expression, valid):
     else:
         with pytest.raises(ValueError, match="规则 r1：必须是条件（结果为真或假）"):
             OntologyDraft.model_validate(draft)
+
+
+# --- review fixes (Codex review of PR #77) -----------------------------------------
+
+
+def test_a_ratio_reads_the_datasets_of_its_parts():
+    draft = sales()
+    orders = by_name(draft, "datasets", "orders")
+    orders["columns"] = None
+    part = {"id": str(uuid4()), "name": "order_total", "kind": "simple", "dataset_id": orders["id"],
+            "aggregation": "sum", "measure": {"dataset_id": orders["id"], "column": "amount"}}
+    ratio = {"id": str(uuid4()), "name": "share", "display_name": "占比", "kind": "ratio",
+             "numerator_id": part["id"], "denominator_id": part["id"]}
+    draft["metrics"] += [part, ratio]
+    assert "指标 占比：请先同步数据集 orders 的表结构，列无法验证" in issues(draft, [Change("metric", ratio["id"], ratio)])
+
+
+def test_a_used_column_without_a_known_type_blocks():
+    draft = sales()
+    customers = by_name(draft, "datasets", "customers")
+    next(c for c in customers["columns"] if c["name"] == "region")["physical_type"] = None
+    mapping = next(m for m in draft["mappings"] if m["sources"][0]["dataset_id"] == customers["id"])
+    found = issues(draft, [Change("mapping", mapping["id"], mapping)])
+    assert any(p.endswith("：请先同步数据集 customers 的表结构，列无法验证") for p in found)
+
+
+def test_nullif_may_be_a_condition():
+    draft = sales()
+    order = next(o for o in draft["object_types"] if o["name"] != "customer")
+    draft["properties"].append({"id": str(uuid4()), "owner_type_id": order["id"], "name": "is_active",
+                                "value_kind": "boolean"})
+    draft["rules"].append({"id": str(uuid4()), "name": "r1", "owner_kind": "object_type", "owner_id": order["id"],
+                           "rule_kind": "constraint", "expression": f"NULLIF({order['name']}.is_active, FALSE)"})
+    OntologyDraft.model_validate(draft)
+
+
+def test_a_property_is_accepted_with_the_mapping_update_that_binds_it(client):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "01-basic-sales")
+    draft = session["draft"]
+    customer = by_name(draft, "object_types", "customer")
+    mapping = next(m for m in draft["mappings"] if m["type_id"] == customer["id"])
+    prop = create("vip", "property", {"owner_type_id": customer["id"], "name": "vip_region"})
+    rebound = {
+        "operation": "update", "target_kind": "mapping", "target_id": mapping["id"],
+        "after": {**{k: v for k, v in mapping.items() if k != "id"},
+                  "inherited_link_bindings": [],
+                  "fields": {**mapping["fields"], "vip_region": {"kind": "column", "source_id": "main", "column": "region"}}},
+    }
+    batch = seed_batch(client, session, [prop, rebound])
+    shown = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}").json()["items"]
+    assert all(i["acceptance_issues"] == [] for i in shown)
+    the_property = next(i for i in shown if i["target_kind"] == "property")
+    response = decide(client, session, [(the_property["id"], "accept")])
+    assert response.status_code == 200, response.text
+    assert {r["status"] for r in response.json()["results"]} == {"accepted"}
+    assert len(response.json()["results"]) == 2
+
+
+def test_deleting_the_old_target_frees_a_many_to_one_relation(client):
+    from test_instance_store import baseline, instance_update
+
+    session = create_session(client)
+    t = types(session)
+    buyer = session["draft"]["link_types"][0]
+    source, target = (("order", "customer") if buyer["source_type_id"] == t["order"] else ("customer", "order"))
+    values = {"order": {"order_no": "O-1"}, "customer": {"label": "旧"}}
+    session, batch = accept_all(client, session, [
+        create("s", "material_object", {"type_id": t[source], "values": values[source]}),
+        create("t1", "material_object", {"type_id": t[target], "values": values[target]}),
+        create("t2", "material_object", {"type_id": t[target], "values": values[target]}),
+        create("l1", "material_link", {"type_id": buyer["id"], "source_id": {"client_ref": "s"},
+                                       "target_id": {"client_ref": "t1"}}),
+    ])
+    ids = {i["client_ref"]: i["target_id"] for i in batch["items"]}
+    old = next(e for e in baseline(client, session)["items"] if e["target_id"] == ids["t1"])
+    change = seed_batch(client, session, [
+        {**instance_update(old), "operation": "delete", "after": None},
+        create("l2", "material_link", {"type_id": buyer["id"], "source_id": ids["s"], "target_id": ids["t2"]}),
+    ])
+    shown = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{change['id']}").json()["items"]
+    assert all(i["acceptance_issues"] == [] for i in shown)
+    response = decide(client, session, [(i["id"], "accept") for i in change["items"]])
+    assert response.status_code == 200, response.text

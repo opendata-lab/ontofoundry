@@ -238,9 +238,8 @@ def read_batch(
     items = _batch_items(db, [batch.id], workspace_id, session_id)
     dependencies = dependency_map(db, [batch.id], workspace_id, session_id)
     statuses = effective_statuses(items)
-    elements = _session_elements(
-        instance_store.session_snapshot(db, workspace_id, session_id, draft)
-    )
+    snapshot = instance_store.session_snapshot(db, workspace_id, session_id, draft)
+    elements = _session_elements(snapshot)
     for item in items:
         element = item.after_json or item.before_json
         if element:
@@ -259,7 +258,7 @@ def read_batch(
         duplicates=DuplicateCandidates(db, workspace_id, session),
         peers=_atomic_peers(db, workspace_id, session_id, items),
     )
-    context.acceptance = AcceptanceIssues(context.diagnostics.draft, elements)
+    context.acceptance = AcceptanceIssues(context.diagnostics.draft, snapshot, items)
     return {
         **_batch_summary(batch, items, statuses, session),
         "items": [_item_view(i, statuses, dependencies, elements, context) for i in items],
