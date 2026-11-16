@@ -80,12 +80,12 @@ def check_accepted_values(model, objects):
     """Stricter than `validate_instances`: what an accepted document instance must state.
 
     Proposals and reads stay lenient so stored instances are never hidden; only the
-    instances being accepted must state numbers as numbers."""
+    instances being accepted must state numbers as numbers and datetimes with a time."""
     errors = [
         issue["message"]
         for obj in objects
         for issue in value_issues(
-            model, UUID(str(obj["type_id"])), obj["values"], str(obj["id"]), numeral_text=False
+            model, UUID(str(obj["type_id"])), obj["values"], str(obj["id"]), strict=True
         )
         if issue["severity"] == "error"
     ]
