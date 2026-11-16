@@ -75,6 +75,8 @@ export function acceptanceBlock(item: ProposalItem, byIdMap: Map<string, Proposa
   visited.add(item.id);
   const source = item.source_diagnostics?.find((d) => d.severity === "error");
   if (source) return `数据来源未就绪：${source.message}`;
+  const issue = item.acceptance_issues?.[0];
+  if (issue) return `待补全：${issue}`;
   for (const id of requiredIds(item)) {
     const dependency = byIdMap.get(id);
     if (!dependency) return "依赖提案缺失";

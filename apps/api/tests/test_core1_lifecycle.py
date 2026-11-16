@@ -106,9 +106,10 @@ def test_unnamed_independent_proposals_do_not_share_atomic_decisions(client, kin
         edits = []
         for mapping in (a, b):
             fields = deepcopy(mapping["fields"])
-            # Clearing a non-key field is an independent incomplete binding.
+            # Reading a field through an expression is an independent edit that
+            # keeps the binding complete (an incomplete one cannot be accepted).
             field = next(name for name in fields if name in {"name", "amount"})
-            fields.pop(field)
+            fields[field] = {"kind": "expression", "expression": f"main.{fields[field]['column']}"}
             edits.append(update(kind, mapping, fields=fields, inherited_link_bindings=[]))
     batch = seed_batch(client, session, edits)
     assert len(batch["items"]) == 2

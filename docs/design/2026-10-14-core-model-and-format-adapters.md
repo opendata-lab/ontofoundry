@@ -495,7 +495,7 @@ metrics, datasets, mappings, material_objects, material_links
   例：订单明细的标识是“订单号”+“行号”两个属性，行号在不同订单里会重复，`unique=false` 合法；
   “所属订单”关系另外存在，用于从明细走到订单。属性键与关系分开；复合业务标识是本平台明确支持的能力，不能等同 Palantir 当前单 primary-key property。
 - 英文标识允许 SQL 保留字，例如 order；解析时按本体标识符处理，物理 SQL 标识符由 agent 按方言引用。
-- 业务标识顺序按属性 UUID 字节序确定，Ossie 导出 identify_by 和原生引用使用同一顺序；不依赖 JSON 数组位置。物理 key_columns 顺序独立保持。元数据 UUID、文档事实 UUID、数据库 `(具体 type_id, 有序 typed key tuple)` 分开；不以分隔符拼接复合身份。文档事实缺标识仍保存并提示补全，不因 required/identifier 自动拒绝。
+- 业务标识顺序按属性 UUID 字节序确定，Ossie 导出 identify_by 和原生引用使用同一顺序；不依赖 JSON 数组位置。物理 key_columns 顺序独立保持。元数据 UUID、文档事实 UUID、数据库 `(具体 type_id, 有序 typed key tuple)` 分开；不以分隔符拼接复合身份。文档事实缺标识可以作为提案提交并提示补全；接受时 required/identifier 缺值拒绝（2026-11-15，见 [接受时检查](2026-11-15-accept-completeness.md) AC-02）。
 
 ---
 

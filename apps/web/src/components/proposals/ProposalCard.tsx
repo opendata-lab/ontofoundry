@@ -136,6 +136,11 @@ export function ProposalCard({
               <Tag className="m-0">联动 {deps.length} 项</Tag>
             </Tooltip>
           )}
+          {!!item.acceptance_issues?.length && item.status === "pending" && (
+            <Tooltip title={<ul className="m-0 pl-4">{item.acceptance_issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}>
+              <StatusMark state="partial" label="待补全" />
+            </Tooltip>
+          )}
           {item.duplicate_candidates.length > 0 && item.status === "pending" && (
             <Tooltip title="可能与已有实例重复，打开详情可改为更新已有实例">
               <StatusMark state="partial" label="可能重复" />

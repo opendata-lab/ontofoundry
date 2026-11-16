@@ -22,14 +22,18 @@ type Props = {
   loading?: boolean;
   canEdit?: boolean;
 };
-type StatusFilter = "pending" | "accepted" | "rejected";
+type StatusFilter = "pending" | "incomplete" | "accepted" | "rejected";
 const STATUSES: { key: StatusFilter; label: string }[] = [
   { key: "pending", label: "待审" },
+  { key: "incomplete", label: "待补全" },
   { key: "accepted", label: "已接受" },
   { key: "rejected", label: "已拒绝" },
 ];
+// 待补全 is the part of 待审 that cannot be accepted until it is completed.
 const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
-  item.status === status;
+  status === "incomplete"
+    ? item.status === "pending" && !!item.acceptance_issues?.length
+    : item.status === status;
 
 // The latest modeling run's outcome belongs to the proposals it was meant to
 // produce, so a run that produced none says why here, not in the conversation.
@@ -257,7 +261,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
         renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
         items={statusChoices.map((tab) => {
           const count = statusBase.filter((item) => matchesStatus(item, tab.key)).length;
-          const alert = false;
+          const alert = tab.key === "incomplete" && count > 0;
           return {
             key: tab.key,
             label: (

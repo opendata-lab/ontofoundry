@@ -259,8 +259,8 @@ def test_thirteen_native_files_preview_confirm_review_publish(client, space, nam
     assert reopened["report"] == p["report"]
 
 
-@pytest.mark.parametrize("file", ["storybook-lending", "library-lending"])
-def test_original_ossie_examples_preview_to_pending_keep_report(client, space, file):
+@pytest.mark.parametrize(("file", "complete"), [("storybook-lending", True), ("library-lending", False)])
+def test_original_ossie_examples_preview_to_pending_keep_report(client, space, file, complete):
     raw = (
         Path(__file__).parent / f"fixtures/ossie_synthetic/{file}.ossie.json"
     ).read_bytes()
@@ -276,7 +276,13 @@ def test_original_ossie_examples_preview_to_pending_keep_report(client, space, f
         client.get(import_root(space, "ossie") + "/" + p["import_id"]).json()["report"]
         == p["report"]
     )
-    publish(client, space, accept(client, space, response.json()))
+    if complete:
+        publish(client, space, accept(client, space, response.json()))
+        return
+    # Its tables declare no logical keys and leave properties unmapped: the import
+    # still lands as proposals, but they cannot be accepted until completed (AC-04).
+    with pytest.raises(AssertionError, match="fable_volume：来源逻辑键待补全.*未绑定"):
+        accept(client, space, response.json())
 
 
 @pytest.mark.parametrize("raw", [b"", b'{"ontology":', b'{"format":"wrong"}'])

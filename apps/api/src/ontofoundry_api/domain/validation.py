@@ -26,11 +26,13 @@ from ontofoundry_api.domain.core import (
     Multiplicity,
     Operator,
     RatioMetric,
+    RuleKind,
     RuleOwnerKind,
     SimpleMetric,
     ValueKind,
 )
 from ontofoundry_api.domain.expressions import (
+    require_condition,
     resolve_derived_expression,
     resolve_field_expression,
     resolve_metric_expression,
@@ -367,10 +369,16 @@ def _value_types(draft: CoreDraft, index: DraftIndex) -> None:
             _require(rule.owner_id in index.value_types, "规则归属的值类型不存在")
 
 
+def _rule(draft, rule):
+    resolved = resolve_rule_expression(draft, rule)
+    if rule.rule_kind == RuleKind.CONSTRAINT:
+        require_condition(resolved)
+
+
 def _derived(draft, index, obj):
     for branch in obj.derived_by:
         if isinstance(branch, DerivedExpression):
-            resolve_derived_expression(draft, obj.extends, branch.expression)
+            require_condition(resolve_derived_expression(draft, obj.extends, branch.expression))
             continue
         for condition in branch.conditions:
             resolve_path(
@@ -509,7 +517,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
         key = (rule.owner_kind, rule.owner_id, rule.name.casefold())
         _require(key not in rule_keys, "同一归属下规则英文标识重复")
         rule_keys.add(key)
-        problems.check(f"规则 {rule.name}", resolve_rule_expression, draft, rule)
+        problems.check(f"规则 {rule.name}", _rule, draft, rule)
     _mappings(draft, index, problems)
     for link in draft.link_types:
         if link.data_join is not None:

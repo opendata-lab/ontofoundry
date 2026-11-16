@@ -1,6 +1,6 @@
 # 接受时检查：定义与实例
 
-日期：2026-11-15。状态：AC-03 已实施（PR #75），AC-12 已实施，其余待实施。来源：用户 2026-11-15 决定（“提案可以不完整，接受时必须修好”）；Codex 校验阶段审查（`~/.agents/handoffs/2026-11-15-codex-validation-review/`）；Codex 对本设计的审查（`~/.agents/handoffs/2026-11-15-codex-accept-checks-review/`），其中的实现约束已并入 AC-04、AC-07。
+日期：2026-11-15。状态：AC-03（PR #75）、AC-12（PR #76）已实施；AC-01、02、04、05、08、09、10、11 见[实施计划](../plans/2026-11-15-accept-completeness-plan.md)；AC-07 与验证待实施。来源：用户 2026-11-15 决定（“提案可以不完整，接受时必须修好”）；Codex 校验阶段审查（`~/.agents/handoffs/2026-11-15-codex-validation-review/`）；Codex 对本设计的审查（`~/.agents/handoffs/2026-11-15-codex-accept-checks-review/`），其中的实现约束已并入 AC-04、AC-07。
 
 ## 1. 问题
 

@@ -19,6 +19,11 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
     utc_now,
 )
+from ontofoundry_api.domain.accept_checks import (
+    Change,
+    definition_issues,
+    link_count_issues,
+)
 from ontofoundry_api.domain.canonical import canonical, element_sha256
 from ontofoundry_api.domain.evidence import EvidenceError, check_material_evidence
 from ontofoundry_api.domain.instances import (
@@ -130,6 +135,11 @@ def _instances(model, candidate, items, accepting=False):
     validate_instances(model, [objects[key] for key in ids if key in objects], links)
     if accepting:
         check_accepted_values(model, [objects[key] for key in changed if key in objects])
+        issues = link_count_issues(
+            model, objects, [*candidate.get("material_links", [])], changed - deleted
+        )
+        if issues:
+            raise ValueError("；".join(issues))
 
 
 def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, draft=None, accepting=False):
@@ -192,6 +202,13 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
         candidate = apply_items(before, items)
         model = OntologyDraft.model_validate(definitions(candidate))
         _instances(model, candidate, items, accepting)
+        if accepting:
+            issues = definition_issues(model, [
+                Change(i.target_kind, i.target_id, i.after, i.before)
+                for i in items if i.target_kind not in INSTANCE_KINDS
+            ])
+            if issues:
+                raise ValueError("；".join(issues))
         _evidence(db, workspace_id, before, candidate, items, lookup)
         check_identities(db, workspace_id, element_kinds(candidate))
         published = instance_store.published_model(db, workspace_id)
