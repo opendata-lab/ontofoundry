@@ -1,13 +1,16 @@
-import { Alert, Button, Checkbox, Dropdown, Empty, Flex, Input, Modal, Select, Spin, Tabs, Tooltip, Typography } from "antd";
-import { MoreHorizontal } from "lucide-react";
+import { Alert, Button, Checkbox, Dropdown, Empty, Flex, Input, Modal, Spin, Tabs, Tooltip, Typography } from "antd";
+import { ChevronDown, ChevronRight, MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ModelingSession, ProposalItem, TargetKind } from "../../api/types";
+import type { Draft, ModelingSession, ProposalItem, TargetKind } from "../../api/types";
 import type { ProposalsState } from "../../hooks/useProposals";
+import { byId } from "../../lib/coreModel";
+import { ELEMENT_CATEGORIES, type ElementCategory } from "../../lib/elementCategories";
+import { ElementCategoryTiles } from "../ElementCategoryTiles";
 import { ImportReportDialog } from "../ImportReportDialog";
 import { PanelToolbar } from "../layout";
 import { ProposalCard, type CardActions } from "./ProposalCard";
 import { ProposalDetail } from "./ProposalDetail";
-import { acceptanceBlock, decisionIds, reviewKindName, searchText, technicalName, type ReviewDecision } from "./reviewMeta";
+import { acceptanceBlock, decisionIds, searchText, technicalName, type ReviewDecision } from "./reviewMeta";
 
 const { Text } = Typography;
 
@@ -25,17 +28,6 @@ const STATUSES: { key: StatusFilter; label: string }[] = [
   { key: "accepted", label: "已接受" },
   { key: "rejected", label: "已拒绝" },
 ];
-const KIND_ORDER: TargetKind[] = [
-  "object_type",
-  "property",
-  "link_type",
-  "rule",
-  "metric",
-  "dataset",
-  "mapping",
-  "material_object",
-  "material_link",
-];
 const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
   item.status === status;
 
@@ -43,6 +35,50 @@ const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
 // produce, so a run that produced none says why here, not in the conversation.
 const failedRun = (session: ModelingSession | null | undefined) =>
   session?.result_state === "failed_permanent" ? session.task_detail || "本轮没有产出提案" : "";
+
+type ProposalGroup =
+  | { type: "object"; key: string; title: string; changed: boolean; objects: ProposalItem[]; properties: ProposalItem[] }
+  | { type: "kind"; key: string; title: string; tone: string; members: ProposalItem[] };
+
+const elementField = (item: ProposalItem, key: string) => {
+  const value = (item.after ?? item.before) as unknown as Record<string, unknown> | null;
+  return value?.[key];
+};
+
+/** The object an object or property proposal belongs to: its own target, or the property's owner. */
+const ownerOf = (item: ProposalItem) =>
+  item.target_kind === "object_type" ? item.target_id : (elementField(item, "owner_type_id") as string | undefined) ?? item.owner_label ?? "";
+
+function ownerTitle(id: string, items: ProposalItem[], draft: Draft, fallback: string) {
+  const proposal = items.find((candidate) => candidate.target_kind === "object_type" && candidate.target_id === id);
+  if (proposal) return String(elementField(proposal, "display_name") || proposal.display_name || elementField(proposal, "name") || fallback);
+  const existing = byId(draft.object_types, id);
+  return existing?.display_name || existing?.name || fallback || "未知对象";
+}
+
+function proposalGroups(visible: ProposalItem[], others: ElementCategory[], items: ProposalItem[], draft: Draft): ProposalGroup[] {
+  const byOwner = new Map<string, { objects: ProposalItem[]; properties: ProposalItem[] }>();
+  for (const item of visible) {
+    if (item.target_kind !== "object_type" && item.target_kind !== "property") continue;
+    const owner = ownerOf(item);
+    const entry = byOwner.get(owner) ?? { objects: [], properties: [] };
+    (item.target_kind === "object_type" ? entry.objects : entry.properties).push(item);
+    byOwner.set(owner, entry);
+  }
+  const objectGroups: ProposalGroup[] = [...byOwner].map(([owner, entry]) => ({
+    type: "object",
+    key: `object:${owner}`,
+    title: ownerTitle(owner, items, draft, entry.properties.find((m) => m.owner_label)?.owner_label ?? ""),
+    // The batch also changes the object itself, even when a filter hides that card.
+    changed: items.some((candidate) => candidate.target_kind === "object_type" && candidate.target_id === owner),
+    ...entry,
+  }));
+  const kindGroups: ProposalGroup[] = others
+    .filter((category) => category.key !== "object_type" && category.key !== "property")
+    .map((category) => ({ type: "kind" as const, key: category.key, title: category.text, tone: category.tone, members: visible.filter((item) => item.target_kind === category.key) }))
+    .filter((group) => group.members.length);
+  return [...objectGroups, ...kindGroups];
+}
 
 export function ProposalPanel(props: Props) {
   if (props.loading || (props.proposals.loading && !props.proposals.batches.length))
@@ -80,8 +116,10 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const importSource = producer?.kind === "import" && producer.adapter && producer.report_id ? { adapter: producer.adapter, report_id: producer.report_id } : session.import_source;
   const items = useMemo(() => detail?.items ?? [], [detail]);
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-  const kinds = KIND_ORDER.filter((kind) => items.some((item) => item.target_kind === kind));
-  const [kindFilter, setKindFilter] = useState<TargetKind[]>([]);
+  const categories = ELEMENT_CATEGORIES.filter((category) => items.some((item) => item.target_kind === category.key));
+  const [kind, setKind] = useState<TargetKind | null>(null);
+  // Groups the reviewer flipped from their default: objects start closed (open under 属性), kind groups open.
+  const [toggled, setToggled] = useState(new Set<string>());
   const [status, setStatus] = useState<StatusFilter>("pending");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(new Set<string>());
@@ -93,7 +131,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const submitting = useRef(false);
   const busy = proposals.busy || undoBusy || running || !!detail?.read_only;
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const matchesKind = (item: ProposalItem) => !kindFilter.length || kindFilter.includes(item.target_kind);
+  const matchesKind = (item: ProposalItem) => !kind || item.target_kind === kind;
   const matchesSearch = (item: ProposalItem) => {
     if (!terms.length) return true;
     const text = searchText(item, items, session.draft);
@@ -106,7 +144,19 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const rejectable = items.filter((item) => item.status === "pending");
   const selectedIds = [...selected].filter((id) => byId.has(id));
   const selectedVisible = visible.filter((item) => selected.has(item.id)).length;
-  const hasFilters = !!kindFilter.length || !!terms.length || status !== "pending";
+  const hasFilters = !!kind || !!terms.length || status !== "pending";
+  // Under 全部 and 属性, each object is a group holding its own proposal and its
+  // properties; the other kinds follow as one group per kind, in tile order.
+  const groups = kind && kind !== "property" ? null : proposalGroups(visible, kind ? [] : categories, items, session.draft);
+  // A search opens objects too, so a matching property is never hidden behind a closed object.
+  const isOpen = (group: ProposalGroup) => (group.type === "object" ? kind === "property" || terms.length > 0 : true) !== toggled.has(group.key);
+  const flip = (key: string) =>
+    setToggled((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const openItem = openId ? byId.get(openId) : undefined;
   useEffect(() => {
     if (!toast || undoBusy) return;
@@ -115,7 +165,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   }, [toast, undoBusy]);
   const clearFilters = () => {
     setQuery("");
-    setKindFilter([]);
+    setKind(null);
     setStatus("pending");
   };
   const submit = async (requested: string[], decision: ReviewDecision) => {
@@ -175,6 +225,21 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
       else next.delete(id);
       return next;
     });
+  const renderCard = (item: ProposalItem) => (
+    <ProposalCard
+      key={item.id}
+      item={item}
+      items={items}
+      technical={technicalName(item, items, session.draft)}
+      busy={busy}
+      canEdit={canEdit}
+      error={proposals.itemErrors[item.id]}
+      blocked={acceptanceBlock(item, byId)}
+      actions={actions}
+      selected={selected.has(item.id)}
+      onSelect={(checked) => toggle(item.id, checked)}
+    />
+  );
   return (
     <div className="flex h-full min-h-0 flex-col" aria-label="提案审核面板" aria-busy={busy}>
       {importSource && <>
@@ -204,30 +269,23 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
           };
         })}
       />
-      <div className="flex items-center gap-2 border-b border-rule px-4 py-2">
+      <div className="flex flex-col gap-2 border-b border-rule px-4 py-2">
+        <ElementCategoryTiles
+          label="提案分类"
+          categories={categories}
+          count={(k) => items.filter((i) => i.target_kind === k && matchesStatus(i, status) && matchesSearch(i)).length}
+          allTotal={items.filter((i) => matchesStatus(i, status) && matchesSearch(i)).length}
+          selected={kind}
+          onSelect={setKind}
+        />
         <Input.Search
           allowClear
           size="small"
           aria-label="搜索提案名称"
           placeholder="搜索名称、英文标识或所属对象…"
-          className="min-w-0 flex-1"
+          className="min-w-0"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-        />
-        <Select
-          mode="multiple"
-          size="small"
-          allowClear
-          aria-label="元素类型"
-          placeholder="全部类型"
-          maxTagCount={1}
-          className="min-w-review-filter"
-          value={kindFilter}
-          onChange={setKindFilter}
-          options={kinds.map((kind) => ({
-            value: kind,
-            label: `${reviewKindName(kind)} ${items.filter((i) => i.target_kind === kind && matchesStatus(i, status)).length}`,
-          }))}
         />
       </div>
       {canEdit && (
@@ -300,21 +358,50 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
           </div>
         )}
         {visible.length || proposals.loading ? (
-          visible.map((item) => (
-            <ProposalCard
-              key={item.id}
-              item={item}
-              items={items}
-              technical={technicalName(item, items, session.draft)}
-              busy={busy}
-              canEdit={canEdit}
-              error={proposals.itemErrors[item.id]}
-              blocked={acceptanceBlock(item, byId)}
-              actions={actions}
-              selected={selected.has(item.id)}
-              onSelect={(checked) => toggle(item.id, checked)}
-            />
-          ))
+          groups ? (
+            groups.map((group) => {
+              const open = isOpen(group);
+              if (group.type === "kind")
+                return (
+                  <section key={group.key} aria-label={`${group.title}提案`}>
+                    <button type="button" aria-expanded={open} onClick={() => flip(group.key)}
+                      className="sticky top-0 z-1 flex w-full items-center gap-2 border-b border-rule bg-surface-raised px-4 py-1.5 text-left text-xs font-semibold text-ink-2">
+                      {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <span className={group.tone}>{group.title}</span>
+                      <span className="tabular-nums text-muted">{group.members.length}</span>
+                    </button>
+                    {open && group.members.map(renderCard)}
+                  </section>
+                );
+              const toggle = group.properties.length > 0 && (
+                <button type="button" aria-expanded={open} onClick={() => flip(group.key)}
+                  aria-label={`${open ? "收起" : "展开"} ${group.title} 的属性（${group.properties.length}）`}
+                  className="flex w-full items-center gap-1.5 border-b border-rule-soft bg-surface px-4 py-1 pl-10 text-left text-xs text-ink-2 hover:bg-surface-soft">
+                  {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  属性 <span className="tabular-nums">{group.properties.length}</span>
+                </button>
+              );
+              return (
+                <section key={group.key} aria-label={`${group.title}提案`}>
+                  {group.objects.length ? (
+                    group.objects.map(renderCard)
+                  ) : (
+                    // Properties of an object this batch leaves unchanged still need a parent row.
+                    <div className="flex items-center gap-2 border-b border-rule-soft bg-surface-raised px-4 py-2 text-xs">
+                      <span className="font-semibold text-object">{group.title}</span>
+                      {!group.changed && <span className="text-muted">已有对象，本批未修改</span>}
+                    </div>
+                  )}
+                  {toggle}
+                  {open && group.properties.length > 0 && (
+                    <div className="ml-6 border-l-2 border-rule">{group.properties.map(renderCard)}</div>
+                  )}
+                </section>
+              );
+            })
+          ) : (
+            visible.map(renderCard)
+          )
         ) : (
           <Empty className="py-6" description={hasFilters ? "没有符合条件的提案" : "当前没有待审提案"}>
             {hasFilters && <Button onClick={clearFilters}>清除筛选</Button>}

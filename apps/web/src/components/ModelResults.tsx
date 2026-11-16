@@ -1,5 +1,5 @@
 import { Alert, Button, Empty, Input, Table, Tabs, Tooltip, Typography } from "antd";
-import { Box, Braces, Database, FileText, GitBranch, Rocket, ShieldCheck, Sigma, TableProperties, Workflow, type LucideIcon } from "lucide-react";
+import { Rocket } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Draft, ElementChange, ModelingSession, TargetKind, TypeGraph } from "../api/types";
@@ -11,6 +11,7 @@ import { METRIC_KINDS } from "../lib/metricEditing";
 import { BINDING_MODES } from "../lib/objectMapping";
 import { draftGraph } from "../lib/semanticExplorer";
 import { Panel as ResultPanel, PanelToolbar, StatusMark, type StatusState } from "./layout";
+import { ElementCategoryTiles } from "./ElementCategoryTiles";
 import { ElementModal } from "./elements/ElementInspector";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
@@ -26,17 +27,6 @@ const CHANGE: Record<ElementChange["change"], { text: string; state: StatusState
   deleted: { text: "待删除", state: "error" },
 };
 
-const CATEGORIES: { key: TargetKind; text: string; icon: LucideIcon; tone: string; background: string }[] = [
-  { key: "object_type", text: "实体", icon: Box, tone: "text-object", background: "bg-object-soft" },
-  { key: "link_type", text: "关系", icon: GitBranch, tone: "text-relation", background: "bg-relation-soft" },
-  { key: "property", text: "属性", icon: Braces, tone: "text-attribute", background: "bg-attribute-soft" },
-  { key: "rule", text: "规则", icon: ShieldCheck, tone: "text-ink-2", background: "bg-canvas" },
-  { key: "metric", text: "指标", icon: Sigma, tone: "text-ink-2", background: "bg-canvas" },
-  { key: "dataset", text: "数据集", icon: Database, tone: "text-ink-2", background: "bg-canvas" },
-  { key: "mapping", text: "映射", icon: TableProperties, tone: "text-ink-2", background: "bg-canvas" },
-  { key: "material_object", text: "文档实例", icon: FileText, tone: "text-ink-2", background: "bg-canvas" },
-  { key: "material_link", text: "关系实例", icon: Workflow, tone: "text-ink-2", background: "bg-canvas" },
-];
 
 // Instances accepted against definitions this session has not published yet (IS-04).
 const staged = (instance: { state?: string }) => (instance.state === "staged" ? "待发布 · " : "");
@@ -200,20 +190,7 @@ export function ModelResults({
               children: (
                 <div className="flex h-full min-h-0 flex-col">
                   <div className="flex shrink-0 flex-col gap-3 border-b border-rule p-4">
-                    <div className="model-result-categories" aria-label="模型分类">
-                      {CATEGORIES.map((category) => {
-                        const Icon = category.icon;
-                        const selected = kind === category.key;
-                        const total = count(category.key);
-                        return <Button key={category.key} aria-pressed={selected} aria-label={`${category.text} ${total}`}
-                          className={`h-auto min-w-0 justify-start gap-2 rounded-md px-2 py-2 text-xs ${selected ? "border-accent text-accent" : category.tone}`}
-                          onClick={() => setKind(category.key)}>
-                          <span className={`inline-flex size-5 flex-none items-center justify-center rounded-xs ${category.background} ${category.tone}`}><Icon size={14} /></span>
-                          <span className="min-w-0 truncate">{category.text}</span>
-                          <span className="ml-auto flex-none font-semibold tabular-nums">{total}</span>
-                        </Button>;
-                      })}
-                    </div>
+                    <ElementCategoryTiles label="模型分类" count={count} selected={kind} onSelect={(next) => next && setKind(next)} />
                     <div className="flex min-w-0 items-center gap-2">
                       <Input.Search allowClear size="small" aria-label="搜索模型" placeholder="搜索名称、英文标识、描述"
                         className="min-w-0 flex-1" value={query} onChange={(event) => setQuery(event.target.value)} />
