@@ -11,7 +11,7 @@
 | DT-03 | 一个连接下有多个 schema 的场景必须支持：浏览时可在库之间切换或看全部；同步时可一次选择多个库。 |
 | DT-04 | 「同步数据表」按钮和搜索框与「文档」Tab 一致：放在列表上方的灰底工具栏，主按钮在左，搜索框在右；连接下拉（页面和同步弹窗）只显示连接名。 |
 | DT-05 | 每张表可查看表详情：基本信息、字段，以及只读查询的前 100 行数据。 |
-| DT-06 | Doris 连接的表清单和表结构按 schema 显式读取，与 opendataworks 一致：`information_schema.tables/columns` 以 `TABLE_SCHEMA` 过滤；字段类型依次取 `COLUMN_TYPE`、`DATA_TYPE`，仍为空时用 `SHOW FULL COLUMNS` 补；`COLUMN_KEY = 'PRI'` 记为主键；隐藏 `information_schema`、`mysql`、`performance_schema`、`sys`、`__internal_schema`。 |
+| DT-06 | Doris 连接的表清单和表结构按 schema 显式读取：`information_schema.tables/columns` 以 `TABLE_SCHEMA` 过滤；字段类型依次取 `COLUMN_TYPE`、`DATA_TYPE`，仍为空时用 `SHOW FULL COLUMNS` 补；`COLUMN_KEY` 优先识别 `'PRI'`，无 `'PRI'` 时将 `'UNI'`（`UNIQUE KEY`）与 `'AGG'`（`AGGREGATE KEY`）记为主键，排除仅作排序前缀的 `'DUP'`（`DUPLICATE KEY`）；隐藏 `information_schema`、`mysql`、`performance_schema`、`sys`、`__internal_schema`。 |
 | DT-07 | 同步、表清单、表数据预览和登记表目录只读取连接允许范围内的库（MySQL 为配置的 database，配置了 schemas 时以其为准，Doris 排除系统库）；不能把“存在快照”当成仍获准读取。 |
 
 ## 2. 设计
