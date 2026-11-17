@@ -2,7 +2,7 @@
 
 from core1_fixtures import example_draft
 from test_instance_store import accept_all, call, create_instance
-from test_modeling import ROOT, create_session
+from test_modeling import ROOT, create_session, publish
 
 from ontofoundry_api.services import entity_resolution
 
@@ -23,6 +23,7 @@ def test_document_instances_resolve_by_level_and_status(client):
     session = create_session(client)
     type_id = customer_type(session)["id"]
     session, _ = accept_all(client, session, [create_instance(session, name) for name in ("月湾客户", "月湾客户二部", "鹭汀商行")])
+    assert publish(client, session).status_code == 200
 
     exact = resolve(client, " 月湾客户 ", type_id)
     assert exact["status"] == "MATCHED" and exact["coverage"] in {"complete", "partial"}

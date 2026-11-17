@@ -137,6 +137,11 @@
           "title": "Hash",
           "type": "string"
         },
+        "pending_change": {
+          "default": false,
+          "title": "Pending Change",
+          "type": "boolean"
+        },
         "revision": {
           "minimum": 1,
           "title": "Revision",

@@ -43,10 +43,9 @@ def test_fact_revision_only_revises_pending_proposal(client):
     session["revision"] += 1
     accepted = decide(client, session, [(new_item["id"], "accept")])
     assert accepted.status_code == 200, accepted.text
-    assert (
-        baseline(client, accepted.json()["session"])["items"][0]["revision"]
-        == target["revision"] + 1
-    )
+    # The revised fact equals the published content: nothing is pending (AI-11).
+    after = baseline(client, accepted.json()["session"])["items"][0]
+    assert after["revision"] == target["revision"] and not after["pending_change"]
 
 
 @pytest.mark.parametrize(

@@ -17,6 +17,8 @@ class InstanceBaselineItem(Strict):
     session_id: UUID | None
     element: MaterialObject | MaterialLink
     hash: str = Field(pattern="^[0-9a-f]{64}$")
+    # A published instance shown with this session's pending change (AI-11).
+    pending_change: bool = False
 
     @model_validator(mode="after")
     def matching_target(self):

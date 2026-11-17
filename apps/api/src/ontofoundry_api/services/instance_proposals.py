@@ -19,9 +19,11 @@ def check_undo(db, workspace_id, session_id, item):
         .with_for_update()
         .execution_options(populate_existing=True)
     )
+    pending = instance_store.session_drafts(db, workspace_id, session_id, item.target_kind).get(item.target_id)
+    current = pending.revision if pending is not None else (row.revision if row is not None else None)
     if (
         row is None
-        or row.revision != item.accepted_instance_revision
+        or current != item.accepted_instance_revision
         or (row.state == "staged" and row.session_id != session_id)
     ):
         raise ServiceError(
@@ -29,12 +31,14 @@ def check_undo(db, workspace_id, session_id, item):
             code="PROPOSAL_UNDO_CONFLICT",
             status_code=409,
         )
+    link_drafts = instance_store.session_drafts(db, workspace_id, session_id, "material_link")
     for entry in cascade_history(db, workspace_id, item):
         linked = db.get(instance_store.RECORDS["material_link"], entry.owner_id)
+        draft = link_drafts.get(entry.owner_id)
         if (
             linked is None
             or linked.workspace_id != workspace_id
-            or linked.revision != entry.revision
+            or (draft.revision if draft is not None else linked.revision) != entry.revision
         ):
             raise ServiceError(
                 "关联关系在删除后又被修改，不能直接撤销",
@@ -84,22 +88,16 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
         )
     except ValueError as exc:
         raise ServiceError(str(exc), code="VALIDATION_FAILED", status_code=422) from exc
-    published = instance_store.published_model(db, workspace_id)
     current = instance_store.baseline(db, workspace_id, session_id)
     active = {i["target_id"] for i in current["items"] if i["state"] == "active"}
     for item, undo in [*((i, True) for i in undone), *((i, False) for i in accepted)]:
         if item.target_kind not in INSTANCE_KINDS:
             continue
         after = item.before_json if undo else item.after_json
-        state = (
-            instance_store.state_for(
-                model, published, item.target_kind, after, objects, active
-            )
-            if after
-            else None
-        )
-        if instance_states is not None:
-            state = instance_states[item.id]
+        # Accepting never makes an instance visible: it waits for the session's
+        # publish (AI-11). The store keeps a new instance staged and a change to
+        # a published one in the session's draft.
+        state = "staged" if after else None
         result = instance_store.write(
             db,
             workspace_id,
@@ -136,7 +134,8 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             expected_revision=entry.revision,
             actor=actor,
             proposal_item_id=entry.proposal_item_id,
-            state=before["state"],
+            # A published relation only had its delete pending: undoing drops it.
+            state=None if before["state"] == "active" else before["state"],
             operation="undo_endpoint_delete",
             lookup=lookup,
             model=model,
