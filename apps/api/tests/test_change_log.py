@@ -411,10 +411,37 @@ def test_resolve_merge_and_publish_record_draft_and_version_events(client):
     )
     assert resolved.status_code == 200, resolved.text
     b_events = events_for(client, s_b["id"], target_id=target_id).json()["items"]
-    assert b_events[0]["subject"] == "draft"
-    assert b_events[0]["action"] == "updated"
-    assert b_events[0]["before"]["description"] == "会话B冲突描述"
-    assert b_events[0]["after"]["description"] == "人工合并描述"
+    draft_row = next(e for e in b_events if e["subject"] == "draft" and e["after"] and e["after"].get("description") == "人工合并描述")
+    assert draft_row["action"] == "updated"
+    assert draft_row["before"]["description"] == "会话B冲突描述"
+    # A value typed while resolving is the user's own edit: an accepted human proposal (§4.3).
+    proposal_row = next(e for e in b_events if e["id"] == draft_row["cause_id"])
+    assert proposal_row["subject"] == "proposal" and proposal_row["actor_kind"] == "human"
+    assert proposal_row["after"]["after"]["description"] == "人工合并描述"
+
+
+def test_resolving_with_the_latest_version_only_moves_the_base(client):
+    session_a = create_session(client)
+    session_b = create_session(client)
+    target_id = session_a["draft"]["object_types"][0]["id"]
+    d_a = deepcopy(session_a["draft"])
+    d_a["object_types"][0]["description"] = "会话A发布描述"
+    s_a = submit_element_save(client, d_a, session=session_a).json()
+    version_id = publish(client, s_a).json()["version"]["version_id"]
+    d_b = deepcopy(session_b["draft"])
+    d_b["object_types"][0]["description"] = "会话B冲突描述"
+    s_b = submit_element_save(client, d_b, session=session_b).json()
+    proposals_before = [e for e in events_for(client, s_b["id"], target_id=target_id).json()["items"] if e["subject"] == "proposal"]
+    conflicts = client.post(ROOT + f"/sessions/{s_b['id']}/publish-preview",
+                            json={"expected_session_revision": s_b["revision"]}).json()["error"]["conflicts"]
+    resolved = client.post(ROOT + f"/sessions/{s_b['id']}/resolve-merge", json={
+        "expected_session_revision": s_b["revision"], "expected_current_version_id": version_id,
+        "resolutions": {c["key"]: {"choice": "latest"} for c in conflicts},
+    })
+    assert resolved.status_code == 200, resolved.text
+    events = events_for(client, s_b["id"], target_id=target_id).json()["items"]
+    assert [e for e in events if e["subject"] == "proposal"] == proposals_before
+    assert events[0]["subject"] == "draft" and events[0]["after"]["description"] == "会话A发布描述"
 
 
 def test_change_events_pagination_and_cursor_validation(client):
