@@ -173,7 +173,7 @@ def test_accepting_an_update_writes_the_draft_once(client):
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["results"] == [
-        {"proposal_id": item["id"], "status": "accepted", "reason": ""}
+        {"proposal_id": item["id"], "status": "accepted", "reason": "", "triggered_by": None}
     ]
     assert body["session"]["revision"] == session["revision"] + 1
     assert body["session"]["draft"]["object_types"][0]["description"] == "提案描述"

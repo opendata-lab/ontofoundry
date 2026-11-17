@@ -22,6 +22,14 @@
 
 ## 2c 撤销、待审收敛与发布边界
 
+分三步实施（2026-11-17）：2c-1 撤销与退回待审的跨批次级联、发布边界、发布时复查合并结果；2c-2 唯一待审批次、提交合并、运行输入与轮次；2c-3 resolve-merge 迁入管线。
+
+2c-1 已实施（Claude）：
+- 撤销与退回待审覆盖上次发布后的全部批次：依赖它的已接受提案、之后对同一元素的已接受修改，按接受先后从新到旧撤销，结果逐条带 `triggered_by`。跨批次依赖按“引用依赖元素的创建，否则最新修改，不依赖删除”建立。
+- 发布在同一事务记录 `published_revision`，此前创建的批次只读（`PROPOSAL_BATCH_PUBLISHED`）；发布前对合并结果中本次改动的定义复跑定义检查（`ACCEPT_CHECK_FAILED`）。
+- 两处临时限制，2c-2 收敛为唯一待审批次后取消：退回待审的级联若会落到已只读的智能体批次则拒绝并提示改用撤销；退回待审后不逐批复查待审项（同一组待审项可能分在多个批次）。
+- 实例提案不能退回待审（撤销实例会写新修订），留待 2d。
+
 - `services/changes.py`、`proposal_decisions.py`、`session_gate.py` 实现跨未发布批次的依赖与同目标后继闭包，按新到旧撤销或退回待审，返回完整结果。发布边界前的提案只读。
 - `proposal_submit.py`、`proposal_revision.py`、`import_proposals.py` 和 `proposals.py` 在提交、恢复、退回与导入补全时收敛到唯一待审批次，同目标沿用 target_id、折叠连续修改、带入未提及项、重算依赖和原子组及两级检查。旧 pending 标为 superseded，已决定项保留。
 - `modeling_input.py` 与 `proposal_context` 提供未发布修改和待审上下文。`table_submission.py` 在检查通过后才持久化表结构收据。

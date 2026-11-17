@@ -279,7 +279,7 @@ def read_batch(
 
 class Decision(BaseModel):
     proposal_id: str
-    decision: Literal["accept", "reject", "restore"]
+    decision: Literal["accept", "reject", "restore", "back_to_pending"]
 
 
 class DecisionRequest(BaseModel):

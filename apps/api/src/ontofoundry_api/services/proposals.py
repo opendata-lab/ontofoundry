@@ -186,6 +186,23 @@ def effective_statuses(items: list[ProposalItemRecord]) -> dict[str, tuple[str, 
     return {item.id: (item.status, item.status_reason or "") for item in items}
 
 
+def _defining_items(items):
+    """The proposal a reference to each element depends on.
+
+    One batch proposes each element once; across batches (an undo reaches all
+    unpublished ones) the same element can be created, changed and deleted by
+    different proposals. A reference needs the element to exist, so it depends
+    on its creation, else its latest change, never on its deletion."""
+    found = {}
+    for item in sorted(items, key=lambda i: (i.accepted_revision or 0, i.ordinal)):
+        if item.operation == "delete":
+            continue
+        current = found.get(item.target_id)
+        if current is None or current.operation != "create":
+            found[item.target_id] = item
+    return found
+
+
 def dependency_map(
     db: Session, batch_ids: list[str], workspace_id: str, session_id: str
 ) -> dict[str, list[str]]:
@@ -209,7 +226,7 @@ def dependency_map(
     session = db.get(ModelingSessionRecord, session_id)
     if session is not None:
         items = batch_items(db, batch_ids, workspace_id, session_id)
-        by_target = {i.target_id: i for i in items}
+        by_target = _defining_items(items)
         from ontofoundry_api.services.instance_store import session_snapshot
         candidate = deepcopy(session_snapshot(db, workspace_id, session_id, session.draft_json))
         for item in items:

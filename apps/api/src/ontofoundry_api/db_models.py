@@ -115,6 +115,8 @@ class ModelingSessionRecord(Base):
     # AI-03/AI-08 workflow bookkeeping, outside the semantic model.
     personal_owner_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     human_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # Session revision right after its last publish; batches from before it are closed.
+    published_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     abandoned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     abandoned_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     title: Mapped[str] = mapped_column(String(240), default="新的建模会话")

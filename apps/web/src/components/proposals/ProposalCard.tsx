@@ -23,6 +23,7 @@ export type CardActions = {
   accept: (item: ProposalItem) => void;
   reject: (item: ProposalItem) => void;
   restore: (item: ProposalItem) => void;
+  backToPending: (item: ProposalItem) => void;
   open: (item: ProposalItem) => void;
 };
 
@@ -47,11 +48,18 @@ export function ProposalActions({
     );
   if (item.status === "accepted")
     return (
-      <Tooltip title="撤销已接受的修改，并一并拒绝依赖此项的已接受提案">
-        <Button size={size} disabled={busy} aria-label={`拒绝并撤销 ${item.display_name}`} onClick={() => actions.reject(item)}>
-          拒绝
-        </Button>
-      </Tooltip>
+      <>
+        <Tooltip title="移出草稿并回到待审，之后建立在它之上的已接受修改一并退回">
+          <Button size={size} disabled={busy} aria-label={`退回待审 ${item.display_name}`} onClick={() => actions.backToPending(item)}>
+            退回待审
+          </Button>
+        </Tooltip>
+        <Tooltip title="撤销已接受的修改，之后建立在它之上的已接受修改一并撤销">
+          <Button size={size} disabled={busy} aria-label={`拒绝并撤销 ${item.display_name}`} onClick={() => actions.reject(item)}>
+            拒绝
+          </Button>
+        </Tooltip>
+      </>
     );
   return (
     <>
