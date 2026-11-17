@@ -370,9 +370,13 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     accepted_items = _topological([items[i] for i in accepts], dependencies)
     undone_items = _newest_first([items[i] for i in undoes], dependencies)
     undo_contexts = {}
+    undo_starts: dict[str, int | None] = {}  # instance -> revision before its newest undone change
     for item in undone_items:
         if item.target_kind in INSTANCE_KINDS:
-            instance_proposals.check_undo(db, workspace_id, session_id, item)
+            instance_proposals.check_undo(db, workspace_id, session_id, item,
+                                          after_newer_undo=item.target_id in undo_starts,
+                                          newer_undo_starts_at=undo_starts.get(item.target_id))
+            undo_starts[item.target_id] = item.expected_instance_revision
         else:
             _check_undo(draft, item, {}, {})
         _apply(draft, _inverse(item, {}))
@@ -390,15 +394,29 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             hit = {by_target[t]: found for t, found in culprits.items() if t in by_target}
             if not getattr(body, "partial", False) or undone_items or not hit:
                 raise
-            remaining = {item.id for item in accepted_items}
+            remaining = {item.id: item for item in accepted_items}
             for identity, found in hit.items():
                 set_aside[identity] = "；".join(found)
-                for dep in dependent_group(identity, dependencies):
-                    if dep in remaining and dep not in hit:
-                        set_aside.setdefault(dep, f"依赖的「{_label(by_id[identity])}」未通过")
+            # What depends on a refused item, and its atomic group, wait with it.
+            grown = True
+            while grown:
+                grown = False
+                for identity in list(set_aside):
+                    group = remaining[identity].atomic_group_id if identity in remaining else None
+                    peers = [i for i, item in remaining.items() if group and item.atomic_group_id == group]
+                    for dep in [*peers, *dependent_group(identity, dependencies)]:
+                        if dep in remaining and dep not in set_aside:
+                            set_aside[dep] = (f"与「{_label(by_id[identity])}」同组，一起留待审" if dep in peers
+                                              else f"依赖的「{_label(by_id[identity])}」未通过")
+                            grown = True
             accepted_items = [item for item in accepted_items if item.id not in set_aside]
     if set_aside:
         body = body.model_copy(update={"decisions": [d for d in body.decisions if d.proposal_id not in set_aside]})
+        # Nothing is recorded for what was set aside: it was not decided.
+        expansion_order = [identity for identity in expansion_order if identity not in set_aside]
+        for identity in set_aside:
+            expanded.pop(identity, None)
+            triggered_by.pop(identity, None)
     if trial is not None:
         draft = trial.candidate
     changed_items = [*undone_items, *accepted_items]

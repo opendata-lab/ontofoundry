@@ -11,7 +11,10 @@ from ontofoundry_api.services import instance_store
 from ontofoundry_api.services.errors import ServiceError
 
 
-def check_undo(db, workspace_id, session_id, item):
+def check_undo(db, workspace_id, session_id, item, *, after_newer_undo=False, newer_undo_starts_at=None):
+    """``after_newer_undo``: a newer change to the same instance is undone first in
+    this request, so this one must end where that one started; the database is not
+    at this item's revision yet."""
     cls = instance_store.RECORDS[item.target_kind]
     row = db.scalar(
         select(cls)
@@ -21,6 +24,8 @@ def check_undo(db, workspace_id, session_id, item):
     )
     pending = instance_store.session_drafts(db, workspace_id, session_id, item.target_kind).get(item.target_id)
     current = pending.revision if pending is not None else (row.revision if row is not None else None)
+    if after_newer_undo:
+        current = newer_undo_starts_at
     if (
         row is None
         or current != item.accepted_instance_revision
@@ -72,6 +77,14 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
         link for link in links if {link["source_id"], link["target_id"]} <= set(objects)
     ]
     changing = [i for i in [*undone, *accepted] if i.target_kind in INSTANCE_KINDS]
+    written: dict[str, int] = {}  # revision each instance is at after this request's earlier writes
+    # Several changes to one instance undone together: only the end state matters, so
+    # write the oldest one's inverse once, from the revision the newest one left.
+    oldest_undo, newest_revision = {}, {}
+    for item in undone:
+        if item.target_kind in INSTANCE_KINDS:
+            oldest_undo[item.target_id] = item
+            newest_revision.setdefault(item.target_id, item.accepted_instance_revision)
     ids = {i.target_id for i in changing if i.target_kind == "material_object"}
     changed_links = [
         e
@@ -93,6 +106,11 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
     for item, undo in [*((i, True) for i in undone), *((i, False) for i in accepted)]:
         if item.target_kind not in INSTANCE_KINDS:
             continue
+        if undo and oldest_undo.get(item.target_id) is not item:
+            item.accepted_instance_revision = None
+            continue
+        if undo:
+            written.setdefault(item.target_id, newest_revision[item.target_id])
         after = item.before_json if undo else item.after_json
         # Accepting never makes an instance visible: it waits for the session's
         # publish (AI-11). The store keeps a new instance staged and a change to
@@ -105,7 +123,7 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             item.target_kind,
             item.target_id,
             after,
-            expected_revision=item.accepted_instance_revision
+            expected_revision=written.get(item.target_id, item.accepted_instance_revision)
             if undo
             else item.expected_instance_revision,
             actor=actor,
@@ -117,6 +135,7 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             validated=instance_states is not None,
             cascades=cascades_out,
         )
+        written[item.target_id] = result["revision"]
         item.accepted_instance_revision = result["revision"] if not undo else None
         if state == "active":
             active.add(item.target_id)

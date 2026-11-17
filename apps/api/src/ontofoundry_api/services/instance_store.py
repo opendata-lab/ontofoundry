@@ -280,6 +280,7 @@ def write(
     validated=False,
     cascades=None,
     next_revision=None,
+    reconciled=False,
 ):
     """Compare-and-set content, evidence and history. Deleted IDs are never reused.
 
@@ -335,14 +336,17 @@ def write(
         if after["id"] != target_id:
             fail("VALIDATION_FAILED", "实例 id 与目标不匹配", 422)
         try:
-            after = reconcile_evidence(
-                before_element,
-                after,
-                kind,
-                lookup=lookup or (lambda _: None),
-                actor=actor,
-                now=now,
-            )
+            # A draft being published was reconciled when it was accepted: its new
+            # evidence, authors and times stay exactly as accepted.
+            if not reconciled:
+                after = reconcile_evidence(
+                    before_element,
+                    after,
+                    kind,
+                    lookup=lookup or (lambda _: None),
+                    actor=actor,
+                    now=now,
+                )
         except EvidenceError as exc:
             raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
         current = baseline(db, workspace_id, session_id)
@@ -731,6 +735,22 @@ def _write_draft(db, workspace_id, session_id, kind, target_id, row, pending, af
     return result
 
 
+def _require_no_pending_links_elsewhere(db, workspace_id, session_id, object_id):
+    """Deleting a published instance would also delete relations to it that another
+    session has accepted but not published: refuse instead of touching their work."""
+    touches = or_(InstanceLinkRecord.source_instance_id == object_id, InstanceLinkRecord.target_instance_id == object_id)
+    staged = db.scalar(select(func.count()).select_from(InstanceLinkRecord).where(
+        InstanceLinkRecord.workspace_id == workspace_id, InstanceLinkRecord.state == "staged",
+        InstanceLinkRecord.session_id != session_id, touches))
+    drafted = db.scalar(select(func.count()).select_from(InstanceDraftRecord).join(
+        InstanceLinkRecord, InstanceLinkRecord.id == InstanceDraftRecord.target_id).where(
+        InstanceDraftRecord.workspace_id == workspace_id, InstanceDraftRecord.kind == "material_link",
+        InstanceDraftRecord.session_id != session_id, touches))
+    if staged or drafted:
+        fail("INSTANCE_REFERENCED_ELSEWHERE",
+             "要删除的实例还有其他会话待发布的关系，请先在那个会话发布或撤销这些关系")
+
+
 def activate(db, workspace_id, session_id, actor, model):
     current = baseline(db, workspace_id, session_id)
     for item in current["items"]:
@@ -754,12 +774,14 @@ def activate(db, workspace_id, session_id, actor, model):
     for pending in drafts:
         cls = RECORDS[pending.kind]
         row = db.get(cls, pending.target_id)
+        if pending.kind == "material_object" and pending.content_json is None:
+            _require_no_pending_links_elsewhere(db, workspace_id, session_id, pending.target_id)
         if row is not None and row.state == "active":
             write(
                 db, workspace_id, None, pending.kind, pending.target_id, pending.content_json,
                 expected_revision=row.revision, actor=actor,
                 state="active" if pending.content_json is not None else None,
-                operation="activate", model=model, validated=True,
+                operation="activate", model=model, validated=True, reconciled=True,
                 # Draft writes already used revisions in this instance's history.
                 next_revision=_next_revision(db, pending.kind, pending.target_id, row.revision),
             )
@@ -837,13 +859,14 @@ def history(db, workspace_id, kind, target_id, session_id=None):
         .order_by(InstanceHistoryRecord.revision)
     ).all()
 
+    # A snapshot that belongs to a session (staged, or a pending change to a
+    # published instance) is that session's own until it publishes (AI-11).
     return [
         row
         for row in rows
         if all(
             not snapshot
-            or snapshot["state"] != "staged"
-            or snapshot["session_id"] == session_id
+            or snapshot.get("session_id") in (None, session_id)
             for snapshot in (row.before, row.after)
         )
     ]
