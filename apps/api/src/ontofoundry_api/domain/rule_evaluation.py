@@ -247,3 +247,35 @@ def violation_message(where: str, outcome: RuleOutcome) -> str:
 
 def unchecked_message(outcome: RuleOutcome) -> str:
     return f"规则未检查：{rule_label(outcome.rule)}，{outcome.reason}"
+
+
+def only_says_required(draft: CoreDraft, rule: Rule) -> list[str]:
+    """Properties a constraint only requires to be filled (``x IS NOT NULL``, possibly
+    joined with AND). Required belongs on the property, where acceptance checks it;
+    as a rule it would never be evaluated on an empty value. Empty when the rule
+    says anything else, or reaches another object."""
+    if rule.rule_kind != RuleKind.CONSTRAINT or rule.owner_kind == RuleOwnerKind.VALUE_TYPE:
+        return []
+    try:
+        resolved = resolve_rule_expression(draft, rule)
+    except ExpressionError:
+        return []
+    index = draft_index(draft)
+    names = []
+
+    def visit(node) -> bool:
+        while isinstance(node, exp.Paren):
+            node = node.this
+        if isinstance(node, exp.And):
+            return visit(node.this) and visit(node.expression)
+        if not (isinstance(node, exp.Not) and isinstance(node.this, exp.Is) and isinstance(node.this.expression, exp.Null)):
+            return False
+        column = node.this.this
+        ref = column.meta.get("core_reference") if isinstance(column, exp.Column) else None
+        if ref is None or ref.links or ref.property_id not in index.properties:
+            return False
+        prop = index.properties[ref.property_id]
+        names.append(_label(prop))
+        return True
+
+    return names if visit(resolved.ast) else []

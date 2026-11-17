@@ -526,13 +526,15 @@ export const proposalsApi = {
     ),
   batch: (s: Pick<ModelingSession, "id" | "workspace_id">, batchId: string) =>
     request<ProposalBatchDetail>(sessionPath(s) + "/proposal-batches/" + batchId),
-  decide: (s: ModelingSession, decisions: Decision[], idempotencyKey: string) =>
+  /** partial: accept what passes; refused proposals come back pending with their reason. */
+  decide: (s: ModelingSession, decisions: Decision[], idempotencyKey: string, partial = false) =>
     request<DecisionResult>(
       sessionPath(s) + "/proposal-decisions",
       json("POST", {
         idempotency_key: idempotencyKey,
         expected_session_revision: s.revision,
         decisions,
+        ...(partial ? { partial: true } : {}),
       }),
     ).then(sessionWithInstances),
   /** Turns a pending duplicate-fact create into an update of an existing fact. */

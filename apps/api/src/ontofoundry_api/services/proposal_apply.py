@@ -138,29 +138,54 @@ def _instances(model, candidate, items, accepting=False):
     ids = (changed & set(objects)) | {end for link in links for end in (link["source_id"], link["target_id"])}
     validate_instances(model, [objects[key] for key in ids if key in objects], links)
     if accepting:
-        issues = [
-            issue
-            for key in sorted(changed & objects.keys())
-            for issue in instance_value_errors(model, MaterialObject.model_validate(objects[key]), strict=True)
-        ]
+        # Each problem is kept with the instance it is about, so a partial accept
+        # can set exactly those aside.
+        culprits: dict[str, list[str]] = {}
+        for key in sorted(changed & objects.keys()):
+            found = instance_value_errors(model, MaterialObject.model_validate(objects[key]), strict=True)
+            if found:
+                culprits.setdefault(key, []).extend(found)
         # Relations whose endpoint this accept deletes go with it.
         surviving = [
             link for link in candidate.get("material_links", [])
             if link["source_id"] in objects and link["target_id"] in objects
             and not {link["source_id"], link["target_id"]} & deleted
         ]
-        issues.extend(link_count_issues(model, objects, surviving, changed - deleted))
+        for key in sorted(changed - deleted):
+            found = link_count_issues(model, objects, surviving, {key})
+            if found:
+                culprits.setdefault(key, []).extend(found)
         rule_issues, notices = _rule_checks(model, [objects[key] for key in sorted(changed & objects.keys())])
-        issues.extend(rule_issues)
+        for key, found in rule_issues.items():
+            culprits.setdefault(key, []).extend(found)
+        issues = list(dict.fromkeys(m for found in culprits.values() for m in found))
         if issues:
             raise ServiceError("候选图校验未通过：" + "；".join(issues), code="VALIDATION_FAILED",
-                               status_code=422, details={"issues": issues})
+                               status_code=422, details={"issues": issues, "culprits": culprits})
         return notices
     return []
 
 
+def _no_required_rules(model, items):
+    """A new or changed rule that only says a property must be filled is refused:
+    required is set on the property, where acceptance enforces it."""
+    from ontofoundry_api.domain.rule_evaluation import only_says_required, rule_label
+
+    rules = {str(r.id): r for r in model.rules}
+    culprits = {}
+    for item in items:
+        rule = rules.get(item.target_id) if item.target_kind == "rule" and item.after is not None else None
+        if rule is not None and (names := only_says_required(model, rule)):
+            culprits[item.target_id] = [f"规则 {rule_label(rule)}（{rule.expression}）只要求 {'、'.join(names)} 不为空："
+                                        "是否必填在属性上设置，不写成规则"]
+    if culprits:
+        issues = [m for found in culprits.values() for m in found]
+        raise ServiceError("候选图校验未通过：" + "；".join(issues), code="VALIDATION_FAILED",
+                           status_code=422, details={"issues": issues, "culprits": culprits})
+
+
 def _rule_checks(model, objects):
-    """Constraint rules on the accepted instances (AC-07): violations, and rules not checked."""
+    """Constraint rules on the accepted instances (AC-07): violations by instance id, and rules not checked."""
     from uuid import UUID
 
     from ontofoundry_api.domain.graph import draft_index
@@ -172,14 +197,14 @@ def _rule_checks(model, objects):
     )
 
     index = draft_index(model)
-    issues, notices = [], []
+    issues, notices = {}, []
     for raw in objects:
         obj = MaterialObject.model_validate(raw)
         owner = index.objects[obj.type_id]
         where = f"{owner.display_name or owner.name}「{document_display_text(model, obj)}」"
         for outcome in check_instance_rules(model, UUID(str(obj.type_id)), obj.values):
             if outcome.passed is False:
-                issues.append(violation_message(where, outcome))
+                issues.setdefault(str(obj.id), []).append(violation_message(where, outcome))
             elif outcome.passed is None and (message := unchecked_message(outcome)) not in notices:
                 notices.append(message)
     return issues, notices
@@ -244,15 +269,17 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
         group_items(before, items, references_resolved=True)
         candidate = apply_items(before, items)
         model = OntologyDraft.model_validate(definitions(candidate))
+        _no_required_rules(model, items)
         notices = _instances(model, candidate, items, accepting)
         if accepting:
-            issues = definition_issues(model, [
-                Change(i.target_kind, i.target_id, i.after, i.before)
-                for i in items if i.target_kind not in INSTANCE_KINDS
-            ])
+            changes = [Change(i.target_kind, i.target_id, i.after, i.before)
+                       for i in items if i.target_kind not in INSTANCE_KINDS]
+            issues = definition_issues(model, changes)
             if issues:
+                # Which accepted definition each problem comes from, for a partial accept.
+                culprits = {c.target_id: found for c in changes if (found := definition_issues(model, [c]))}
                 raise ServiceError("候选图校验未通过：" + "；".join(issues), code="VALIDATION_FAILED",
-                                   status_code=422, details={"issues": issues})
+                                   status_code=422, details={"issues": issues, "culprits": culprits})
         _evidence(db, workspace_id, before, candidate, items, lookup)
         check_identities(db, workspace_id, element_kinds(candidate))
         published = instance_store.published_model(db, workspace_id)

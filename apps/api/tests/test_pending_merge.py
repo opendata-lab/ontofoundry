@@ -17,7 +17,7 @@ def run_on_top_of_pending(client, session):
     with client.app.state.session_factory() as db:
         record = db.get(ModelingSessionRecord, session["id"])
         review = run_review_context(db, record)
-        candidate = review.pop("candidate_draft")
+        candidate = review.pop("candidate_draft", None) or record.draft_json
         manifest = {
             "run_token": RUN_TOKEN, "workspace_id": session["workspace_id"], "session_id": session["id"],
             "base_version_id": session["base_version_id"], "base_version_sha256": session["base_version_sha256"],

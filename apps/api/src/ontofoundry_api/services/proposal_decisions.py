@@ -377,9 +377,29 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             _check_undo(draft, item, {}, {})
         _apply(draft, _inverse(item, {}))
     trial = None
-    if accepted_items:
-        trial = check_accept(db, workspace_id, session, stored_items(accepted_items, dependencies), settings,
-                             draft=definitions(draft))
+    # "Accept all" (partial): what fails is set aside with its reason, the rest is accepted.
+    set_aside: dict[str, str] = {}
+    while accepted_items:
+        try:
+            trial = check_accept(db, workspace_id, session, stored_items(accepted_items, dependencies), settings,
+                                 draft=definitions(draft))
+            break
+        except ServiceError as exc:
+            culprits = (exc.details or {}).get("culprits") or {}
+            by_target = {item.target_id: item.id for item in accepted_items}
+            hit = {by_target[t]: found for t, found in culprits.items() if t in by_target}
+            if not getattr(body, "partial", False) or undone_items or not hit:
+                raise
+            remaining = {item.id for item in accepted_items}
+            for identity, found in hit.items():
+                set_aside[identity] = "；".join(found)
+                for dep in dependent_group(identity, dependencies):
+                    if dep in remaining and dep not in hit:
+                        set_aside.setdefault(dep, f"依赖的「{_label(by_id[identity])}」未通过")
+            accepted_items = [item for item in accepted_items if item.id not in set_aside]
+    if set_aside:
+        body = body.model_copy(update={"decisions": [d for d in body.decisions if d.proposal_id not in set_aside]})
+    if trial is not None:
         draft = trial.candidate
     changed_items = [*undone_items, *accepted_items]
     instance_cascades: list[dict[str, Any]] = []
@@ -562,6 +582,9 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
                 "triggered_by": triggered_by.get(decision.proposal_id),
             }
         )
+
+    for identity, reason in set_aside.items():
+        results.append({"proposal_id": identity, "status": "pending", "reason": reason, "triggered_by": None})
 
     response = jsonable(
         {
