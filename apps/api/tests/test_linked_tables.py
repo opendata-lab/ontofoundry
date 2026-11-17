@@ -115,7 +115,7 @@ def test_work_pack_catalog_is_compact_and_full_columns_go_to_the_tables_file(cli
     full = json.loads(body)["tables"]
     assert full[1]["connection_id"] == connection_id and full[1]["dialect"] == "mysql"
     assert full[1]["primary_key"] == ["id"]
-    assert full[1]["columns"][1] == {"name": "amount", "type": "DECIMAL(12,2)", "nullable": True, "comment": "金额"}
+    assert full[1]["columns"][1] == {"name": "amount", "type": "DECIMAL(12,2)", "value_kind": "decimal", "nullable": True, "comment": "金额"}
 
 
 def test_publish_rechecks_datasets_saved_directly_into_the_session(client):

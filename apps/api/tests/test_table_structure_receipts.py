@@ -124,7 +124,7 @@ def test_payload_fixes_nested_key_order_and_foreign_key_order(client):
         "key", "table", "connection_id", "connection", "dialect", "schema_name",
         "table_name", "kind", "comment", "primary_key", "foreign_keys", "columns",
     ]
-    assert list(payload["tables"][0]["columns"][0]) == ["name", "type", "nullable", "comment"]
+    assert list(payload["tables"][0]["columns"][0]) == ["name", "type", "value_kind", "nullable", "comment"]
 
 
 def test_multiple_connections_share_one_named_receipt(client):

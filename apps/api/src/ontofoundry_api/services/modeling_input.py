@@ -294,13 +294,22 @@ def linked_tables_payload(details: list[dict]) -> tuple[list[dict], bytes]:
                     }))
                 ],
                 "columns": [
-                    {"name": c["name"], "type": c.get("type"), "nullable": c.get("nullable"), "comment": c.get("comment") or ""}
+                    {"name": c["name"], "type": c.get("type"), "value_kind": _value_kind(c.get("type")),
+                     "nullable": c.get("nullable"), "comment": c.get("comment") or ""}
                     for c in table.get("columns", [])
                 ],
             }
         )
     # Dict insertion order fixes keys; physical column and key-column order is retained.
     return catalog, json.dumps({"tables": full}, indent=2, ensure_ascii=False).encode("utf-8")
+
+
+def _value_kind(physical_type) -> str:
+    """The property value kind a column maps to; the agent no longer keeps its own table."""
+    from ontofoundry_api.domain.validation import physical_value_kind
+
+    kind = physical_value_kind(physical_type)
+    return kind.value if kind is not None else "string"
 
 
 def store_linked_tables_receipt(

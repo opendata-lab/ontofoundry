@@ -645,11 +645,19 @@ def _validate_group(draft, items, *, references_resolved):
 
 
 def _fill_material_sha(evidence, material_lookup):
-    """Evidence names a material by id; its hash is the platform's to supply."""
+    """Evidence names a material by id and lines; the platform supplies its hash
+    and, when no quote is written, the cited text (design §6: the agent need not
+    copy it). Filled before the evidence id is derived, so ids stay stable."""
+    found = material_lookup(str(evidence.get("material_id", "")))
+    if not found:
+        return
     if not evidence.get("material_sha256"):
-        found = material_lookup(str(evidence.get("material_id", "")))
-        if found:
-            evidence["material_sha256"] = found[0]
+        evidence["material_sha256"] = found[0]
+    locator = evidence.get("locator")
+    if not evidence.get("quote") and isinstance(locator, dict):
+        start, end, lines = locator.get("line_start"), locator.get("line_end"), found[1]
+        if isinstance(start, int) and isinstance(end, int) and 0 < start <= end <= len(lines):
+            evidence["quote"] = " ".join(line.strip() for line in lines[start - 1 : end])[:2000]
 
 
 def parse_result(
