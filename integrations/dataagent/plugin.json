@@ -1,6 +1,6 @@
 {
   "name": "ontofoundry-dataagent",
-  "version": "0.2.9",
+  "version": "0.3.1",
   "description": "OntoFoundry 三个语义技能与已有 Agent 配置，管理员安装包",
   "minimum_platform_version": "0.2.9",
   "platform_baseline": "2026-11-15 core-1：工作包带续做信息（run.resume，基线未变时保留上一轮成果）；表数据集提案可不带列，平台按本轮表结构补齐；数据库迁移 20261112_000001（用户管理）、20261113_000001（本体网关）；结果提交到 sessions/{session_id}/proposals，每次运行最多修正 3 轮",

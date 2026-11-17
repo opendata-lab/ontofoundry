@@ -68,7 +68,7 @@ def test_skills_are_one_directory_level_and_frontmatter_is_portable():
         assert 0 < len(fields["description"]) <= 1024
 
 
-def test_offline_package_includes_plugin_and_marketplace(tmp_path):
+def _build_offline_package(tmp_path):
     docker = tmp_path / "fiction-docker"
     docker.write_text('''#!/usr/bin/env python3
 import sys
@@ -83,8 +83,34 @@ if "-o" in sys.argv:
         env={**os.environ, "DOCKER": str(docker)}, capture_output=True, text=True, timeout=20,
     )
     assert result.returncode == 0, result.stderr
+    return output
+
+
+def test_offline_package_includes_plugin_and_marketplace(tmp_path):
+    output = _build_offline_package(tmp_path)
     for path in (PLUGIN / ".claude-plugin/plugin.json", PLUGIN / ".mcp.json", PLUGIN / "skills/ontology-grounding/SKILL.md", ROOT / ".claude-plugin/marketplace.json"):
         assert (output / path.relative_to(ROOT)).read_bytes() == path.read_bytes()
     ci = (ROOT / ".github/workflows/ci.yml").read_text()
     for relative in ("plugins/ontofoundry/.claude-plugin/plugin.json", "plugins/ontofoundry/.mcp.json", "plugins/ontofoundry/skills/ontology-grounding/SKILL.md", ".claude-plugin/marketplace.json"):
         assert "test -f " + relative in ci
+
+
+def _top_block(text, name):
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line == f"{name}:")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i] and not lines[i].startswith(" ")), len(lines))
+    return "\n".join(lines[start + 1 : end])
+
+
+def test_offline_compose_mounts_ontofoundry_data(tmp_path):
+    output = _build_offline_package(tmp_path)
+    compose = (output / "compose.yaml").read_text()
+    assert compose == (ROOT / "scripts/offline-compose.yaml").read_text()
+    services = _top_block(compose, "services")
+    backend_match = re.search(r"(?m)^  of-backend:\n((?:    .*\n|\s*\n)*)", services)
+    assert backend_match is not None
+    backend = backend_match.group(1)
+    assert re.search(r"(?m)^      ONTOFOUNDRY_DATA_DIR:\s*/var/lib/ontofoundry/files\s*$", backend)
+    assert re.search(r"(?m)^      -\s*ontofoundry-data:/var/lib/ontofoundry/files\s*$", backend)
+    volumes = _top_block(compose, "volumes")
+    assert re.search(r"(?m)^  ontofoundry-data:\s*$", volumes)
