@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
+    ProposalBatchRecord,
     ProposalDecisionItemRecord,
     ProposalDecisionRequestRecord,
     ProposalItemRecord,
@@ -90,6 +91,40 @@ def _topological(items: list[ProposalItemRecord], dependencies: dict[str, list[s
     return ordered
 
 
+def _label(item: ProposalItemRecord) -> str:
+    element = item.after_json or item.before_json or {}
+    return element.get("display_name") or element.get("name") or item.target_id
+
+
+def _open_batch_ids(db: Session, session) -> list[str]:
+    """Batches of the session that are not closed by its last publish."""
+    query = select(ProposalBatchRecord.id).where(
+        ProposalBatchRecord.workspace_id == session.workspace_id,
+        ProposalBatchRecord.session_id == session.id,
+    )
+    if session.published_revision is not None:
+        query = query.where(ProposalBatchRecord.source_session_revision >= session.published_revision)
+    return sorted(db.scalars(query))
+
+
+def _later_changes(item: ProposalItemRecord, items: list[ProposalItemRecord]) -> list[str]:
+    """Accepted changes to the same element made after this one: undone first."""
+    if item.accepted_revision is None:
+        return []
+    return [
+        other.id for other in items
+        if other.id != item.id and other.status == "accepted"
+        and other.target_kind == item.target_kind and other.target_id == item.target_id
+        and (other.accepted_revision or 0) > item.accepted_revision
+    ]
+
+
+def _newest_first(items: list[ProposalItemRecord], dependencies: dict[str, list[str]]):
+    """Undo order: latest accepted first; within one accept, dependents before what they need."""
+    rank = {item.id: index for index, item in enumerate(_topological(items, dependencies))}
+    return sorted(items, key=lambda item: (-(item.accepted_revision or 0), -rank[item.id]))
+
+
 def _decision_response(record: ProposalDecisionRequestRecord) -> dict:
     # Side-effect history lives in the decision record, never in the API DTO.
     return {key: value for key, value in record.response_json.items() if key != "_undo"}
@@ -145,6 +180,7 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
         trial_pending,
     )
     from ontofoundry_api.services.session_gate import (
+        batch_read_only,
         lock_session,
         require_current_batch,
         require_idle,
@@ -191,11 +227,14 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             "请求包含不属于本会话的提案",
             items=[{"proposal_id": i, "reason": "不存在或不属于本会话"} for i in missing],
         )
-    batch_ids = sorted({item.batch_id for item in items.values()})
-    batch_items = _batch_items(db, batch_ids, workspace_id, session_id)
-    dependencies = dependency_map(db, batch_ids, workspace_id, session_id)
-    for batch_id in batch_ids:
+    for batch_id in sorted({item.batch_id for item in items.values()}):
         require_current_batch(db, session, batch_id)
+    # Every batch since the last publish: an undo reaches what was built on top
+    # of the item in any of them (AI-06), including older agent batches.
+    batch_ids = _open_batch_ids(db, session)
+    batch_items = _batch_items(db, batch_ids, workspace_id, session_id)
+    batches = {b.id: b for b in db.scalars(select(ProposalBatchRecord).where(ProposalBatchRecord.id.in_(batch_ids)))}
+    dependencies = dependency_map(db, batch_ids, workspace_id, session_id)
     by_id = {item.id: item for item in batch_items}
     explicit = {d.proposal_id: d.decision for d in body.decisions}
     expanded = dict(explicit)
@@ -229,9 +268,24 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
                         include(dep, decision, identity)
                     elif decision == "accept":
                         raise _fail(409, "PROPOSAL_NOT_DECIDABLE", "依赖提案已拒绝，请先恢复")
+            elif decision == "back_to_pending":
+                # What was accepted on top of it leaves the draft with it.
+                for dep in [*dependent_group(identity, dependencies), *_later_changes(item, batch_items)]:
+                    if dep != identity and by_id[dep].status == "accepted":
+                        if batch_read_only(session, batches[by_id[dep].batch_id]):
+                            # Pending items in a read-only batch could never be decided
+                            # again; an undo rejects them instead (lifted in 2c-2).
+                            raise _fail(
+                                409, "PROPOSAL_NOT_RETURNABLE",
+                                f"「{_label(by_id[dep])}」在已只读的智能体批次中依赖此项，请改用撤销",
+                            )
+                        include(dep, decision, identity)
             else:
                 for dep in dependent_group(identity, dependencies):
                     if by_id[dep].status in {"pending", "accepted"}:
+                        include(dep, decision, identity)
+                if item.status == "accepted":
+                    for dep in _later_changes(item, batch_items):
                         include(dep, decision, identity)
         changed = previous_expanded != expanded
     if len(expanded) > 500:
@@ -250,7 +304,8 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     undoes = [
         d.proposal_id
         for d in body.decisions
-        if d.decision == "reject" and items[d.proposal_id].status == "accepted"
+        if (d.decision == "reject" and items[d.proposal_id].status == "accepted")
+        or d.decision == "back_to_pending"
     ]
     problems = []
     for decision in body.decisions:
@@ -272,6 +327,11 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
                     f"提案当前为 {status}",
                 )
             )
+        elif decision.decision == "back_to_pending" and status != "accepted":
+            problems.append((409, "PROPOSAL_NOT_DECIDABLE", decision.proposal_id, f"只有已接受的提案可以退回待审，当前为 {status}"))
+        elif decision.decision == "back_to_pending" and items[decision.proposal_id].target_kind in INSTANCE_KINDS:
+            # Undoing an instance writes a new revision, so it cannot simply wait again (2d).
+            problems.append((409, "PROPOSAL_NOT_RETURNABLE", decision.proposal_id, "实例提案不能退回待审，请撤销后重新建模"))
         elif decision.decision == "restore" and _undone_instance(db, items[decision.proposal_id]):
             # Undoing wrote a new instance revision; restoring the old content
             # would need a fresh check against it, so it takes a new run instead.
@@ -301,7 +361,7 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
 
     before_mapping_write = deepcopy(draft)
     accepted_items = _topological([items[i] for i in accepts], dependencies)
-    undone_items = list(reversed(_topological([items[i] for i in undoes], dependencies)))
+    undone_items = _newest_first([items[i] for i in undoes], dependencies)
     undo_contexts = {}
     for item in undone_items:
         if item.target_kind in INSTANCE_KINDS:
@@ -365,6 +425,9 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
         elif decision.decision == "reject":
             item.status = "rejected"
             item.accepted_revision = None
+        elif decision.decision == "back_to_pending":
+            item.status = "pending"
+            item.accepted_revision = None
         else:
             item.status = "pending"
         item.decided_by, item.decided_at = actor_id, now
@@ -372,7 +435,9 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     from ontofoundry_api.services import change_log
 
     proposal_event_ids: dict[str, str] = {}
-    action_by_decision = {"accept": "accepted", "reject": "rejected", "restore": "restored"}
+    action_by_decision = {
+        "accept": "accepted", "reject": "rejected", "restore": "restored", "back_to_pending": "back_to_pending",
+    }
     for identity in expansion_order:
         item = items[identity]
         decision_name = expanded[identity]
@@ -472,6 +537,9 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             cause_id=proposal_event_ids[trigger_item.id],
             at=now,
         )
+    # Restored items are re-checked per batch. Items sent back to pending are not:
+    # they were valid when accepted, and a cascade can leave them pending in several
+    # batches, which a per-batch check cannot judge (one pending batch comes in 2c-2).
     if any(d.decision == "restore" for d in body.decisions):
         for batch_id in batch_ids:
             trial_pending(db, session, batch_id, settings)
@@ -479,7 +547,13 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     for decision in body.decisions:
         status, reason = after_statuses[decision.proposal_id]
         results.append(
-            {"proposal_id": decision.proposal_id, "status": status, "reason": reason}
+            {
+                "proposal_id": decision.proposal_id,
+                "status": status,
+                "reason": reason,
+                # Set when the item changed because of another one in this request.
+                "triggered_by": triggered_by.get(decision.proposal_id),
+            }
         )
 
     response = jsonable(

@@ -171,6 +171,7 @@ describe("ElementChangeHistory", () => {
           accept: vi.fn(),
           reject: vi.fn(),
           restore: vi.fn(),
+          backToPending: vi.fn(),
         }}
         onRevise={vi.fn()}
         onReviseDataset={vi.fn()}

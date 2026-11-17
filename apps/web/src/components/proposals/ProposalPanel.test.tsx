@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CoreElement, ModelingSession, ProposalBatchDetail, ProposalItem } from "../../api/types";
+import type { CoreElement, DecisionResult, ModelingSession, ProposalBatchDetail, ProposalItem } from "../../api/types";
 import type { ProposalsState } from "../../hooks/useProposals";
 import { emptyDraft } from "../../lib/coreModel";
 import { example } from "../../test/drafts";
@@ -99,7 +99,12 @@ function state(extra: Partial<ProposalsState> = {}): ProposalsState {
     busy: false,
     loading: false,
     reload: vi.fn(),
-    decide: vi.fn().mockResolvedValue(true),
+    // Echoes the server: one result per decided item.
+    decide: vi.fn(async (decisions: { proposal_id: string; decision: string }[]) => ({
+      session: session(),
+      results: decisions.map((d) => ({ proposal_id: d.proposal_id, status: d.decision === "accept" ? "accepted" : "rejected", triggered_by: null })),
+      validation: {},
+    }) as unknown as DecisionResult),
     revise: vi.fn().mockResolvedValue(true),
     ...extra,
   };
@@ -186,9 +191,31 @@ describe("proposal review", () => {
         { proposal_id: "po", decision: "accept" },
       ]),
     );
-    expect(await screen.findByText("已接受 2 条（含 1 条依赖项）")).toBeInTheDocument();
+    expect(await screen.findByText("已接受 1 条；同时接受了：采购订单")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "撤销" }));
     await waitFor(() => expect(proposals.decide).toHaveBeenCalledTimes(3));
+  });
+
+  it("sends an accepted proposal back to review and names what went with it", async () => {
+    const done = item({ id: "done", display_name: "已接受对象", status: "accepted", stored_status: "accepted", after: element({ display_name: "已接受对象", name: "accepted_object" }) });
+    const list = [...items, done];
+    const proposals = state({
+      detail: batch(list),
+      batches: [batch(list)],
+      decide: vi.fn(async () => ({
+        session: session(),
+        results: [
+          { proposal_id: "done", status: "pending", triggered_by: null },
+          { proposal_id: "po", status: "pending", triggered_by: "done" },
+        ],
+        validation: {},
+      }) as unknown as DecisionResult),
+    });
+    panel(proposals);
+    fireEvent.click(screen.getByRole("tab", { name: /已接受/ }));
+    fireEvent.click(screen.getByRole("button", { name: "退回待审 已接受对象" }));
+    await waitFor(() => expect(proposals.decide).toHaveBeenCalledWith([{ proposal_id: "done", decision: "back_to_pending" }]));
+    expect(await screen.findByText("已退回待审 1 条；同时退回待审：采购订单")).toBeInTheDocument();
   });
 
   it("filters by status, kind and search text", async () => {

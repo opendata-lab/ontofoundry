@@ -576,6 +576,44 @@ def validate_session(
     return validate_draft(item.draft_json, get_workspace(db, workspace_id))
 
 
+def _check_merged_definitions(db, workspace_id, current_version_id, model):
+    """Each side passed the accept checks, but their merge can still leave a bound
+    object incomplete (another session bound a table while this one added a
+    property). Re-check the definitions this publish changes, on the merged result."""
+    from ontofoundry_api.domain.accept_checks import Change, definition_issues
+    from ontofoundry_api.domain.instances import INSTANCE_KINDS
+
+    latest = version_snapshot(db, workspace_id, current_version_id)
+    merged = model.model_dump(mode="json")
+    changes = [
+        Change(change["kind"], change["id"], change.get("after"), change.get("before"))
+        for change in _definition_changes(latest, merged)
+        if change["kind"] not in INSTANCE_KINDS
+    ]
+    issues = definition_issues(model, changes)
+    if issues:
+        raise ServiceError(
+            "发布后的模型不完整：" + "；".join(issues),
+            code="ACCEPT_CHECK_FAILED",
+            status_code=422,
+            details={"issues": issues},
+        )
+
+
+def _definition_changes(before: dict, after: dict) -> list[dict]:
+    """Elements added, changed or removed between two snapshots, by kind and id."""
+    from ontofoundry_api.domain.models import PROPOSAL_COLLECTIONS
+
+    found = []
+    for kind, collection in PROPOSAL_COLLECTIONS.items():
+        old = {str(e["id"]): e for e in before.get(collection) or []}
+        new = {str(e["id"]): e for e in after.get(collection) or []}
+        for identity in old.keys() | new.keys():
+            if old.get(identity) != new.get(identity):
+                found.append({"kind": kind.value, "id": identity, "before": old.get(identity), "after": new.get(identity)})
+    return found
+
+
 def publish_session(
     workspace_id: str,
     session_id: str,
@@ -693,6 +731,7 @@ def publish_session(
         raise ServiceError(
             "发布草稿校验失败：" + str(exc), code="VALIDATION_FAILED", status_code=422
         ) from exc
+    _check_merged_definitions(db, workspace_id, space.current_version_id, model)
     try:
         from ontofoundry_api.services import change_log
 
@@ -717,6 +756,8 @@ def publish_session(
         item.draft_json = final_draft
         item.draft_sha256 = item.base_version_sha256
         item.revision += 1
+        # Everything decided so far is now part of a version: closed (§4.4).
+        item.published_revision = item.revision
         item.updated_at = utc_now()
         _record_draft_diffs(
             db,

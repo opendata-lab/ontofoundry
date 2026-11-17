@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, modelingApi, proposalsApi } from "../api/client";
 import type {
   Dataset,
+  DecisionResult,
   FactProposalRevision,
   ModelingSession,
   ProposalBatch,
@@ -11,7 +12,7 @@ import { newId } from "../lib/id";
 
 type Decision = {
   proposal_id: string;
-  decision: "accept" | "reject" | "restore";
+  decision: "accept" | "reject" | "restore" | "back_to_pending";
 };
 
 /**
@@ -106,9 +107,10 @@ export function useProposals(
     if (latest) setSelected(latest);
   }, [latest]);
 
-  const decide = async (decisions: Decision[]) => {
+  /** The server's result on success (it lists everything a cascade changed), null otherwise. */
+  const decide = async (decisions: Decision[]): Promise<DecisionResult | null> => {
     const current = sessionRef.current;
-    if (!current) return false;
+    if (!current) return null;
     const body = JSON.stringify(decisions);
     if (pendingKey.current?.body !== body)
       pendingKey.current = { body, key: newId() };
@@ -127,7 +129,7 @@ export function useProposals(
       sessionRef.current = result.session;
       onSession(result.session);
       reload();
-      return true;
+      return result;
     } catch (e) {
       if (e instanceof ApiError && (e.status === 409 || e.status === 422)) {
         pendingKey.current = null;
@@ -145,7 +147,7 @@ export function useProposals(
         // Transport failure: keep the key, so trying again is a replay.
         setError(e instanceof Error ? e.message : "提交失败");
       }
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }

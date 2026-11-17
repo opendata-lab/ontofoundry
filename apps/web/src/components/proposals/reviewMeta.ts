@@ -86,7 +86,7 @@ export function acceptanceBlock(item: ProposalItem, byIdMap: Map<string, Proposa
   return "";
 }
 
-export type ReviewDecision = "accept" | "reject" | "restore";
+export type ReviewDecision = "accept" | "reject" | "restore" | "back_to_pending";
 
 /** Share the same dependency expansion for row, modal and bulk decisions. */
 export function decisionIds(items: ProposalItem[], requested: string[], decision: ReviewDecision): string[] {
@@ -105,6 +105,9 @@ export function decisionIds(items: ProposalItem[], requested: string[], decision
     if (!item) continue;
     if (decision === "accept") {
       if (item.status === "pending" && !acceptanceBlock(item, byIdMap)) accept(item);
+    } else if (decision === "back_to_pending") {
+      // The server works out what was built on top of it, across batches.
+      if (item.status === "accepted") ids.add(id);
     } else if (
       decision === "restore" ? item.status === "rejected" : ["pending", "accepted"].includes(item.status)
     )

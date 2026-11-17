@@ -61,7 +61,7 @@ def test_undo_restores_element_and_records_a_replayable_decision(client, operati
     assert body["session"]["draft_sha256"] == snapshot_sha256(before)
     assert body["session"]["revision"] == session["revision"] + 1
     assert body["results"] == [
-        {"proposal_id": item["id"], "status": "rejected", "reason": ""}
+        {"proposal_id": item["id"], "status": "rejected", "reason": "", "triggered_by": None}
     ]
     assert (
         decide(client, session, [(item["id"], "reject")], key="undo-replay-key").json()
@@ -89,24 +89,18 @@ def test_undo_restores_element_and_records_a_replayable_decision(client, operati
     assert restored.json()["session"]["pending_proposal_count"] == 1
 
 
-@pytest.mark.parametrize("later_change", ["manual", "proposal"])
-def test_undo_refuses_later_edits_without_changing_draft_or_decision(client, later_change):
+def test_undo_refuses_later_edits_without_changing_draft_or_decision(client):
+    """A later edit that is not a proposal cannot be undone with it."""
     session = create_session(client)
     target = session["draft"]["object_types"][0]
     session, batch = accepted(
         client, session, [update("object_type", target, description="第一次接受")]
     )
-    target = session["draft"]["object_types"][0]
-    if later_change == "manual":
-        draft = deepcopy(session["draft"])
-        draft["object_types"][0]["description"] = "后续人工修改"
-        response = save(client, session, draft)
-        assert response.status_code == 200, response.text
-        session = response.json()
-    else:
-        session, _ = accepted(
-            client, session, [update("object_type", target, description="后续提案修改")]
-        )
+    draft = deepcopy(session["draft"])
+    draft["object_types"][0]["description"] = "后续人工修改"
+    response = save(client, session, draft)
+    assert response.status_code == 200, response.text
+    session = response.json()
     (item,) = batch["items"]
     refused = decide(client, session, [(item["id"], "reject")])
     assert refused.status_code == 409, refused.text
@@ -166,12 +160,31 @@ def test_a_changed_dependent_makes_group_undo_atomic(client):
         )
 
 
-def test_undo_validates_the_whole_draft_before_writing(client):
+def test_undo_cascades_to_a_later_proposal_on_the_same_element(client):
+    """AI-06: the later accepted change is undone first, then the earlier one."""
+    session = create_session(client)
+    target = session["draft"]["object_types"][0]
+    original = target.get("description", "")
+    session, first = accepted(client, session, [update("object_type", target, description="第一次接受")])
+    target = session["draft"]["object_types"][0]
+    session, later = accepted(client, session, [update("object_type", target, description="后续提案修改")])
+    undone = decide(client, session, [(first["items"][0]["id"], "reject")])
+    assert undone.status_code == 200, undone.text
+    results = {r["proposal_id"]: r for r in undone.json()["results"]}
+    assert results[first["items"][0]["id"]]["triggered_by"] is None
+    assert results[later["items"][0]["id"]] == {
+        "proposal_id": later["items"][0]["id"], "status": "rejected", "reason": "",
+        "triggered_by": first["items"][0]["id"],
+    }
+    assert current(client, session)["draft"]["object_types"][0].get("description", "") == original
+
+
+def test_undo_cascades_across_batches_to_what_was_built_on_it(client):
+    """An undone object takes the property a later batch added to it."""
     session = create_session(client)
     session, root_batch = accepted(client, session, chain(session)[:1])
     root = root_batch["items"][0]
-    # A later proposal refers to the root without a recorded item dependency.
-    session, _ = accepted(
+    session, later_batch = accepted(
         client,
         session,
         [
@@ -186,12 +199,15 @@ def test_undo_validates_the_whole_draft_before_writing(client):
             )
         ],
     )
-    refused = decide(client, session, [(root["id"], "reject")])
-    assert refused.status_code == 422, refused.text
-    assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
-    assert "撤销后草稿校验未通过" in refused.json()["error"]["message"]
-    assert current(client, session)["draft"] == session["draft"]
-    assert current(client, session)["revision"] == session["revision"]
+    undone = decide(client, session, [(root["id"], "reject")])
+    assert undone.status_code == 200, undone.text
+    later = later_batch["items"][0]
+    assert {r["proposal_id"]: r["triggered_by"] for r in undone.json()["results"]} == {
+        root["id"]: None, later["id"]: root["id"],
+    }
+    draft = current(client, session)["draft"]
+    assert all(p["id"] != later["target_id"] for p in draft["properties"])
+    assert all(o["id"] != root["target_id"] for o in draft["object_types"])
 
 
 def test_undo_preserves_unrelated_manual_edits(client):

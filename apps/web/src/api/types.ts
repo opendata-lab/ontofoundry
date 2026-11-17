@@ -585,10 +585,11 @@ export type ProposalBatch = {
   error: { code: string; message: string } | null;
 };
 export type ProposalBatchDetail = ProposalBatch & { items: ProposalItem[] };
-export type Decision = { proposal_id: UUID; decision: "accept" | "reject" | "restore" };
+export type Decision = { proposal_id: UUID; decision: "accept" | "reject" | "restore" | "back_to_pending" };
 export type DecisionResult = {
   session: ModelingSession;
-  results: { proposal_id: UUID; status: ProposalStatus; reason?: string }[];
+  /** Every item the decision changed; triggered_by names the item a cascade came from. */
+  results: { proposal_id: UUID; status: ProposalStatus; reason?: string; triggered_by?: UUID | null }[];
   validation: ValidationReport;
 };
 export type FactProposalRevision = {

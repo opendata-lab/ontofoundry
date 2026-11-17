@@ -66,11 +66,21 @@ def require_draft_edit(db, session):
 
 def require_current_batch(db, session, batch_id):
     batch = db.get(ProposalBatchRecord, batch_id)
+    if batch is not None and batch_closed(session, batch):
+        raise ConflictError("该批次已发布，提案只读", code="PROPOSAL_BATCH_PUBLISHED")
     if batch is None or batch_read_only(session, batch):
         raise ConflictError("新一轮已开始，旧批次只读", code="PROPOSAL_BATCH_READ_ONLY")
 
 
+def batch_closed(session, batch):
+    """Decided before the session's last publish: part of a published version."""
+    return session.published_revision is not None and batch.source_session_revision < session.published_revision
+
+
 def batch_read_only(session, batch):
+    """Closed batches never change; an older agent batch is read-only once a newer run started."""
+    if batch_closed(session, batch):
+        return True
     if batch.id == session.human_batch_id:
         return False
     return (session.run_manifest_json or {}).get("source_session_revision", -1) > batch.source_session_revision
