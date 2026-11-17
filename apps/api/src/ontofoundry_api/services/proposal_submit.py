@@ -12,6 +12,7 @@ from ontofoundry_api.contracts.proposal_submit import (
 from ontofoundry_api.contracts.proposals import RunContext, result_digest
 from ontofoundry_api.db_models import utc_now
 from ontofoundry_api.services.errors import ConflictError, ServiceError
+from ontofoundry_api.services.material_store import discard_new_files, keep_new_files
 from ontofoundry_api.services.proposal_apply import parse_agent
 from ontofoundry_api.services.proposals import (
     batch_item_count,
@@ -23,8 +24,9 @@ from ontofoundry_api.services.session_gate import has_pending, lock_session
 
 logger = logging.getLogger(__name__)
 
-# Rejected submissions after the first that a run may repair (CO-02).
-REPAIR_LIMIT = 3
+# Rejected submissions after the first that a run may repair (CO-02): ten
+# submissions of different content in all (AI-10, 2026-11-16); checks happen on submit.
+REPAIR_LIMIT = 9
 
 
 def context_from_manifest(manifest):
@@ -142,12 +144,14 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, act
         )
     except ServiceError as exc:
         db.rollback()
+        discard_new_files(db)
         return _rejected(exc.code, _reason(exc), _record_rejection(db, workspace_id, session_id, digest),
                          problems=(exc.details or {}).get("problems"))
     except Exception:
         # Reported to the agent like any rejection, so it never looks like an outage.
         logger.exception("Unexpected proposal submit failure")
         db.rollback()
+        discard_new_files(db)
         used = _record_rejection(db, workspace_id, session_id, digest)
         return _rejected("RESULT_CHECK_FAILED", "建模结果校验异常，请按本轮契约重新生成", used)
     # A passing submission after a rejection is the repair that fixed it.
@@ -163,4 +167,5 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, act
         session.last_result_task_id = session.dataagent_task_id
     session.updated_at = utc_now()
     db.commit()
+    keep_new_files(db)
     return receipt

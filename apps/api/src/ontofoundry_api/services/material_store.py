@@ -55,5 +55,24 @@ def store_text_material(
     item.chunk_count = count
     destination = settings.data_dir.resolve() / workspace_id / (sha + ".md")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    if not destination.exists():
+        # Written now (evidence checks in this request read it); discarded if
+        # the transaction that created the record rolls back.
+        db.info.setdefault("new_material_files", []).append((workspace_id, sha, destination))
     destination.write_bytes(data)
     return item
+
+
+def discard_new_files(db):
+    """After a rollback: remove files written in it that no committed material uses."""
+    for workspace_id, sha, path in db.info.pop("new_material_files", []):
+        kept = db.scalar(select(MaterialRecord.id).where(
+            MaterialRecord.workspace_id == workspace_id, MaterialRecord.sha256 == sha,
+        ).limit(1))
+        if kept is None:
+            path.unlink(missing_ok=True)
+
+
+def keep_new_files(db):
+    """After a commit: the files belong to committed materials."""
+    db.info.pop("new_material_files", None)
