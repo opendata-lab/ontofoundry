@@ -92,6 +92,8 @@ def test_derivations_are_skipped(order_rules):
     ("REGEXP_LIKE(sales_order.order_no, '^SO-[0-9]+$')", True),
     ("LENGTH(TRIM(sales_order.order_no)) = 4 AND UPPER(sales_order.order_no) = 'SO-1'", True),
     ("NOT (sales_order.status = '已支付' OR sales_order.amount < 0)", False),
+    ("sales_order.status IS NOT NULL", True),
+    ("sales_order.status IS NULL", False),
 ])
 def test_allow_listed_syntax_is_evaluated(order_rules, expression, expected):
     model, order = order_rules(expression)
@@ -115,3 +117,8 @@ def test_arithmetic_is_exact():
     assert evaluate(sqlglot.parse_one("1 / 3"), lambda _: None) == Decimal(1) / Decimal(3)
     with pytest.raises(Unsupported):
         evaluate(sqlglot.parse_one("TRY_CAST('abc' AS INT) IS NOT NULL"), lambda _: None)
+
+
+def test_is_not_null_on_an_empty_value_is_not_evaluated(order_rules):
+    model, order = order_rules("sales_order.status IS NOT NULL")
+    assert "extra_0" not in outcomes(model, order, {**ORDER, "status": None})

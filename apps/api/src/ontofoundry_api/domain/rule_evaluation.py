@@ -104,6 +104,10 @@ def evaluate(node: exp.Expression, lookup) -> object:
         return bool(evaluate(node.this, lookup)) or bool(evaluate(node.expression, lookup))
     if isinstance(node, exp.Not):
         return not evaluate(node.this, lookup)
+    if isinstance(node, exp.Is) and isinstance(node.expression, exp.Null):
+        # Reached only with a value: an empty one stops evaluation first (AC-02's job).
+        evaluate(node.this, lookup)
+        return False
     for kind, compare in COMPARISONS.items():
         if type(node) is kind:
             return compare(*_comparable(evaluate(node.this, lookup), evaluate(node.expression, lookup)))
