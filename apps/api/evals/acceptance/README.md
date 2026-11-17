@@ -12,6 +12,8 @@
 | `results/2026-11-15-modeling-scale-regression` | PR #66 回归（展开脚本、覆盖提醒）：青禾 Q1 54 轮 3 修正、Q2 40 轮 0 修正，指标 10 项＋1 项说明（基线 9），业务规则落位、库存地点关系有；输出 token 53.6–66.6k（基线 42.2k）；星河全量 26–34 轮 64 条，增量各 1 次修正（已加本地列检查） |
 | `results/2026-11-15-modeling-scale-regression-2` | PR #66 关系短清单后复测：青禾 Q3 32 轮 231 s、输出 46.7k、430 条、1 次修正，11 项指标均有定义（复购率口径有误）；星河全量 36 轮 64 条 1 次修正，增量 12 轮 0 修正 |
 
+场景：`xinghe-retail/`（星河，5 表）、`qinghe-scale/`（青禾，34 表）、`accept-checks/`（岚汀，接受检查逐项埋问题）。
+
 `tool_stats.py <conversation.json> [--calls]` 统计一次对话的轮数和工具调用。
 
 概念范围评测的存档在 `../concept_scope/results/`。
