@@ -42,7 +42,8 @@ def _combine(pending: ProposalItemRecord, item: ParsedItem) -> ParsedItem | None
     if pending.operation == "create":
         if item.operation == "delete":
             return None  # proposed and withdrawn: nothing to review
-        return replace(item, operation="create", before=None, expected_target_hash=None)
+        return replace(item, operation="create", before=None, expected_target_hash=None,
+                       expected_instance_revision=None)
     # The real draft still has the element as it was before the pending change.
     operation = "delete" if item.operation == "delete" else "update"
     return replace(
@@ -50,6 +51,33 @@ def _combine(pending: ProposalItemRecord, item: ParsedItem) -> ParsedItem | None
         expected_target_hash=pending.expected_target_hash,
         expected_instance_revision=pending.expected_instance_revision,
     )
+
+
+def instance_overlay(baseline: dict, pending: list[ProposalItemRecord], session_id: str) -> dict:
+    """The run's instance baseline with the pending instance proposals applied, as
+    the pinned draft has the pending definitions applied: the agent can revise them."""
+    from copy import deepcopy
+
+    from ontofoundry_api.domain.instances import INSTANCE_KINDS, instance_hash
+
+    out = deepcopy(baseline)
+    entries = {e["target_id"]: e for e in out.get("items", [])}
+    for row in pending:
+        if row.target_kind not in INSTANCE_KINDS:
+            continue
+        if row.after_json is None:
+            entries.pop(row.target_id, None)
+            continue
+        element = {**row.after_json, "id": row.target_id}
+        entry = entries.get(row.target_id)
+        revision = entry["revision"] if entry else 1
+        entries[row.target_id] = {
+            "target_kind": row.target_kind, "target_id": row.target_id, "revision": revision,
+            "state": entry["state"] if entry else "staged", "session_id": entry["session_id"] if entry else session_id,
+            "element": element, "hash": instance_hash(element, revision),
+        }
+    out["items"] = list(entries.values())
+    return out
 
 
 def merge(parsed: ParsedBatch, pending: list[ProposalItemRecord]) -> tuple[ParsedBatch, dict[str, str]]:

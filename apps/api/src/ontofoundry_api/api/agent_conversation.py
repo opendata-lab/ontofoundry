@@ -382,8 +382,6 @@ async def send_message(
         manifest.update(review)
         manifest["pinned_draft"] = review.pop("candidate_draft", None) or draft
         manifest.pop("candidate_draft", None)
-        from ontofoundry_api.services.instance_store import baseline
-        manifest["instance_baseline"] = baseline(db, workspace_id, session_id)
 
     table_catalog, tables_body = [], None
     if proposals:

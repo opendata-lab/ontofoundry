@@ -275,7 +275,7 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
         raise ServiceError("候选图校验未通过：" + str(exc), code="VALIDATION_FAILED", status_code=422) from exc
 
 
-def parse_agent(db, settings, session, raw, context):
+def parse_agent(db, settings, session, raw, context, *, check=True):
     from ontofoundry_api.services.changes import check_proposal
     from ontofoundry_api.services.table_submission import prepare_table_submission
 
@@ -287,7 +287,9 @@ def parse_agent(db, settings, session, raw, context):
         problems = getattr(exc, "problems", None) or [(exc.code, str(exc))]
         raise ServiceError(str(exc), code=exc.code, status_code=422,
                            details={"problems": problems}) from exc
-    # Against the draft the run was pinned to, which includes pending proposals.
+    if not check:
+        # Merged with the pending proposals first, then checked against the real draft.
+        return parsed
     trial = check_proposal(db, context.workspace_id, session, parsed.items, settings, draft=context.draft)
     return ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
 

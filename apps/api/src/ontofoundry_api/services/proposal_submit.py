@@ -158,8 +158,8 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, act
         )
     try:
         context = context_from_manifest(manifest)
-        parsed = parse_agent(db, settings, session, raw, context)
         pending = pending_items(db, session)
+        parsed = parse_agent(db, settings, session, raw, context, check=not pending)
         fate: dict[str, str] = {}
         if pending:
             # One pending batch per session (AI-08): the result absorbs what is pending.
