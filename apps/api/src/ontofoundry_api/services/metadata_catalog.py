@@ -62,6 +62,20 @@ def list_tables(source, schema):
     return sorted(set(inspector.get_table_names(schema=schema) + inspector.get_view_names(schema=schema)))
 
 
+def _doris_primary_key(columns):
+    """Return Doris key column names in ordinal order.
+
+    When MySQL-compatible key metadata is enabled, PRI marks the primary key
+    and UNI/MUL mark secondary indexes. Released Doris instead reports the table
+    model in COLUMN_KEY: UNI (Unique) and AGG (Aggregate) uniquely identify
+    rows, whereas DUP (Duplicate) is only a sort prefix.
+    """
+    keys = [(c[0], (c[5] or "").strip().upper()) for c in columns]
+    if any(key == "PRI" for _, key in keys):
+        return [name for name, key in keys if key == "PRI"]
+    return [name for name, key in keys if key in {"UNI", "AGG"}]
+
+
 def read_doris_table(source, schema, name, observed_at):
     require_source_schema(source, schema)
     params = {"schema": schema, "name": name}
@@ -88,7 +102,8 @@ def read_doris_table(source, schema, name, observed_at):
             types = {key: value or fallback.get(key) or "" for key, value in types.items()}
         except Exception:
             pass
-    primary = [c[0] for c in columns if (c[5] or "").upper() == "PRI"]
+    primary = _doris_primary_key(columns)
+    primary_set = set(primary)
     return {
         "name": name,
         "schema": schema,
@@ -99,7 +114,7 @@ def read_doris_table(source, schema, name, observed_at):
         "missing": False,
         "observed_at": observed_at,
         "columns": [
-            {"name": c[0], "type": types[c[0]], "primary_key": c[0] in primary, "nullable": c[3] == "YES", "comment": c[4] or None}
+            {"name": c[0], "type": types[c[0]], "primary_key": c[0] in primary_set, "nullable": c[3] == "YES", "comment": c[4] or None}
             for c in columns
         ],
     }
