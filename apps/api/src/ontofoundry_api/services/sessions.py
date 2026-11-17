@@ -335,9 +335,8 @@ def resolve_merge(
     draft = session_draft(item)
     # Resolutions must answer exactly the current conflicts, each with an
     # allowed choice and, for custom, a value of the field's own type.
-    check_resolutions(
-        three_way(base, latest, draft, workspace_id).conflicts, body.resolutions
-    )
+    conflicts = three_way(base, latest, draft, workspace_id).conflicts
+    check_resolutions(conflicts, body.resolutions)
     merge = three_way(base, latest, draft, workspace_id, body.resolutions)
     try:
         jsonschema.validate(merge.merged, CoreDraft.model_json_schema())
@@ -355,9 +354,16 @@ def resolve_merge(
                 "current_version_id": space.current_version_id,
             },
         )
+    # Values typed while resolving are the user's own edits (§4.3); everything
+    # else the merge brings in comes from the latest version, not from them.
+    custom = _custom_elements(conflicts, body.resolutions)
+    custom_items = _check_custom_resolutions(draft, merge.merged, custom)
     # The draft now starts from the current version: resolved conflicts are
     # its content, and the base moves so they are never asked again.
-    draft_diffs = element_changes(draft, merge.merged)
+    draft_diffs = [
+        d for d in element_changes(draft, merge.merged)
+        if (d["element_kind"], d["element_id"]) not in custom
+    ]
     revise(
         db,
         item,
@@ -366,17 +372,58 @@ def resolve_merge(
         draft_json=merge.merged,
         base_version_id=space.current_version_id,
     )
+    actor = user_id or item.created_by
     _record_draft_diffs(
         db,
         workspace_id=workspace_id,
         session_id=session_id,
-        actor_id=user_id or item.created_by,
+        actor_id=actor,
         diffs=draft_diffs,
         at=utc_now(),
     )
+    if custom_items:
+        from types import SimpleNamespace
+
+        from ontofoundry_api.services.changes import _record_human_changes
+
+        # Accepted human proposals in the session's batch of unpublished edits,
+        # with proposal and draft rows in the change log, like any save.
+        _record_human_changes(db, item, SimpleNamespace(items=custom_items), actor, item.revision)
     db.commit()
     db.refresh(item)
     return session_response(db, item)
+
+
+def _custom_elements(conflicts: list[dict], resolutions: dict[str, Any]) -> set[tuple[str, str]]:
+    """Elements whose conflict was answered with a value of the user's own."""
+    found = set()
+    for conflict in conflicts:
+        answer = resolutions.get(conflict["key"])
+        choice = answer.get("choice") if isinstance(answer, dict) else answer
+        if choice == "custom" and conflict.get("element_kind") and conflict.get("element_id"):
+            found.add((conflict["element_kind"], str(conflict["element_id"])))
+    return found
+
+
+def _check_custom_resolutions(draft: dict, merged: dict, custom: set[tuple[str, str]]):
+    """The user's own resolution values go through the accept checks (§4.3)."""
+    if not custom:
+        return []
+    from ontofoundry_api.domain.accept_checks import Change, definition_issues
+    from ontofoundry_api.services.changes import _items
+
+    items = [i for i in _items(draft, merged) if (i.target_kind, str(i.target_id)) in custom]
+    try:
+        model = OntologyDraft.model_validate(merged)
+    except ValidationError as exc:
+        raise ServiceError("合并结果校验失败：" + str(exc), code="RESOLUTION_INVALID", status_code=422) from exc
+    issues = definition_issues(model, [Change(i.target_kind, i.target_id, i.after, i.before) for i in items])
+    if issues:
+        raise ServiceError(
+            "自定义的合并结果不完整：" + "；".join(issues),
+            code="ACCEPT_CHECK_FAILED", status_code=422, details={"issues": issues},
+        )
+    return items
 
 
 def _record_draft_diffs(
