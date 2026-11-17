@@ -288,6 +288,8 @@ class DecisionRequest(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=64)
     expected_session_revision: int
     decisions: list[Decision] = Field(min_length=1, max_length=500)
+    # "Accept all": accept what passes; refused proposals stay pending with their reason.
+    partial: bool = False
 
 
 @router.post("/proposal-decisions")

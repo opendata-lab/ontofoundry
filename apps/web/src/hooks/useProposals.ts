@@ -108,10 +108,10 @@ export function useProposals(
   }, [latest]);
 
   /** The server's result on success (it lists everything a cascade changed), null otherwise. */
-  const decide = async (decisions: Decision[]): Promise<DecisionResult | null> => {
+  const decide = async (decisions: Decision[], partial = false): Promise<DecisionResult | null> => {
     const current = sessionRef.current;
     if (!current) return null;
-    const body = JSON.stringify(decisions);
+    const body = JSON.stringify([decisions, partial]);
     if (pendingKey.current?.body !== body)
       pendingKey.current = { body, key: newId() };
     setBusy(true);
@@ -122,6 +122,7 @@ export function useProposals(
         current,
         decisions,
         pendingKey.current.key,
+        partial,
       );
       pendingKey.current = null;
       // A server-backed undo can issue another decision before React renders

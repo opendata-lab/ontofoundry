@@ -231,6 +231,28 @@ describe("proposal review", () => {
     expect(await screen.findByText("已接受 1 条。规则未检查：买方有名称（buyer_named），涉及其他对象")).toBeInTheDocument();
   });
 
+  it("accept all accepts what passes and says what stayed pending and why", async () => {
+    const proposals = state({
+      decide: vi.fn(async (decisions: { proposal_id: string }[]) => ({
+        session: session(),
+        results: decisions.map((d) =>
+          d.proposal_id === "po"
+            ? { proposal_id: "po", status: "pending", reason: "订单：属性 渠道（channel）未绑定", triggered_by: null }
+            : { proposal_id: d.proposal_id, status: "accepted", triggered_by: null },
+        ),
+        validation: {},
+      }) as unknown as DecisionResult),
+    });
+    panel(proposals);
+    fireEvent.click(screen.getByRole("button", { name: /全部接受/ }));
+    await waitFor(() => expect(proposals.decide).toHaveBeenCalled());
+    expect((proposals.decide as ReturnType<typeof vi.fn>).mock.calls[0][1]).toBe(true);
+    const accepted = (proposals.decide as ReturnType<typeof vi.fn>).mock.calls[0][0].length - 1;
+    expect(
+      await screen.findByText(`已接受 ${accepted} 条；1 条未通过，仍待审：采购订单（订单：属性 渠道（channel）未绑定）`),
+    ).toBeInTheDocument();
+  });
+
   it("filters by status, kind and search text", async () => {
     panel();
     fireEvent.click(screen.getByRole("tab", { name: /已拒绝\s*1/ }));

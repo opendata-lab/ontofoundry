@@ -51,3 +51,53 @@ def test_rules_that_reach_another_object_are_reported_not_blocking(client):
         "规则未检查：买方有名称（buyer_named），涉及其他对象",
         "规则未检查：买方关系规则（buyer_rule），涉及其他对象",
     }
+
+
+def test_a_rule_that_only_says_required_is_refused_at_proposal(client):
+    """Found in the AC verification: the agent moved required into `x IS NOT NULL`, which never blocks."""
+    from test_pending_merge import run_on_top_of_pending
+    from test_t1_proposal_contract import items_only
+
+    session = create_session(client)
+    order = next(o for o in session["draft"]["object_types"] if o["name"] == "order")
+    rule = create("order_no_required", "rule", {
+        "name": "order_no_required", "display_name": "订单号必填", "owner_kind": "object_type",
+        "owner_id": order["id"], "rule_kind": "constraint", "expression": "order.order_no IS NOT NULL"})
+    _, _, url, headers = run_on_top_of_pending(client, session)
+    response = client.post(url, json={"items": items_only([rule])}, headers=headers)
+    assert response.status_code == 200 and not response.json()["passed"], response.text
+    assert "是否必填在属性上设置" in response.text and "订单号必填" in response.text
+
+
+def test_accept_all_accepts_what_passes_and_lists_the_rest(client):
+    import uuid as _uuid
+
+    from test_modeling import ROOT
+
+    session = with_rules(client, create_session(client),
+                         ("no_test_customer", "不收测试客户", "object_type", "customer", "customer.label <> '测试客户'"))
+    order = next(o for o in session["draft"]["object_types"] if o["name"] == "order")
+    buyer = next(link for link in session["draft"]["link_types"] if link["name"] == "buyer")
+    good, bad = create_instance(session, "月湾客户"), create_instance(session, "测试客户")
+    order_item = create("order-1", "material_object", {"type_id": order["id"], "values": {"order_no": "O-1"}, "evidence": []})
+    link = create("buyer-1", "material_link", {"type_id": buyer["id"], "source_id": {"client_ref": "order-1"},
+                                               "target_id": {"client_ref": bad["client_ref"]}, "evidence": []})
+    batch = seed_batch(client, session, [good, bad, order_item, link])
+    ids = {i["client_ref"]: i["id"] for i in batch["items"]}
+    decisions = [{"proposal_id": i, "decision": "accept"} for i in ids.values()]
+
+    def post(partial):
+        current = client.get(ROOT + f"/sessions/{session['id']}").json()
+        return client.post(ROOT + f"/sessions/{session['id']}/proposal-decisions", json={
+            "idempotency_key": str(_uuid.uuid4()), "expected_session_revision": current["revision"],
+            "decisions": decisions, **({"partial": True} if partial else {})})
+
+    assert post(False).status_code == 422  # one by one or all at once: still all or nothing
+    response = post(True)
+    assert response.status_code == 200, response.text
+    results = {r["proposal_id"]: r for r in response.json()["results"]}
+    assert results[ids[good["client_ref"]]]["status"] == "accepted"
+    assert results[ids["order-1"]]["status"] == "accepted"
+    refused = results[ids[bad["client_ref"]]]
+    assert refused["status"] == "pending" and "不收测试客户" in refused["reason"]
+    assert results[ids["buyer-1"]]["status"] == "pending" and "未通过" in results[ids["buyer-1"]]["reason"]

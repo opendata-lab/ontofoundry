@@ -173,25 +173,34 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
     setKind(null);
     setStatus("pending");
   };
-  const submit = async (requested: string[], decision: ReviewDecision) => {
+  const submit = async (requested: string[], decision: ReviewDecision, partial = false) => {
     if (busy || submitting.current) return;
     const ids = decisionIds(items, requested, decision);
     if (!ids.length) return;
     submitting.current = true;
-    const result = await proposals.decide(ids.map((proposal_id) => ({ proposal_id, decision })));
+    const decisions = ids.map((proposal_id) => ({ proposal_id, decision }));
+    const result = await (partial ? proposals.decide(decisions, true) : proposals.decide(decisions));
     submitting.current = false;
     if (!result) return;
+    // An "accept all" leaves what did not pass pending, with the reason.
+    const setAside = partial ? result.results.filter((r) => r.status === "pending") : [];
     // The server may have reached further (other batches, later changes): use what it changed.
-    const changed = result.results.map((r) => r.proposal_id);
+    const changed = result.results.filter((r) => !setAside.includes(r)).map((r) => r.proposal_id);
     setSelected((current) => new Set([...current].filter((id) => !changed.includes(id))));
     const verb = { accept: "已接受", reject: "已拒绝", restore: "已恢复", back_to_pending: "已退回待审" }[decision];
     const extra = changed.filter((id) => !requested.includes(id));
+    const acceptedCount = partial ? changed.length : requested.length;
     const names = extra.map((id) => byId.get(id)?.display_name ?? id).slice(0, 5);
     const also = { accept: "同时接受了", reject: "同时撤销了", restore: "同时恢复了", back_to_pending: "同时退回待审" }[decision];
     // Rules the platform could not evaluate on these instances (AC-07); a note, not a refusal.
     const unchecked = (result.validation?.warnings ?? []).filter((w) => w.code === "RULE_NOT_CHECKED").map((w) => w.message);
     setToast(
-      `${verb} ${requested.length} 条${extra.length ? `；${also}：${names.join("、")}${extra.length > names.length ? ` 等 ${extra.length} 条` : ""}` : ""}` +
+      (partial
+        ? `${verb} ${acceptedCount} 条`
+        : `${verb} ${requested.length} 条${extra.length ? `；${also}：${names.join("、")}${extra.length > names.length ? ` 等 ${extra.length} 条` : ""}` : ""}`) +
+        (setAside.length
+          ? `；${setAside.length} 条未通过，仍待审：${setAside.slice(0, 3).map((r) => `${byId.get(r.proposal_id)?.display_name ?? r.proposal_id}（${r.reason}）`).join("；")}${setAside.length > 3 ? ` 等` : ""}`
+          : "") +
         (unchecked.length ? `。${unchecked.slice(0, 3).join("；")}${unchecked.length > 3 ? ` 等 ${unchecked.length} 条` : ""}` : ""),
     );
     const step = (values: string[], next: ReviewDecision) => values.map((proposal_id) => ({ proposal_id, decision: next }));
@@ -347,7 +356,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
                     size="small"
                     type="primary"
                     disabled={busy || !acceptable.length}
-                    onClick={() => void submit(acceptable.map((item) => item.id), "accept")}
+                    onClick={() => void submit(acceptable.map((item) => item.id), "accept", true)}
                   >
                     全部接受（{acceptable.length}）
                   </Button>

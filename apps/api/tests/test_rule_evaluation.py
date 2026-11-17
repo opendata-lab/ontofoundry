@@ -122,3 +122,18 @@ def test_arithmetic_is_exact():
 def test_is_not_null_on_an_empty_value_is_not_evaluated(order_rules):
     model, order = order_rules("sales_order.status IS NOT NULL")
     assert "extra_0" not in outcomes(model, order, {**ORDER, "status": None})
+
+
+@pytest.mark.parametrize("expression, names", [
+    ("sales_order.status IS NOT NULL", ["status"]),
+    ("(sales_order.status IS NOT NULL) AND sales_order.amount IS NOT NULL", ["status", "amount"]),
+    ("sales_order.status IS NOT NULL AND sales_order.amount > 0", []),
+    ("sales_order.customer.region IS NOT NULL", []),
+    ("sales_order.status IS NULL", []),
+])
+def test_rules_that_only_say_required_are_found(order_rules, expression, names):
+    from ontofoundry_api.domain.rule_evaluation import only_says_required
+
+    model, _ = order_rules(expression)
+    rule = next(r for r in model.rules if r.name == "extra_0")
+    assert [n.split("（")[-1].rstrip("）") if "（" in n else n for n in only_says_required(model, rule)] == names
