@@ -533,7 +533,8 @@ export type ElementSaveResult = {
 
 // --- proposals ------------------------------------------------------------
 
-export type ProposalStatus = "pending" | "accepted" | "rejected";
+/** superseded: replaced by a merged batch when the agent revised pending proposals (history only). */
+export type ProposalStatus = "pending" | "accepted" | "rejected" | "superseded";
 export type EvidenceView = Evidence & { material_name?: string; material_archived?: boolean };
 export type DuplicateCandidate = {
   id: UUID;
@@ -581,7 +582,8 @@ export type ProposalBatch = {
   created_at: ISOTime;
   source_session_revision: number;
   base_version_id: UUID | null;
-  counts: Record<ProposalStatus, number>;
+  /** Superseded items are history and not counted. */
+  counts: Record<"pending" | "accepted" | "rejected", number>;
   error: { code: string; message: string } | null;
 };
 export type ProposalBatchDetail = ProposalBatch & { items: ProposalItem[] };

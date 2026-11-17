@@ -9,9 +9,12 @@ from ontofoundry_api.contracts.proposal_submit import (
     ProposalSubmitIssue,
     ProposalSubmitResponse,
 )
-from ontofoundry_api.contracts.proposals import RunContext, result_digest
+from ontofoundry_api.contracts.proposals import ParsedBatch, RunContext, result_digest
 from ontofoundry_api.db_models import utc_now
-from ontofoundry_api.services.errors import ConflictError, ServiceError
+from ontofoundry_api.services.changes import check_proposal
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.material_store import discard_new_files, keep_new_files
+from ontofoundry_api.services.pending_merge import merge, pending_items
 from ontofoundry_api.services.proposal_apply import parse_agent
 from ontofoundry_api.services.proposals import (
     batch_item_count,
@@ -19,12 +22,13 @@ from ontofoundry_api.services.proposals import (
     submitted_batch,
 )
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
-from ontofoundry_api.services.session_gate import has_pending, lock_session
+from ontofoundry_api.services.session_gate import lock_session
 
 logger = logging.getLogger(__name__)
 
-# Rejected submissions after the first that a run may repair (CO-02).
-REPAIR_LIMIT = 3
+# Rejected submissions after the first that a run may repair (CO-02): ten
+# submissions of different content in all (AI-10, 2026-11-16); checks happen on submit.
+REPAIR_LIMIT = 9
 
 
 def context_from_manifest(manifest):
@@ -102,6 +106,28 @@ def _receipt(db, batch, repair_used=0):
     )
 
 
+def supersede(db, session, pending, fate, batch, actor_id):
+    """The old pending items give way to the merged batch; each fate is in the change log."""
+    from ontofoundry_api.services import change_log
+
+    now = utc_now()
+    for row in pending:
+        before = change_log.proposal_snapshot(status=row.status, operation=row.operation,
+                                              before=row.before_json, after=row.after_json)
+        row.status = "superseded"
+        row.status_reason = {"revised": "已由智能体修订", "withdrawn": "已由智能体撤回", "carried": "已并入新批次"}[fate[row.id]]
+        change_log.record_proposal_event(
+            db, workspace_id=session.workspace_id, session_id=session.id, actor_id=actor_id,
+            actor_kind="agent", action="revised" if fate[row.id] == "revised" else "superseded",
+            target_kind=row.target_kind, target_id=row.target_id, proposal_id=row.id,
+            batch_id=row.batch_id, before=before,
+            after=change_log.proposal_snapshot(status="superseded", operation=row.operation,
+                                               before=row.before_json, after=row.after_json),
+            cause_id=None, at=now, run_token=session.dataagent_run_token,
+        )
+    db.flush()
+
+
 def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, actor_id=None):
     """Returns the outcome; the caller has already verified the run credential."""
     session = lock_session(db, workspace_id, session_id)
@@ -131,23 +157,32 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, act
             int(manifest.get("repair_used") or 0),
         )
     try:
-        if has_pending(db, session):
-            raise ConflictError("请先处理完待审提案", code="PENDING_PROPOSALS")
         context = context_from_manifest(manifest)
         parsed = parse_agent(db, settings, session, raw, context)
+        pending = pending_items(db, session)
+        fate: dict[str, str] = {}
+        if pending:
+            # One pending batch per session (AI-08): the result absorbs what is pending.
+            parsed, fate = merge(parsed, pending)
+            trial = check_proposal(db, workspace_id, session, parsed.items, settings)
+            parsed = ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
         batch = store_batch(
             db, workspace_id=workspace_id, session_id=session_id,
             task_id=session.dataagent_task_id, manifest=manifest, parsed=parsed,
             actor_id=resolved_actor, actor_kind="agent",
         )
+        if pending:
+            supersede(db, session, pending, fate, batch, resolved_actor)
     except ServiceError as exc:
         db.rollback()
+        discard_new_files(db)
         return _rejected(exc.code, _reason(exc), _record_rejection(db, workspace_id, session_id, digest),
                          problems=(exc.details or {}).get("problems"))
     except Exception:
         # Reported to the agent like any rejection, so it never looks like an outage.
         logger.exception("Unexpected proposal submit failure")
         db.rollback()
+        discard_new_files(db)
         used = _record_rejection(db, workspace_id, session_id, digest)
         return _rejected("RESULT_CHECK_FAILED", "建模结果校验异常，请按本轮契约重新生成", used)
     # A passing submission after a rejection is the repair that fixed it.
@@ -163,4 +198,5 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, act
         session.last_result_task_id = session.dataagent_task_id
     session.updated_at = utc_now()
     db.commit()
+    keep_new_files(db)
     return receipt

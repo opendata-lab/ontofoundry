@@ -118,7 +118,8 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const [reportOpen, setReportOpen] = useState(false);
   const producer = detail?.producer;
   const importSource = producer?.kind === "import" && producer.adapter && producer.report_id ? { adapter: producer.adapter, report_id: producer.report_id } : session.import_source;
-  const items = useMemo(() => detail?.items ?? [], [detail]);
+  // Superseded items were folded into a newer batch; their history is in the change log.
+  const items = useMemo(() => (detail?.items ?? []).filter((item) => item.status !== "superseded"), [detail]);
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const categories = ELEMENT_CATEGORIES.filter((category) => items.some((item) => item.target_kind === category.key));
   const [kind, setKind] = useState<TargetKind | null>(null);

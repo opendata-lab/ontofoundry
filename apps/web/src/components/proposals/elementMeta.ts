@@ -23,12 +23,14 @@ export const STATUS: Record<ProposalStatus, string> = {
   pending: "待审",
   accepted: "已接受",
   rejected: "已拒绝",
+  superseded: "已被取代",
 };
 
 export const STATUS_COLOR: Record<ProposalStatus, string> = {
   pending: "default",
   accepted: "success",
   rejected: "default",
+  superseded: "default",
 };
 
 /** Heading like "属性 · 供应商.信用等级". */

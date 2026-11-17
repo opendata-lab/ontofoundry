@@ -138,7 +138,7 @@ it("sends messages as typed, tagged with the session's mode", async () => {
   }
 });
 
-it("blocks sending while proposals are pending and allows it otherwise", async () => {
+it("lets the agent run while proposals are pending (it revises them)", async () => {
   const { container, unmount } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await ready();
   const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
@@ -149,11 +149,9 @@ it("blocks sending while proposals are pending and allows it otherwise", async (
   context.model.session = { ...session(), pending_proposal_count: 1 };
   const pending = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await ready();
-  const blocked = pending.container.querySelector("dataagent-conversation") as AgentConversationElement;
-  expect(blocked.beforeSend!({ content: "建模", settings: {}, attachments: [] })).toBe(false);
-  // The reason is shown above the input, inside the composer.
-  const notice = await screen.findByText("请先处理完待审提案，或在提案上修订");
-  expect(notice.closest('[slot="composer-overlay"]')).not.toBeNull();
+  const open = pending.container.querySelector("dataagent-conversation") as AgentConversationElement;
+  await waitFor(() => expect(open.beforeSend!({ content: "请修订待审提案", settings: {}, attachments: [] })).toBe(true));
+  expect(screen.queryByText("请先处理完待审提案，或在提案上修订")).toBeNull();
 });
 
 it("uploads business knowledge files through Upload.Dragger and switches to the material library", async () => {

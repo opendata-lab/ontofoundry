@@ -167,6 +167,39 @@ def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[st
         },
         "draft": draft,
         "instance_baseline": manifest.get("instance_baseline", {"change_sequence": 0, "items": []}),
+        # AI-05: what is waiting for review and what the session changed since
+        # its base, so the agent can review and revise it.
+        "pending_proposals": manifest.get("pending_proposals", []),
+        "unpublished_changes": manifest.get("unpublished_changes", []),
+    }
+
+
+def run_review_context(db: Session, session) -> dict[str, Any]:
+    """Pending proposals, the draft they would produce, and the unpublished changes."""
+    from ontofoundry_api.services.dataset_proposals import candidate_for
+    from ontofoundry_api.services.element_diff import element_changes
+    from ontofoundry_api.services.sessions import _base_snapshot, session_draft
+
+    pending = list(db.scalars(select(ProposalItemRecord).where(
+        ProposalItemRecord.workspace_id == session.workspace_id,
+        ProposalItemRecord.session_id == session.id,
+        ProposalItemRecord.status == "pending",
+    ).order_by(ProposalItemRecord.created_at, ProposalItemRecord.ordinal)))
+    try:
+        unpublished = element_changes(_base_snapshot(db, session), session_draft(session))
+    except ValueError:
+        unpublished = []
+    return {
+        "pending_proposals": [
+            {
+                "proposal_id": item.id, "operation": item.operation, "target_kind": item.target_kind,
+                "target_id": item.target_id, "before": item.before_json, "after": item.after_json,
+                "reason": item.reason or "",
+            }
+            for item in pending
+        ],
+        "unpublished_changes": unpublished,
+        **({"candidate_draft": candidate_for(db, session)} if pending else {}),
     }
 
 
