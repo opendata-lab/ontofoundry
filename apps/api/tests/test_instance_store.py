@@ -827,7 +827,10 @@ def test_parallel_sessions_compare_and_set_on_postgres(pg_client):
             )
         )
     assert sorted(r.status_code for r in responses) == [200, 409]
-    assert baseline(pg_client, first)["items"][0]["revision"] == entry["revision"] + 1
+    # The winner's change waits in its own draft (AI-11); the loser still sees the published row.
+    winner, loser = (first, second) if responses[0].status_code == 200 else (second, first)
+    assert baseline(pg_client, winner)["items"][0]["revision"] == entry["revision"] + 1
+    assert baseline(pg_client, loser)["items"][0]["revision"] == entry["revision"]
 
 
 def test_delete_proposal_cascades_relations_and_undo_restores_them(client):
