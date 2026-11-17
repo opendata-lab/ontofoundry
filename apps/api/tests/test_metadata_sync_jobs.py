@@ -246,3 +246,150 @@ def test_doris_catalog_reads_filter_each_schema_explicitly():
         assert table["primary_key"] == ["id"]
         assert read_doris_table(conn, "fiction_main", "orders_view", "t")["kind"] == "view"
         assert read_doris_table(conn, "fiction_archive", "orders", "t")["missing"] is True
+
+
+def _doris_engine(db_path, tables, columns):
+    engine = sa.create_engine(f"sqlite:///{db_path}")
+
+    @sa.event.listens_for(engine, "connect")
+    def attach(dbapi, _):
+        dbapi.execute('ATTACH DATABASE ? AS "information_schema"', (str(db_path.with_name("information_schema.db")),))
+
+    with engine.begin() as conn:
+        conn.exec_driver_sql("CREATE TABLE information_schema.tables (TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, TABLE_COMMENT)")
+        conn.exec_driver_sql(
+            "CREATE TABLE information_schema.columns "
+            "(TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, DATA_TYPE, IS_NULLABLE, COLUMN_COMMENT, COLUMN_KEY, ORDINAL_POSITION)"
+        )
+        conn.execute(sa.text("INSERT INTO information_schema.tables VALUES (:s, :t, :kind, :c)"), tables)
+        conn.execute(
+            sa.text(
+                "INSERT INTO information_schema.columns "
+                "VALUES (:s, :t, :col, :ct, :dt, :null, :comment, :key, :pos)"
+            ),
+            columns,
+        )
+    return engine
+
+
+def test_doris_unique_and_aggregate_models_report_primary_keys_while_duplicate_does_not(tmp_path):
+    from ontofoundry_api.services.metadata_catalog import read_doris_table
+
+    engine = _doris_engine(
+        tmp_path / "doris_models.db",
+        [
+            {"s": "fiction_dw", "t": "uniq_orders", "kind": "BASE TABLE", "c": "唯一模型订单"},
+            {"s": "fiction_dw", "t": "agg_daily_sales", "kind": "BASE TABLE", "c": "聚合日汇总"},
+            {"s": "fiction_dw", "t": "dup_events", "kind": "BASE TABLE", "c": "明细日志"},
+            {"s": "fiction_dw", "t": "compat_users", "kind": "BASE TABLE", "c": "兼容模式用户"},
+        ],
+        [
+            {"s": "fiction_dw", "t": "uniq_orders", "col": "order_id", "ct": "bigint", "dt": "bigint", "null": "NO", "comment": "订单号", "key": "uni", "pos": 2},
+            {"s": "fiction_dw", "t": "uniq_orders", "col": "tenant_id", "ct": "varchar(32)", "dt": "varchar", "null": "NO", "comment": "租户", "key": "UNI", "pos": 1},
+            {"s": "fiction_dw", "t": "uniq_orders", "col": "amount", "ct": "decimal(12,2)", "dt": "decimal", "null": "YES", "comment": "金额", "key": "", "pos": 3},
+            {"s": "fiction_dw", "t": "agg_daily_sales", "col": "store_id", "ct": "varchar(16)", "dt": "varchar", "null": "NO", "comment": "门店", "key": "AGG", "pos": 2},
+            {"s": "fiction_dw", "t": "agg_daily_sales", "col": "stat_date", "ct": "date", "dt": "date", "null": "NO", "comment": "统计日期", "key": "AGG", "pos": 1},
+            {"s": "fiction_dw", "t": "agg_daily_sales", "col": "gmv", "ct": "decimal(14,2)", "dt": "decimal", "null": "YES", "comment": "销售额", "key": "", "pos": 3},
+            {"s": "fiction_dw", "t": "dup_events", "col": "event_time", "ct": "datetime", "dt": "datetime", "null": "NO", "comment": "时间", "key": "DUP", "pos": 1},
+            {"s": "fiction_dw", "t": "dup_events", "col": "user_id", "ct": "bigint", "dt": "bigint", "null": "YES", "comment": "用户", "key": "DUP", "pos": 2},
+            {"s": "fiction_dw", "t": "compat_users", "col": "id", "ct": "bigint", "dt": "bigint", "null": "NO", "comment": "主键", "key": "PRI", "pos": 1},
+            {"s": "fiction_dw", "t": "compat_users", "col": "email", "ct": "varchar(120)", "dt": "varchar", "null": "NO", "comment": "邮箱", "key": "UNI", "pos": 2},
+        ],
+    )
+    try:
+        with engine.connect() as conn:
+            conn.info["source_kind"] = "doris"
+
+            uniq = read_doris_table(conn, "fiction_dw", "uniq_orders", "t")
+            assert uniq["primary_key"] == ["tenant_id", "order_id"]
+            assert [(c["name"], c["primary_key"]) for c in uniq["columns"]] == [
+                ("tenant_id", True), ("order_id", True), ("amount", False),
+            ]
+
+            agg = read_doris_table(conn, "fiction_dw", "agg_daily_sales", "t")
+            assert agg["primary_key"] == ["stat_date", "store_id"]
+            assert [(c["name"], c["primary_key"]) for c in agg["columns"]] == [
+                ("stat_date", True), ("store_id", True), ("gmv", False),
+            ]
+
+            dup = read_doris_table(conn, "fiction_dw", "dup_events", "t")
+            assert dup["primary_key"] == []
+            assert all(not c["primary_key"] for c in dup["columns"])
+
+            # When MySQL-compatible metadata is enabled (PRI present), secondary UNI indexes stay non-PK.
+            compat = read_doris_table(conn, "fiction_dw", "compat_users", "t")
+            assert compat["primary_key"] == ["id"]
+            assert [(c["name"], c["primary_key"]) for c in compat["columns"]] == [("id", True), ("email", False)]
+    finally:
+        engine.dispose()
+
+
+def test_doris_sync_job_persists_unique_and_aggregate_keys_to_modeling_input(client, tmp_path, monkeypatch):
+    import json
+
+    from ontofoundry_api.services.dataset_sources import linked_table_details
+    from ontofoundry_api.services.modeling_input import linked_tables_payload
+
+    engine = _doris_engine(
+        tmp_path / "doris_sync.db",
+        [
+            {"s": "fiction_dw", "t": "uniq_stores", "kind": "BASE TABLE", "c": "门店"},
+            {"s": "fiction_dw", "t": "agg_sales", "kind": "BASE TABLE", "c": "日汇总"},
+            {"s": "fiction_dw", "t": "dup_logs", "kind": "BASE TABLE", "c": "日志"},
+        ],
+        [
+            {"s": "fiction_dw", "t": "uniq_stores", "col": "store_id", "ct": "varchar(32)", "dt": "varchar", "null": "NO", "comment": "门店编码", "key": "UNI", "pos": 1},
+            {"s": "fiction_dw", "t": "uniq_stores", "col": "store_name", "ct": "varchar(80)", "dt": "varchar", "null": "NO", "comment": "门店名称", "key": "", "pos": 2},
+            {"s": "fiction_dw", "t": "agg_sales", "col": "stat_date", "ct": "date", "dt": "date", "null": "NO", "comment": "日期", "key": "AGG", "pos": 1},
+            {"s": "fiction_dw", "t": "agg_sales", "col": "amount", "ct": "decimal(12,2)", "dt": "decimal", "null": "YES", "comment": "金额", "key": "", "pos": 2},
+            {"s": "fiction_dw", "t": "dup_logs", "col": "log_time", "ct": "datetime", "dt": "datetime", "null": "NO", "comment": "时间", "key": "DUP", "pos": 1},
+        ],
+    )
+
+    @contextmanager
+    def connect(item, settings, *, timeout_ms=None):
+        with engine.connect() as conn:
+            conn.info["source_kind"] = "doris"
+            yield conn
+
+    monkeypatch.setattr(metadata_sync, "connect_readonly", connect)
+    connection_id = str(uuid4())
+    with client.app.state.session_factory() as db:
+        db.add(
+            ConnectionRecord(
+                id=connection_id,
+                workspace_id=str(DEMO_WORKSPACE_ID),
+                name="虚构分析Doris",
+                kind="doris",
+                config_json={"database": ""},
+                secret_encrypted="",
+            )
+        )
+        db.commit()
+
+    try:
+        response = client.post(
+            ROOT + f"/connections/{connection_id}/assets/sync-jobs",
+            json={"scope": "all"},
+            params={"schema_name": "fiction_dw"},
+        )
+        assert response.status_code == 202, response.text
+        job = client.get(ROOT + f"/connections/{connection_id}/assets/sync-jobs/{response.json()['id']}").json()
+        assert job["state"] == "succeeded" and job["available"] == 3
+
+        with client.app.state.session_factory() as db:
+            details = linked_table_details(
+                db,
+                str(DEMO_WORKSPACE_ID),
+                [
+                    {"connection_id": connection_id, "schema_name": "fiction_dw", "table_name": name}
+                    for name in ("uniq_stores", "agg_sales", "dup_logs")
+                ],
+            )
+        _, payload_bytes = linked_tables_payload(details)
+        payload = {t["table_name"]: t for t in json.loads(payload_bytes)["tables"]}
+        assert payload["uniq_stores"]["primary_key"] == ["store_id"]
+        assert payload["agg_sales"]["primary_key"] == ["stat_date"]
+        assert payload["dup_logs"]["primary_key"] == []
+    finally:
+        engine.dispose()
