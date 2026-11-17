@@ -1,0 +1,992 @@
+{
+  "id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+  "status": "available",
+  "created_at": "2026-11-17T15:08:56.389717Z",
+  "source_session_revision": 7,
+  "base_version_id": "4bf8c912-e1a8-4791-9435-6630429c8b70",
+  "counts": {
+    "pending": 11,
+    "accepted": 0,
+    "rejected": 0
+  },
+  "error": null,
+  "producer": {
+    "agent_id": "agent_86a932ae04f440198da2476f",
+    "skill": "ontology-discovery+entity-extraction",
+    "mode": "model"
+  },
+  "read_only": false,
+  "items": [
+    {
+      "source_diagnostics": [],
+      "id": "a63866ce-df05-5eb9-8a39-fe7a81f38d4a",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 0,
+      "client_ref": null,
+      "operation": "update",
+      "target_kind": "property",
+      "target_id": "47c47e1c-2f50-5c23-bf21-69b9b98c6380",
+      "display_name": "退款日期",
+      "owner_label": "退款",
+      "before": {
+        "id": "47c47e1c-2f50-5c23-bf21-69b9b98c6380",
+        "name": "refunded_on",
+        "unique": false,
+        "evidence": [],
+        "required": false,
+        "synonyms": [],
+        "identifier": false,
+        "value_kind": "date",
+        "description": "",
+        "display_name": "退款日期",
+        "owner_type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "value_type_id": null
+      },
+      "after": {
+        "id": "47c47e1c-2f50-5c23-bf21-69b9b98c6380",
+        "owner_type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "name": "refund_date",
+        "display_name": "退款日期",
+        "description": "",
+        "value_kind": "date",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [
+        {
+          "path": "name",
+          "before": "refunded_on",
+          "after": "refund_date"
+        }
+      ],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "6477d516-f738-517c-90ef-2074a6351b2e"
+      ],
+      "dependency_group": [
+        "6477d516-f738-517c-90ef-2074a6351b2e",
+        "a0d776e7-aaf9-5c31-9e58-26d1eff47253",
+        "a63866ce-df05-5eb9-8a39-fe7a81f38d4a",
+        "c057d402-e202-54bd-8965-725fdfb6935f",
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "a0d776e7-aaf9-5c31-9e58-26d1eff47253",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 1,
+      "client_ref": null,
+      "operation": "update",
+      "target_kind": "property",
+      "target_id": "cd066a62-f079-50e5-b794-79cbe11fca17",
+      "display_name": "退款原因",
+      "owner_label": "退款",
+      "before": {
+        "id": "cd066a62-f079-50e5-b794-79cbe11fca17",
+        "name": "refund_reason",
+        "unique": false,
+        "evidence": [],
+        "required": false,
+        "synonyms": [],
+        "identifier": false,
+        "value_kind": "string",
+        "description": "",
+        "display_name": "退款原因",
+        "owner_type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "value_type_id": null
+      },
+      "after": {
+        "id": "cd066a62-f079-50e5-b794-79cbe11fca17",
+        "owner_type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "name": "reason",
+        "display_name": "退款原因",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [
+        {
+          "path": "name",
+          "before": "refund_reason",
+          "after": "reason"
+        }
+      ],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "6477d516-f738-517c-90ef-2074a6351b2e"
+      ],
+      "dependency_group": [
+        "6477d516-f738-517c-90ef-2074a6351b2e",
+        "a0d776e7-aaf9-5c31-9e58-26d1eff47253",
+        "a63866ce-df05-5eb9-8a39-fe7a81f38d4a",
+        "c057d402-e202-54bd-8965-725fdfb6935f",
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "c057d402-e202-54bd-8965-725fdfb6935f",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 2,
+      "client_ref": "refund_order_no",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "28beb889-dd4f-5419-8687-f98a17ff89f8",
+      "display_name": "原订单号",
+      "owner_label": "退款",
+      "before": null,
+      "after": {
+        "id": "28beb889-dd4f-5419-8687-f98a17ff89f8",
+        "owner_type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "name": "order_no",
+        "display_name": "原订单号",
+        "description": "退款针对的原订单；一笔订单可有多笔退款，故同一订单号可出现多行",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [
+        {
+          "id": "01f56875-37d2-5c98-b5f6-7d759c46467d",
+          "kind": "property",
+          "display_name": "订单号",
+          "name": "order_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "order_no"
+          }
+        },
+        {
+          "id": "a0eb2a9f-4abe-5354-b4e6-b96be90c0696",
+          "kind": "property",
+          "display_name": "订单号",
+          "name": "order_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "order_no"
+          }
+        },
+        {
+          "id": "b6b39434-0a93-55e0-b43c-3748e42567a5",
+          "kind": "property",
+          "display_name": "下单日期",
+          "name": "order_date",
+          "match": {
+            "by": "name_in_query",
+            "text": "order"
+          }
+        },
+        {
+          "id": "1fd1e316-3ce5-55ce-b7f4-a2fcd0d8f745",
+          "kind": "property",
+          "display_name": "行号",
+          "name": "line_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "no"
+          }
+        },
+        {
+          "id": "856460d0-998b-5049-aef4-0e5d320697cd",
+          "kind": "property",
+          "display_name": "退款单号",
+          "name": "refund_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "no"
+          }
+        }
+      ],
+      "physical_differences": [],
+      "depends_on": [
+        "6477d516-f738-517c-90ef-2074a6351b2e"
+      ],
+      "dependency_group": [
+        "6477d516-f738-517c-90ef-2074a6351b2e",
+        "a0d776e7-aaf9-5c31-9e58-26d1eff47253",
+        "a63866ce-df05-5eb9-8a39-fe7a81f38d4a",
+        "c057d402-e202-54bd-8965-725fdfb6935f",
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "16077f2e-0adb-56b1-9817-2ca78b10ea02",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 3,
+      "client_ref": null,
+      "operation": "update",
+      "target_kind": "link_type",
+      "target_id": "64d8d710-1109-51a3-bab5-1a6b22f62822",
+      "display_name": "针对原订单",
+      "owner_label": null,
+      "before": {
+        "id": "64d8d710-1109-51a3-bab5-1a6b22f62822",
+        "name": "refund_order",
+        "tags": [],
+        "evidence": [],
+        "synonyms": [],
+        "data_join": null,
+        "verbalizes": [
+          "{source}针对原订单{target}",
+          "{target}产生退款{source}"
+        ],
+        "description": "退款表未同步，暂不声明数据关联",
+        "display_name": "针对原订单",
+        "multiplicity": "many_to_one",
+        "source_type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "target_type_id": "93252a8c-a6f6-59d9-aa6e-8a5dbebdefa5",
+        "source_role_name": null,
+        "target_role_name": null
+      },
+      "after": {
+        "id": "64d8d710-1109-51a3-bab5-1a6b22f62822",
+        "display_name": "针对原订单",
+        "name": "refund_order",
+        "description": "一笔订单可有多笔退款；按退款表原订单号关联订单号",
+        "verbalizes": [
+          "{source}针对原订单{target}",
+          "{target}产生退款{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "target_type_id": "93252a8c-a6f6-59d9-aa6e-8a5dbebdefa5",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "28beb889-dd4f-5419-8687-f98a17ff89f8"
+          ],
+          "target_property_ids": [
+            "01f56875-37d2-5c98-b5f6-7d759c46467d"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "4a5d29b3-2e10-5b22-a00a-155d6162a12c",
+            "material_id": "752ddf34-d10c-4bca-a587-08aaf0efad7f",
+            "material_sha256": "b1d43c9515ebf5502f9c3935d13a2ba14b5626bf1e8cafb80568aa8eda3890e0",
+            "locator": {
+              "heading": "xinghe_retail.refunds.order_no",
+              "line_start": 14,
+              "line_end": 14
+            },
+            "quote": "原订单号"
+          }
+        ]
+      },
+      "field_changes": [
+        {
+          "path": "data_join",
+          "before": null,
+          "after": {
+            "kind": "direct",
+            "source_property_ids": [
+              "28beb889-dd4f-5419-8687-f98a17ff89f8"
+            ],
+            "target_property_ids": [
+              "01f56875-37d2-5c98-b5f6-7d759c46467d"
+            ]
+          }
+        },
+        {
+          "path": "description",
+          "before": "退款表未同步，暂不声明数据关联",
+          "after": "一笔订单可有多笔退款；按退款表原订单号关联订单号"
+        },
+        {
+          "path": "evidence",
+          "before": [],
+          "after": [
+            {
+              "kind": "material",
+              "id": "4a5d29b3-2e10-5b22-a00a-155d6162a12c",
+              "material_id": "752ddf34-d10c-4bca-a587-08aaf0efad7f",
+              "material_sha256": "b1d43c9515ebf5502f9c3935d13a2ba14b5626bf1e8cafb80568aa8eda3890e0",
+              "locator": {
+                "heading": "xinghe_retail.refunds.order_no",
+                "line_start": 14,
+                "line_end": 14
+              },
+              "quote": "原订单号"
+            }
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "4a5d29b3-2e10-5b22-a00a-155d6162a12c",
+          "material_id": "752ddf34-d10c-4bca-a587-08aaf0efad7f",
+          "material_sha256": "b1d43c9515ebf5502f9c3935d13a2ba14b5626bf1e8cafb80568aa8eda3890e0",
+          "locator": {
+            "heading": "xinghe_retail.refunds.order_no",
+            "line_start": 14,
+            "line_end": 14
+          },
+          "quote": "原订单号",
+          "material_name": "表结构收据 · 本轮提交",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "c057d402-e202-54bd-8965-725fdfb6935f"
+      ],
+      "dependency_group": [
+        "16077f2e-0adb-56b1-9817-2ca78b10ea02",
+        "6477d516-f738-517c-90ef-2074a6351b2e",
+        "a0d776e7-aaf9-5c31-9e58-26d1eff47253",
+        "a63866ce-df05-5eb9-8a39-fe7a81f38d4a",
+        "c057d402-e202-54bd-8965-725fdfb6935f",
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "d6655c57-e500-5b05-b41c-b45755e53638",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 4,
+      "client_ref": "ds_refunds",
+      "operation": "create",
+      "target_kind": "dataset",
+      "target_id": "581e8c2d-be8f-50d1-940d-48e585c0bf00",
+      "display_name": "退款数据",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "581e8c2d-be8f-50d1-940d-48e585c0bf00",
+        "name": "refunds",
+        "display_name": "退款数据",
+        "connection_id": "e3225870-9233-416f-9134-a6ec8dc3ad1f",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "xinghe_retail",
+        "table_name": "refunds",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "refund_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "退款单号"
+          },
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "原订单号"
+          },
+          {
+            "name": "refund_date",
+            "physical_type": "DATE",
+            "comment": "退款日期"
+          },
+          {
+            "name": "refund_amount",
+            "physical_type": "DECIMAL(12, 2)",
+            "comment": "退款金额"
+          },
+          {
+            "name": "reason",
+            "physical_type": "VARCHAR(64) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "退款原因"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "6477d516-f738-517c-90ef-2074a6351b2e",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 5,
+      "client_ref": "map_refund",
+      "operation": "create",
+      "target_kind": "mapping",
+      "target_id": "2ab71b44-8dcf-538e-82a5-41d49570bb0a",
+      "display_name": "退款",
+      "owner_label": "退款",
+      "before": null,
+      "after": {
+        "id": "2ab71b44-8dcf-538e-82a5-41d49570bb0a",
+        "type_id": "dcc76dd9-8803-58ed-8959-0d0869bcb5ed",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "581e8c2d-be8f-50d1-940d-48e585c0bf00",
+            "key_columns": [
+              "refund_no"
+            ]
+          }
+        ],
+        "fields": {
+          "refund_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "refund_no"
+          },
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "refund_date": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "refund_date"
+          },
+          "refund_amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "refund_amount"
+          },
+          "reason": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "reason"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "a0d776e7-aaf9-5c31-9e58-26d1eff47253",
+        "a63866ce-df05-5eb9-8a39-fe7a81f38d4a",
+        "c057d402-e202-54bd-8965-725fdfb6935f",
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "dependency_group": [
+        "6477d516-f738-517c-90ef-2074a6351b2e",
+        "a0d776e7-aaf9-5c31-9e58-26d1eff47253",
+        "a63866ce-df05-5eb9-8a39-fe7a81f38d4a",
+        "c057d402-e202-54bd-8965-725fdfb6935f",
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "e5f6d0ec-c703-5556-9576-6ec08946dff1",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 6,
+      "client_ref": "refund_amount_metric",
+      "operation": "create",
+      "target_kind": "metric",
+      "target_id": "a2f1f844-9ecf-53c5-8f6e-6a81f5b984a3",
+      "display_name": "退款金额",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "a2f1f844-9ecf-53c5-8f6e-6a81f5b984a3",
+        "name": "refund_amount",
+        "display_name": "退款金额",
+        "description": "退款单退款金额合计，按退款日期统计",
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "72aeb5e8-10f4-569f-813b-aa05dd62e7c5",
+            "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 35,
+              "line_end": 35
+            },
+            "quote": "| 退款金额 | 退款单的退款金额合计，按退款日期统计 |"
+          }
+        ],
+        "kind": "simple",
+        "dataset_id": "581e8c2d-be8f-50d1-940d-48e585c0bf00",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "581e8c2d-be8f-50d1-940d-48e585c0bf00",
+          "column": "refund_amount"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "581e8c2d-be8f-50d1-940d-48e585c0bf00",
+          "column": "refund_date"
+        }
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "72aeb5e8-10f4-569f-813b-aa05dd62e7c5",
+          "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+          "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+          "locator": {
+            "heading": null,
+            "line_start": 35,
+            "line_end": 35
+          },
+          "quote": "| 退款金额 | 退款单的退款金额合计，按退款日期统计 |",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [
+        {
+          "id": "8e0c6373-c252-5a8a-9e2a-b3b615d4e9f2",
+          "kind": "metric",
+          "display_name": "销售额",
+          "name": "sales_amount",
+          "match": {
+            "by": "name_in_query",
+            "text": "amount"
+          }
+        }
+      ],
+      "physical_differences": [],
+      "depends_on": [
+        "d6655c57-e500-5b05-b41c-b45755e53638"
+      ],
+      "dependency_group": [
+        "d6655c57-e500-5b05-b41c-b45755e53638",
+        "e5f6d0ec-c703-5556-9576-6ec08946dff1"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "008d9d34-69a2-5a56-a5b0-2284e376bde5",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 7,
+      "client_ref": "ds_sales_refund_daily",
+      "operation": "create",
+      "target_kind": "dataset",
+      "target_id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+      "display_name": "按日销售与退款数据",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+        "name": "sales_refund_daily",
+        "display_name": "按日销售与退款数据",
+        "connection_id": "e3225870-9233-416f-9134-a6ec8dc3ad1f",
+        "source_kind": "query",
+        "dialect": "mysql",
+        "schema_name": null,
+        "table_name": null,
+        "query_sql": "SELECT d.event_date, SUM(d.sales_amount) AS sales_amount, SUM(d.refund_amount) AS refund_amount FROM (SELECT o.order_date AS event_date, o.pay_amount AS sales_amount, 0 AS refund_amount FROM xinghe_retail.orders o WHERE o.status = '已完成' UNION ALL SELECT r.refund_date AS event_date, 0 AS sales_amount, r.refund_amount AS refund_amount FROM xinghe_retail.refunds r) d GROUP BY d.event_date",
+        "description": "把销售额与退款金额按各自业务日期对齐到同一日期轴，供退款率在同一数据集内计算；两路各自带日期，避免多笔退款重复累计销售额",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "event_date",
+            "physical_type": "DATE",
+            "comment": "业务日期：销售取订单下单日期，退款取退款日期"
+          },
+          {
+            "name": "sales_amount",
+            "physical_type": "DECIMAL(12,2)",
+            "comment": "当日已完成订单实付金额合计"
+          },
+          {
+            "name": "refund_amount",
+            "physical_type": "DECIMAL(12,2)",
+            "comment": "当日退款金额合计"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "008d9d34-69a2-5a56-a5b0-2284e376bde5"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "d6c076fe-568c-5fd6-853c-21f14cb1a561",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 8,
+      "client_ref": "daily_sales_amount",
+      "operation": "create",
+      "target_kind": "metric",
+      "target_id": "2835e40d-68b4-5c88-91e8-c442e093ae02",
+      "display_name": "销售额(按日对齐)",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "2835e40d-68b4-5c88-91e8-c442e093ae02",
+        "name": "daily_sales_amount",
+        "display_name": "销售额(按日对齐)",
+        "description": "口径同“销售额”（已完成订单实付金额合计，按下单日期）；建在日期对齐数据集上，作为退款率分母",
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "965a3508-347a-546b-bd59-9a9b1c0e1340",
+            "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 32,
+              "line_end": 32
+            },
+            "quote": "| 销售额 | 状态为“已完成”的订单实付金额合计，按下单日期统计 |"
+          }
+        ],
+        "kind": "simple",
+        "dataset_id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+          "column": "sales_amount"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+          "column": "event_date"
+        }
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "965a3508-347a-546b-bd59-9a9b1c0e1340",
+          "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+          "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+          "locator": {
+            "heading": null,
+            "line_start": 32,
+            "line_end": 32
+          },
+          "quote": "| 销售额 | 状态为“已完成”的订单实付金额合计，按下单日期统计 |",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [
+        {
+          "id": "8e0c6373-c252-5a8a-9e2a-b3b615d4e9f2",
+          "kind": "metric",
+          "display_name": "销售额",
+          "name": "sales_amount",
+          "match": {
+            "by": "name_in_query",
+            "text": "sales_amount"
+          }
+        }
+      ],
+      "physical_differences": [],
+      "depends_on": [
+        "008d9d34-69a2-5a56-a5b0-2284e376bde5"
+      ],
+      "dependency_group": [
+        "008d9d34-69a2-5a56-a5b0-2284e376bde5",
+        "d6c076fe-568c-5fd6-853c-21f14cb1a561"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "26dc11af-912a-5488-b44e-6abd22ae6712",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 9,
+      "client_ref": "daily_refund_amount",
+      "operation": "create",
+      "target_kind": "metric",
+      "target_id": "ef083137-717f-5549-8103-75b7b413007b",
+      "display_name": "退款金额(按日对齐)",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "ef083137-717f-5549-8103-75b7b413007b",
+        "name": "daily_refund_amount",
+        "display_name": "退款金额(按日对齐)",
+        "description": "口径同“退款金额”（退款单退款金额合计，按退款日期）；建在日期对齐数据集上，作为退款率分子",
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "3e4c234f-68b0-5bdb-ae78-72201134e594",
+            "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 35,
+              "line_end": 35
+            },
+            "quote": "| 退款金额 | 退款单的退款金额合计，按退款日期统计 |"
+          }
+        ],
+        "kind": "simple",
+        "dataset_id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+          "column": "refund_amount"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "b1fb8b9e-9533-5a9a-a02b-1c1868734e78",
+          "column": "event_date"
+        }
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "3e4c234f-68b0-5bdb-ae78-72201134e594",
+          "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+          "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+          "locator": {
+            "heading": null,
+            "line_start": 35,
+            "line_end": 35
+          },
+          "quote": "| 退款金额 | 退款单的退款金额合计，按退款日期统计 |",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [
+        {
+          "id": "8e0c6373-c252-5a8a-9e2a-b3b615d4e9f2",
+          "kind": "metric",
+          "display_name": "销售额",
+          "name": "sales_amount",
+          "match": {
+            "by": "name_in_query",
+            "text": "amount"
+          }
+        }
+      ],
+      "physical_differences": [],
+      "depends_on": [
+        "008d9d34-69a2-5a56-a5b0-2284e376bde5"
+      ],
+      "dependency_group": [
+        "008d9d34-69a2-5a56-a5b0-2284e376bde5",
+        "26dc11af-912a-5488-b44e-6abd22ae6712"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "ceb6b351-5e63-52f5-b884-15fb39b2f46c",
+      "batch_id": "87fd2270-47f7-552e-a3f7-ac8b1dad446c",
+      "ordinal": 10,
+      "client_ref": "refund_rate",
+      "operation": "create",
+      "target_kind": "metric",
+      "target_id": "369f9ca7-278a-54b3-89eb-47b1b9fd6bdf",
+      "display_name": "退款率",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "369f9ca7-278a-54b3-89eb-47b1b9fd6bdf",
+        "name": "refund_rate",
+        "display_name": "退款率",
+        "description": "退款金额 ÷ 销售额；两者按各自业务日期对齐后同数据集计算，零分母返回空值",
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "52c1a379-3b0e-5a2b-aac5-9e96c514c930",
+            "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 36,
+              "line_end": 36
+            },
+            "quote": "| 退款率 | 退款金额 ÷ 销售额 |"
+          }
+        ],
+        "kind": "ratio",
+        "numerator_id": "ef083137-717f-5549-8103-75b7b413007b",
+        "denominator_id": "2835e40d-68b4-5c88-91e8-c442e093ae02"
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "52c1a379-3b0e-5a2b-aac5-9e96c514c930",
+          "material_id": "05ccae59-2cb8-4f5d-83ab-656fea0a175e",
+          "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+          "locator": {
+            "heading": null,
+            "line_start": 36,
+            "line_end": 36
+          },
+          "quote": "| 退款率 | 退款金额 ÷ 销售额 |",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "26dc11af-912a-5488-b44e-6abd22ae6712",
+        "d6c076fe-568c-5fd6-853c-21f14cb1a561"
+      ],
+      "dependency_group": [
+        "008d9d34-69a2-5a56-a5b0-2284e376bde5",
+        "26dc11af-912a-5488-b44e-6abd22ae6712",
+        "ceb6b351-5e63-52f5-b884-15fb39b2f46c",
+        "d6c076fe-568c-5fd6-853c-21f14cb1a561"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    }
+  ]
+}

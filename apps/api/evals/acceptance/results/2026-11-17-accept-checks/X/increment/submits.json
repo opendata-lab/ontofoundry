@@ -1,0 +1,12 @@
+[
+  {
+    "command": "cd [LOCAL_PATH]/workspace && \"$DATAAGENT_PYTHON_BIN\" [LOCAL_PATH]/prepare_result.py --work-pack uploads/ontofoundry-work-pack-f348562a1d07617d1a9594c3f4d3e784.json modeling/parts/",
+    "output": "平台检查未通过，未入库。最终文件未替换。完整报告：output/ontofoundry-result-f348562a1d07617d1a9594c3f4d3e784.pending.platform-submit.json\n修正轮次：已用 0/9（平台计数）\n错误 [CLIENT_REF_UNKNOWN]：modeling/parts/01-update.json#/2（合并后 /items/2） [\"refund_order_no\"] 未知新增引用 refund；期望 {\"可用新增引用\":[\"refund_order_no\",\"ds_refunds\",\"map_refund\",\"refund_amount_metric\",\"ds_sales_refund_daily\",\"daily_sales_amount\",\"daily_refund_amount\",\"refund_rate\"]}；实际 \"refund\"；下一步：按“期望”改；完整写法见建模技能的 scripts/show_example.py --part 01。本次整批提交未通过，未入库。\n错误 [CLIENT_REF_UNKNOWN]：modeling/parts/01-update.json#/5（合并后 /items/5） [\"map_refund\"] 未知新增引用 refund；期望 {\"可用新增引用\":[\"refund_order_no\",\"ds_refunds\",\"map_refund\",\"refund_amount_metric\",\"ds_sales_refund_daily\",\"daily_sales_amount\",\"daily_refund_amount\",\"refund_rate\"]}；实际 \"refund\"；下一步：按“期望”改；完整写法见建模技能的 scripts/show_example.py --part 03。本次整批提交未通过，未入库。\n下一步：修正片段后重试 \"$DATAAGENT_PYTHON_BIN\" [LOCAL_PATH]/prepare_result.py --work-pack uploads/ontofoundry-work-pack-f348562a1d07617d1a9594c3f4d3e784.json\n",
+    "tool_error": true
+  },
+  {
+    "command": "cd [LOCAL_PATH]/workspace && python3 - <<'EOF'\nimport json\np='modeling/parts/01-update.json'\nd=json.load(open(p,encoding='utf-8'))\nREF=\"dcc76dd9-8803-58ed-8959-0d0869bcb5ed\"\nd[2]['after']['owner_type_id']=REF\nd[5]['after']['type_id']=REF\nopen(p,'w',encoding='utf-8').write(json.dumps(d,ensure_ascii=False,indent=1))\nprint('ok')\nEOF\n\"$DATAAGENT_PYTHON_BIN\" [LOCAL_PATH]/prepare_result.py --work-pack uploads/ontofoundry-work-pack-f348562a1d07617d1a9594c3f4d3e784.json modeling/parts/",
+    "output": "ok\n平台检查通过并已入库：11 条待审。\n按类型：metric 4、property 3、dataset 2、link_type 1、mapping 1\n已完成：直接按收尾第 3 步作答；不必再读结果文件，也不补写 modeling/ 下的文件。\n本轮成果已移到 modeling/submitted/f348562a1d07617d1a9594c3f4d3e784/，下一轮不会重复提交。\n已保存结果留档：output/ontofoundry-result-f348562a1d07617d1a9594c3f4d3e784.json；提案已入库，等待用户审核\n",
+    "tool_error": false
+  }
+]

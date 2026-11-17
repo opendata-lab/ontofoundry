@@ -1,0 +1,80 @@
+{
+  "pending": 39,
+  "accepted_all_at_once": false,
+  "refusals": [
+    {
+      "proposal_id": "a40b1c3a-5b55-5292-b142-c4941d188c8c",
+      "target_kind": "property",
+      "display_name": "下单渠道",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：订单：属性 下单渠道（channel）未绑定",
+      "details": null
+    },
+    {
+      "proposal_id": "aa21f7b3-44db-5eaa-a0dc-df7df6b87077",
+      "target_kind": "material_object",
+      "display_name": "林汀",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）",
+      "details": null
+    },
+    {
+      "proposal_id": "aaaa9d51-5ab7-59e0-b62c-104119aa7564",
+      "target_kind": "material_object",
+      "display_name": "O-2001",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：订单：属性 下单渠道（channel）未绑定",
+      "details": null
+    },
+    {
+      "proposal_id": "70a9d68b-21d1-5cab-be17-e3700084b993",
+      "target_kind": "material_object",
+      "display_name": "F-01",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：发货单「F-01」：发货数量（ship_qty）待补全",
+      "details": null
+    },
+    {
+      "proposal_id": "5b6c9f5c-9208-53dc-a559-ebbba8493b68",
+      "target_kind": "material_link",
+      "display_name": "O-2001 → 林汀",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）",
+      "details": null
+    },
+    {
+      "proposal_id": "2917557e-0411-50ea-bc4f-ac09c5743a97",
+      "target_kind": "material_link",
+      "display_name": "O-2002 → 林汀",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）",
+      "details": null
+    },
+    {
+      "proposal_id": "38f89f42-0d5b-5ddd-b893-5ee1ffe3dc3d",
+      "target_kind": "material_link",
+      "display_name": "F-01 → O-2001",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：发货单「F-01」：发货数量（ship_qty）待补全",
+      "details": null
+    }
+  ],
+  "warnings": [
+    {
+      "severity": "warning",
+      "code": "RULE_NOT_CHECKED",
+      "message": "规则未检查：大额订单限金卡会员（high_amount_gold_member），涉及其他对象"
+    }
+  ],
+  "all_at_once_error": {
+    "issues": [
+      "发货单「F-01」：发货数量（ship_qty）待补全",
+      "订单「O-2002」：关系 下单会员 只能连一个，已连 会员「M102」",
+      "订单「O-2002」：关系 下单会员 只能连一个，已连 会员「林汀」",
+      "会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）"
+    ],
+    "code": "VALIDATION_FAILED",
+    "message": "候选图校验未通过：发货单「F-01」：发货数量（ship_qty）待补全；订单「O-2002」：关系 下单会员 只能连一个，已连 会员「M102」；订单「O-2002」：关系 下单会员 只能连一个，已连 会员「林汀」；会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）"
+  },
+  "still_pending": 7
+}

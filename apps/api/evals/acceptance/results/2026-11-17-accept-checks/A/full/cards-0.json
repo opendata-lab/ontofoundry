@@ -1,0 +1,27 @@
+{
+  "answers": [
+    {
+      "question": "材料提到「发货单表 shipments 的 ship_qty」并给出「发货件数」口径，但本轮关联表只有 members、orders 两张。发货单概念怎么处理？",
+      "selected": [
+        "建发货单概念，字段映射待表结构"
+      ]
+    },
+    {
+      "question": "近期记录中有 4 处与材料规则冲突（M101 等级「钻石」不在普通/金卡枚举内；O-2002 由两位会员共同下单；F-01 发货数量缺失；O-2001 只给日期而要求精确到分钟）。抽取时如何处理？",
+      "selected": [
+        "只抽合规部分，冲突逐条记问题清单"
+      ]
+    },
+    {
+      "question": "近期记录里出现但信息极少的对象（M102 只出现在共同下单句；O-2002 只有订单号与金额），是否作为实例抽取？",
+      "selected": [
+        "点名对象都建实例，缺值留空"
+      ]
+    }
+  ],
+  "response": {
+    "task_id": "task_3a978ee1fb3a49e48c97c90d",
+    "request_id": "82c39cfa09e64395a7029eb34f0fa584:call_00_yXXwiJFCgWiTAPlVOp450487",
+    "accepted": true
+  }
+}

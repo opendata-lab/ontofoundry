@@ -1,0 +1,32 @@
+{
+  "status": "finished",
+  "result_state": "done",
+  "observed_wall_seconds": 44.622942,
+  "turns": 12,
+  "tool_calls": 14,
+  "tool_calls_by_kind": {
+    "bash:init_workflow.py": 1,
+    "read:incremental.md": 1,
+    "bash:show_element.py": 5,
+    "bash:show_example.py": 4,
+    "bash:cd": 1,
+    "bash:prepare_result.py": 2
+  },
+  "usage": {
+    "input_tokens": 9144,
+    "output_tokens": 5956,
+    "cache_read_input_tokens": 1084672,
+    "cache_creation_input_tokens": 0
+  },
+  "platform_submits": 2,
+  "repair_used": 1,
+  "repair_limit": 9,
+  "proposal_counts": {
+    "mapping": 1,
+    "property": 1,
+    "rule": 1
+  },
+  "model_errors": [],
+  "cards": 0,
+  "dataagent_status": null
+}

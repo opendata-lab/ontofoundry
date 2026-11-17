@@ -1,0 +1,539 @@
+{
+  "id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+  "status": "available",
+  "created_at": "2026-11-17T14:59:46.961315Z",
+  "source_session_revision": 22,
+  "base_version_id": null,
+  "counts": {
+    "pending": 7,
+    "accepted": 0,
+    "rejected": 0
+  },
+  "error": null,
+  "producer": {
+    "agent_id": "agent_86a932ae04f440198da2476f",
+    "skill": "ontology-discovery+entity-extraction",
+    "mode": "model"
+  },
+  "read_only": false,
+  "items": [
+    {
+      "source_diagnostics": [],
+      "id": "0cae67fe-1acc-5753-b9e5-274db65b1bd4",
+      "batch_id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+      "ordinal": 0,
+      "client_ref": null,
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "9be3617d-8e08-5553-bca1-b5baa6d29106",
+      "display_name": "下单渠道",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "9be3617d-8e08-5553-bca1-b5baa6d29106",
+        "owner_type_id": "cd171ce0-0fd9-5331-8518-67ed7721c1ae",
+        "name": "channel",
+        "display_name": "下单渠道",
+        "description": "材料要求订单记录下单渠道（门店/线上）；lanting_shop.orders 现有 6 列无渠道列，属性暂无可绑定的物理字段，故不落映射：待该表增列并在数据管理同步后，再为本属性补字段绑定",
+        "value_kind": "string",
+        "value_type_id": "d33932af-9e7a-5c26-a24f-9507e3d1c778",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "5e6627c6-28bd-5213-8b23-3c8040692b7e",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "发货单以发货单号唯一标识，对应一张订单；发货数量必须填写。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "5e6627c6-28bd-5213-8b23-3c8040692b7e",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "发货单以发货单号唯一标识，对应一张订单；发货数量必须填写。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "订单：属性 下单渠道（channel）未绑定"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "0cae67fe-1acc-5753-b9e5-274db65b1bd4"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "dcde94f3-830d-50dd-b9b6-bfd2a87d461f",
+      "batch_id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+      "ordinal": 1,
+      "client_ref": "member_m101",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "bc5495b6-4d01-5a4e-bf70-b86f89c94bc3",
+      "display_name": "林汀",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "bc5495b6-4d01-5a4e-bf70-b86f89c94bc3",
+        "type_id": "1ad9a28f-4790-526e-aa91-768727afe947",
+        "values": {
+          "member_no": "M101",
+          "member_name": "林汀",
+          "member_level": "钻石"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "5ff51f13-9edd-5df5-b885-4efbef172d79",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 13,
+              "line_end": 13
+            },
+            "quote": "会员 M101 林汀，等级为钻石。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "5ff51f13-9edd-5df5-b885-4efbef172d79",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 13,
+            "line_end": 13
+          },
+          "quote": "会员 M101 林汀，等级为钻石。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "dcde94f3-830d-50dd-b9b6-bfd2a87d461f"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "a6992a05-31a8-5ac6-b615-1df256aea5a7",
+      "batch_id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+      "ordinal": 2,
+      "client_ref": "order_o2001",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "030205cc-d307-5b34-a702-2983a82eb4f1",
+      "display_name": "O-2001",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "030205cc-d307-5b34-a702-2983a82eb4f1",
+        "type_id": "cd171ce0-0fd9-5331-8518-67ed7721c1ae",
+        "values": {
+          "order_no": "O-2001",
+          "item_count": 42,
+          "pay_amount": 680,
+          "ordered_at": "2026-03-02 00:00:00",
+          "channel": "门店"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "90b383ae-7cd0-5254-9b88-e49cdf7e3493",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 14,
+              "line_end": 14
+            },
+            "quote": "订单 O-2001 由会员 M101 下单，共 四十二 件，实付 680 元，下单时间 2026 年 3 月 2 日，渠道为门店。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "90b383ae-7cd0-5254-9b88-e49cdf7e3493",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 14,
+            "line_end": 14
+          },
+          "quote": "订单 O-2001 由会员 M101 下单，共 四十二 件，实付 680 元，下单时间 2026 年 3 月 2 日，渠道为门店。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "订单：属性 下单渠道（channel）未绑定"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "0cae67fe-1acc-5753-b9e5-274db65b1bd4"
+      ],
+      "dependency_group": [
+        "0cae67fe-1acc-5753-b9e5-274db65b1bd4",
+        "a6992a05-31a8-5ac6-b615-1df256aea5a7"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "5091e08e-aed1-5697-a880-002d40d83d6b",
+      "batch_id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+      "ordinal": 3,
+      "client_ref": "shipment_f01",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "6ab3484e-e2ac-5740-9108-85608c8a82df",
+      "display_name": "F-01",
+      "owner_label": "发货单",
+      "before": null,
+      "after": {
+        "id": "6ab3484e-e2ac-5740-9108-85608c8a82df",
+        "type_id": "3957fe60-5107-5b22-bff4-9ba93a22d520",
+        "values": {
+          "shipment_no": "F-01"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "550b587a-71a1-513d-b340-e17a3a275d29",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "550b587a-71a1-513d-b340-e17a3a275d29",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 16,
+            "line_end": 16
+          },
+          "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "发货单「F-01」：发货数量（ship_qty）待补全"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "5091e08e-aed1-5697-a880-002d40d83d6b"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "25566a67-7fb3-5c5a-abe8-4534f7a6a2e9",
+      "batch_id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+      "ordinal": 4,
+      "client_ref": "order_o2001_member_m101",
+      "operation": "create",
+      "target_kind": "material_link",
+      "target_id": "db2d04b6-8934-5a3c-85d4-da00df5c7403",
+      "display_name": "O-2001 → 林汀",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "db2d04b6-8934-5a3c-85d4-da00df5c7403",
+        "type_id": "dd5b9ffd-1b3f-5f99-b5c1-2233f164dfdb",
+        "source_id": "030205cc-d307-5b34-a702-2983a82eb4f1",
+        "target_id": "bc5495b6-4d01-5a4e-bf70-b86f89c94bc3",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "bad9eb6f-9ec3-5f00-8783-c344a5ff43d5",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 14,
+              "line_end": 14
+            },
+            "quote": "订单 O-2001 由会员 M101 下单，共 四十二 件，实付 680 元，下单时间 2026 年 3 月 2 日，渠道为门店。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "bad9eb6f-9ec3-5f00-8783-c344a5ff43d5",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 14,
+            "line_end": 14
+          },
+          "quote": "订单 O-2001 由会员 M101 下单，共 四十二 件，实付 680 元，下单时间 2026 年 3 月 2 日，渠道为门店。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "a6992a05-31a8-5ac6-b615-1df256aea5a7",
+        "dcde94f3-830d-50dd-b9b6-bfd2a87d461f"
+      ],
+      "dependency_group": [
+        "0cae67fe-1acc-5753-b9e5-274db65b1bd4",
+        "25566a67-7fb3-5c5a-abe8-4534f7a6a2e9",
+        "a6992a05-31a8-5ac6-b615-1df256aea5a7",
+        "dcde94f3-830d-50dd-b9b6-bfd2a87d461f"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "fa356aa0-eb46-5f73-9de1-250c04982558",
+      "batch_id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+      "ordinal": 5,
+      "client_ref": "order_o2002_member_m101",
+      "operation": "create",
+      "target_kind": "material_link",
+      "target_id": "8cccb4c3-56c9-52ae-aaed-af0f23e2cba1",
+      "display_name": "O-2002 → 林汀",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "8cccb4c3-56c9-52ae-aaed-af0f23e2cba1",
+        "type_id": "dd5b9ffd-1b3f-5f99-b5c1-2233f164dfdb",
+        "source_id": "05aa5916-6dbc-553b-9d9b-9a4837263527",
+        "target_id": "bc5495b6-4d01-5a4e-bf70-b86f89c94bc3",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "63aa1c5c-df48-51e7-b0de-20de0e4c9cd4",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 15,
+              "line_end": 15
+            },
+            "quote": "订单 O-2002 由会员 M101 和会员 M102 共同下单，实付 120 元。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "63aa1c5c-df48-51e7-b0de-20de0e4c9cd4",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 15,
+            "line_end": 15
+          },
+          "quote": "订单 O-2002 由会员 M101 和会员 M102 共同下单，实付 120 元。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "订单「O-2002」：关系 下单会员 只能连一个，已连 会员「M102」",
+        "会员「林汀」：会员等级（member_level）为 '钻石'，不满足规则 会员等级取值（member_level_values）（member_level IN ('普通', '金卡')）"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "dcde94f3-830d-50dd-b9b6-bfd2a87d461f"
+      ],
+      "dependency_group": [
+        "dcde94f3-830d-50dd-b9b6-bfd2a87d461f",
+        "fa356aa0-eb46-5f73-9de1-250c04982558"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "35adc7bc-accc-5149-a664-870ab4ca1460",
+      "batch_id": "6dd632b0-89f6-5890-a333-c1dc899289b0",
+      "ordinal": 6,
+      "client_ref": "shipment_f01_order_o2001",
+      "operation": "create",
+      "target_kind": "material_link",
+      "target_id": "06a466ba-6dfd-5c20-b387-eb450d3c2cbc",
+      "display_name": "F-01 → O-2001",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "06a466ba-6dfd-5c20-b387-eb450d3c2cbc",
+        "type_id": "e198dcbf-7b08-56c1-a7a6-ca16bb475214",
+        "source_id": "6ab3484e-e2ac-5740-9108-85608c8a82df",
+        "target_id": "030205cc-d307-5b34-a702-2983a82eb4f1",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "5cea13b3-5348-5eaa-97fa-591e34065ac3",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "5cea13b3-5348-5eaa-97fa-591e34065ac3",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 16,
+            "line_end": 16
+          },
+          "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "发货单「F-01」：发货数量（ship_qty）待补全"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "5091e08e-aed1-5697-a880-002d40d83d6b",
+        "a6992a05-31a8-5ac6-b615-1df256aea5a7"
+      ],
+      "dependency_group": [
+        "0cae67fe-1acc-5753-b9e5-274db65b1bd4",
+        "35adc7bc-accc-5149-a664-870ab4ca1460",
+        "5091e08e-aed1-5697-a880-002d40d83d6b",
+        "a6992a05-31a8-5ac6-b615-1df256aea5a7"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    }
+  ]
+}

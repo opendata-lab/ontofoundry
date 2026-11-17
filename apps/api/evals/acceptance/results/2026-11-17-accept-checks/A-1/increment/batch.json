@@ -1,0 +1,234 @@
+{
+  "id": "475f706a-acd2-5448-b3ec-0fc5bf6047cc",
+  "status": "available",
+  "created_at": "2026-11-17T15:00:20.436919Z",
+  "source_session_revision": 25,
+  "base_version_id": "e55e65ee-ba15-4cad-893b-4337de704976",
+  "counts": {
+    "pending": 3,
+    "accepted": 0,
+    "rejected": 0
+  },
+  "error": null,
+  "producer": {
+    "agent_id": "agent_86a932ae04f440198da2476f",
+    "skill": "ontology-discovery+entity-extraction",
+    "mode": "model"
+  },
+  "read_only": false,
+  "items": [
+    {
+      "source_diagnostics": [],
+      "id": "e8b3b85f-328b-5c4f-99e1-74f9162d76f9",
+      "batch_id": "475f706a-acd2-5448-b3ec-0fc5bf6047cc",
+      "ordinal": 0,
+      "client_ref": "ds_shipments",
+      "operation": "create",
+      "target_kind": "dataset",
+      "target_id": "895e6964-4a11-5446-8264-8c6e5e1edb75",
+      "display_name": "发货单数据",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "895e6964-4a11-5446-8264-8c6e5e1edb75",
+        "name": "shipments",
+        "display_name": "发货单数据",
+        "connection_id": "e8132572-9511-4584-882b-a87fb45e894e",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "lanting_shop",
+        "table_name": "shipments",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "shipment_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "发货单号"
+          },
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "订单号"
+          },
+          {
+            "name": "qty",
+            "physical_type": "INTEGER",
+            "comment": "发货数量"
+          },
+          {
+            "name": "shipped_at",
+            "physical_type": "DATETIME",
+            "comment": "发货时间"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "e8b3b85f-328b-5c4f-99e1-74f9162d76f9"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "82f9bce0-a39e-53b3-a2b3-661c424b7dad",
+      "batch_id": "475f706a-acd2-5448-b3ec-0fc5bf6047cc",
+      "ordinal": 1,
+      "client_ref": "map_shipment",
+      "operation": "create",
+      "target_kind": "mapping",
+      "target_id": "d9bb00d3-19cc-5a0d-aa87-1bb998d2f72f",
+      "display_name": "发货单",
+      "owner_label": "发货单",
+      "before": null,
+      "after": {
+        "id": "d9bb00d3-19cc-5a0d-aa87-1bb998d2f72f",
+        "type_id": "3957fe60-5107-5b22-bff4-9ba93a22d520",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "895e6964-4a11-5446-8264-8c6e5e1edb75",
+            "key_columns": [
+              "shipment_no"
+            ]
+          }
+        ],
+        "fields": {
+          "shipment_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shipment_no"
+          },
+          "ship_qty": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "qty"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "e8b3b85f-328b-5c4f-99e1-74f9162d76f9"
+      ],
+      "dependency_group": [
+        "82f9bce0-a39e-53b3-a2b3-661c424b7dad",
+        "e8b3b85f-328b-5c4f-99e1-74f9162d76f9"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "6afa81c4-1b91-5326-910e-f35396e576af",
+      "batch_id": "475f706a-acd2-5448-b3ec-0fc5bf6047cc",
+      "ordinal": 2,
+      "client_ref": "shipment_qty",
+      "operation": "create",
+      "target_kind": "metric",
+      "target_id": "acd57527-19b0-5ac1-b1b7-674ee92b1689",
+      "display_name": "发货件数",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "acd57527-19b0-5ac1-b1b7-674ee92b1689",
+        "name": "shipment_qty",
+        "display_name": "发货件数",
+        "description": "发货单表 shipments 的发货数量列（qty）求和，按发货时间 shipped_at 归期",
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "374af877-f1e8-5fd0-b457-19fcae306d1d",
+            "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "指标“发货件数”：发货单表 shipments 的 ship_qty 列求和。"
+          }
+        ],
+        "kind": "simple",
+        "dataset_id": "895e6964-4a11-5446-8264-8c6e5e1edb75",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "895e6964-4a11-5446-8264-8c6e5e1edb75",
+          "column": "qty"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "895e6964-4a11-5446-8264-8c6e5e1edb75",
+          "column": "shipped_at"
+        }
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "374af877-f1e8-5fd0-b457-19fcae306d1d",
+          "material_id": "b028adcd-a29c-44ca-84b8-d730e7b107d7",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 8,
+            "line_end": 8
+          },
+          "quote": "指标“发货件数”：发货单表 shipments 的 ship_qty 列求和。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "e8b3b85f-328b-5c4f-99e1-74f9162d76f9"
+      ],
+      "dependency_group": [
+        "6afa81c4-1b91-5326-910e-f35396e576af",
+        "e8b3b85f-328b-5c4f-99e1-74f9162d76f9"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    }
+  ]
+}

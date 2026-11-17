@@ -1,0 +1,42 @@
+{
+  "status": "finished",
+  "result_state": "done",
+  "observed_wall_seconds": 69.002531,
+  "turns": 18,
+  "tool_calls": 17,
+  "tool_calls_by_kind": {
+    "bash:init_workflow.py": 1,
+    "read:extract.md": 1,
+    "bash:show_example.py": 2,
+    "bash:read_input.py": 1,
+    "write": 5,
+    "bash:expand_tables.py": 2,
+    "bash:cd": 3,
+    "bash:prepare_result.py": 1,
+    "read:finish.md": 1
+  },
+  "usage": {
+    "input_tokens": 14641,
+    "output_tokens": 11425,
+    "cache_read_input_tokens": 423040,
+    "cache_creation_input_tokens": 0
+  },
+  "platform_submits": 1,
+  "repair_used": 0,
+  "repair_limit": 9,
+  "proposal_counts": {
+    "value_type": 3,
+    "rule": 6,
+    "object_type": 3,
+    "property": 13,
+    "link_type": 2,
+    "dataset": 2,
+    "mapping": 2,
+    "metric": 1,
+    "material_object": 5,
+    "material_link": 1
+  },
+  "model_errors": [],
+  "cards": 0,
+  "dataagent_status": null
+}

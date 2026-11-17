@@ -1,0 +1,66 @@
+{
+  "pending": 433,
+  "accepted_all_at_once": false,
+  "refusals": [
+    {
+      "proposal_id": "781be501-7705-522b-abaf-1c73ba7f482b",
+      "target_kind": "property",
+      "display_name": "盘亏数量",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：盘点明细：属性 盘亏数量（loss_qty）未绑定",
+      "details": null
+    },
+    {
+      "proposal_id": "e8b3dbe0-be2b-5b21-8796-25cacdcc073b",
+      "target_kind": "rule",
+      "display_name": "盘亏数量等于账面减实盘",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：盘点明细：属性 盘亏数量（loss_qty）未绑定",
+      "details": null
+    },
+    {
+      "proposal_id": "35423ede-c1b3-5a1b-aea7-77d66370b8a4",
+      "target_kind": "material_object",
+      "display_name": "普通",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：会员等级「普通」：等级代码（level_code）待补全",
+      "details": null
+    },
+    {
+      "proposal_id": "8ca55ed9-09cc-5ba1-92ea-8d95fdea4aa6",
+      "target_kind": "material_object",
+      "display_name": "银卡",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：会员等级「银卡」：等级代码（level_code）待补全",
+      "details": null
+    },
+    {
+      "proposal_id": "07fa1c6e-ba99-5bd9-949c-a488f5381ffc",
+      "target_kind": "material_object",
+      "display_name": "金卡",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：会员等级「金卡」：等级代码（level_code）待补全",
+      "details": null
+    },
+    {
+      "proposal_id": "68ce0219-bc2c-5c12-ae34-19e3c8f07c8e",
+      "target_kind": "material_object",
+      "display_name": "黑卡",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：会员等级「黑卡」：等级代码（level_code）待补全",
+      "details": null
+    }
+  ],
+  "warnings": [],
+  "all_at_once_error": {
+    "issues": [
+      "会员等级「金卡」：等级代码（level_code）待补全",
+      "会员等级「银卡」：等级代码（level_code）待补全",
+      "会员等级「普通」：等级代码（level_code）待补全",
+      "会员等级「黑卡」：等级代码（level_code）待补全"
+    ],
+    "code": "VALIDATION_FAILED",
+    "message": "候选图校验未通过：会员等级「金卡」：等级代码（level_code）待补全；会员等级「银卡」：等级代码（level_code）待补全；会员等级「普通」：等级代码（level_code）待补全；会员等级「黑卡」：等级代码（level_code）待补全"
+  },
+  "still_pending": 6
+}

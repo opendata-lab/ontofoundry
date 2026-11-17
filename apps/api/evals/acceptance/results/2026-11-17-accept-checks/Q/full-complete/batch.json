@@ -1,0 +1,364 @@
+{
+  "id": "41080903-1094-5f57-a27c-48a6378a6509",
+  "status": "available",
+  "created_at": "2026-11-17T15:59:52.884233Z",
+  "source_session_revision": 188,
+  "base_version_id": null,
+  "counts": {
+    "pending": 3,
+    "accepted": 0,
+    "rejected": 0
+  },
+  "error": null,
+  "producer": {
+    "agent_id": "agent_86a932ae04f440198da2476f",
+    "skill": "ontology-discovery+entity-extraction",
+    "mode": "model"
+  },
+  "read_only": false,
+  "items": [
+    {
+      "source_diagnostics": [],
+      "id": "881229c6-129e-59a5-a23f-44ed795c37f0",
+      "batch_id": "41080903-1094-5f57-a27c-48a6378a6509",
+      "ordinal": 0,
+      "client_ref": null,
+      "operation": "update",
+      "target_kind": "mapping",
+      "target_id": "ac20ad75-5de4-57e5-83b1-91d973439004",
+      "display_name": "盘点明细",
+      "owner_label": "盘点明细",
+      "before": {
+        "id": "ac20ad75-5de4-57e5-83b1-91d973439004",
+        "fields": {
+          "sku": {
+            "kind": "column",
+            "column": "sku",
+            "source_id": "main"
+          },
+          "book_qty": {
+            "kind": "column",
+            "column": "book_qty",
+            "source_id": "main"
+          },
+          "counted_qty": {
+            "kind": "column",
+            "column": "counted_qty",
+            "source_id": "main"
+          },
+          "stocktake_no": {
+            "kind": "column",
+            "column": "stocktake_no",
+            "source_id": "main"
+          }
+        },
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "9a7cfee5-5680-5190-92ef-348a887ac7ee",
+            "key_columns": [
+              "stocktake_no",
+              "sku"
+            ]
+          }
+        ],
+        "type_id": "b2ff6b34-37c8-597f-87af-d1acc6174be7",
+        "binding_mode": "independent",
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      "after": {
+        "id": "ac20ad75-5de4-57e5-83b1-91d973439004",
+        "type_id": "b2ff6b34-37c8-597f-87af-d1acc6174be7",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "9a7cfee5-5680-5190-92ef-348a887ac7ee",
+            "key_columns": [
+              "stocktake_no",
+              "sku"
+            ]
+          }
+        ],
+        "fields": {
+          "book_qty": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "book_qty"
+          },
+          "counted_qty": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "counted_qty"
+          },
+          "sku": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "sku"
+          },
+          "stocktake_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "stocktake_no"
+          },
+          "loss_qty": {
+            "kind": "expression",
+            "expression": "main.book_qty - main.counted_qty"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      "field_changes": [
+        {
+          "path": "fields",
+          "before": {
+            "sku": {
+              "kind": "column",
+              "column": "sku",
+              "source_id": "main"
+            },
+            "book_qty": {
+              "kind": "column",
+              "column": "book_qty",
+              "source_id": "main"
+            },
+            "counted_qty": {
+              "kind": "column",
+              "column": "counted_qty",
+              "source_id": "main"
+            },
+            "stocktake_no": {
+              "kind": "column",
+              "column": "stocktake_no",
+              "source_id": "main"
+            }
+          },
+          "after": {
+            "book_qty": {
+              "kind": "column",
+              "source_id": "main",
+              "column": "book_qty"
+            },
+            "counted_qty": {
+              "kind": "column",
+              "source_id": "main",
+              "column": "counted_qty"
+            },
+            "sku": {
+              "kind": "column",
+              "source_id": "main",
+              "column": "sku"
+            },
+            "stocktake_no": {
+              "kind": "column",
+              "source_id": "main",
+              "column": "stocktake_no"
+            },
+            "loss_qty": {
+              "kind": "expression",
+              "expression": "main.book_qty - main.counted_qty"
+            }
+          }
+        }
+      ],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "c12fbc32-fa70-5c6e-b4a1-f97d18e055ac"
+      ],
+      "dependency_group": [
+        "881229c6-129e-59a5-a23f-44ed795c37f0",
+        "c12fbc32-fa70-5c6e-b4a1-f97d18e055ac"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "c12fbc32-fa70-5c6e-b4a1-f97d18e055ac",
+      "batch_id": "41080903-1094-5f57-a27c-48a6378a6509",
+      "ordinal": 1,
+      "client_ref": "stocktake_item_loss_qty",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "38ea2f1c-bbb8-593d-a067-9ff40aa1d48b",
+      "display_name": "盘亏数量",
+      "owner_label": "盘点明细",
+      "before": null,
+      "after": {
+        "id": "38ea2f1c-bbb8-593d-a067-9ff40aa1d48b",
+        "owner_type_id": "b2ff6b34-37c8-597f-87af-d1acc6174be7",
+        "name": "loss_qty",
+        "display_name": "盘亏数量",
+        "description": "实盘数量少于账面数量的部分，按账面数量减实盘数量推导；盘亏成本计入损耗",
+        "value_kind": "integer",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [
+        {
+          "id": "13d9ab8d-6ddd-59b9-8217-f1b491e398b9",
+          "kind": "property",
+          "display_name": "调拨数量",
+          "name": "qty",
+          "match": {
+            "by": "name_in_query",
+            "text": "qty"
+          }
+        },
+        {
+          "id": "3127f330-01c9-5596-9833-cdb7d65bf0bb",
+          "kind": "property",
+          "display_name": "账面数量",
+          "name": "book_qty",
+          "match": {
+            "by": "name_in_query",
+            "text": "qty"
+          }
+        },
+        {
+          "id": "4f41d28e-46c7-5e2b-85ba-3c4491505db4",
+          "kind": "property",
+          "display_name": "退货数量",
+          "name": "qty",
+          "match": {
+            "by": "name_in_query",
+            "text": "qty"
+          }
+        },
+        {
+          "id": "950a7cc9-f7a5-5587-a722-7cc0f96ae471",
+          "kind": "property",
+          "display_name": "数量",
+          "name": "qty",
+          "match": {
+            "by": "name_in_query",
+            "text": "qty"
+          }
+        },
+        {
+          "id": "a8df5b39-b021-54f5-bcb8-eec396bfb682",
+          "kind": "property",
+          "display_name": "实收数量",
+          "name": "qty_received",
+          "match": {
+            "by": "name_in_query",
+            "text": "qty"
+          }
+        }
+      ],
+      "physical_differences": [],
+      "depends_on": [
+        "881229c6-129e-59a5-a23f-44ed795c37f0"
+      ],
+      "dependency_group": [
+        "881229c6-129e-59a5-a23f-44ed795c37f0",
+        "c12fbc32-fa70-5c6e-b4a1-f97d18e055ac"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "ba3b13e4-e086-5528-b5e5-12d721373609",
+      "batch_id": "41080903-1094-5f57-a27c-48a6378a6509",
+      "ordinal": 2,
+      "client_ref": "loss_qty_derivation",
+      "operation": "create",
+      "target_kind": "rule",
+      "target_id": "f8801502-0719-5c53-b4b0-c6334dff6cc7",
+      "display_name": "盘亏数量等于账面减实盘",
+      "owner_label": "盘亏数量",
+      "before": null,
+      "after": {
+        "id": "f8801502-0719-5c53-b4b0-c6334dff6cc7",
+        "name": "loss_qty_derivation",
+        "display_name": "盘亏数量等于账面减实盘",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "38ea2f1c-bbb8-593d-a067-9ff40aa1d48b",
+        "rule_kind": "derivation",
+        "expression": "stocktake_item.book_qty - stocktake_item.counted_qty",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "66d71c29-b22f-57d9-a275-4413be9fcadc",
+            "material_id": "07e7463a-fec0-48f8-bc38-0d553e279e6b",
+            "material_sha256": "42f08952bcb5cf31742efb3de754e9828fb3af6e46320aa1d07a893bac91f176",
+            "locator": {
+              "heading": null,
+              "line_start": 23,
+              "line_end": 23
+            },
+            "quote": "- 门店定期盘点，实盘数量少于账面数量的部分算“盘亏”，盘亏成本计入损耗。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "66d71c29-b22f-57d9-a275-4413be9fcadc",
+          "material_id": "07e7463a-fec0-48f8-bc38-0d553e279e6b",
+          "material_sha256": "42f08952bcb5cf31742efb3de754e9828fb3af6e46320aa1d07a893bac91f176",
+          "locator": {
+            "heading": null,
+            "line_start": 23,
+            "line_end": 23
+          },
+          "quote": "- 门店定期盘点，实盘数量少于账面数量的部分算“盘亏”，盘亏成本计入损耗。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "c12fbc32-fa70-5c6e-b4a1-f97d18e055ac"
+      ],
+      "dependency_group": [
+        "881229c6-129e-59a5-a23f-44ed795c37f0",
+        "ba3b13e4-e086-5528-b5e5-12d721373609",
+        "c12fbc32-fa70-5c6e-b4a1-f97d18e055ac"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    }
+  ]
+}

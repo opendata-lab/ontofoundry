@@ -1,0 +1,13 @@
+{
+  "pending": 6,
+  "accepted_all_at_once": true,
+  "refusals": [],
+  "warnings": [
+    {
+      "severity": "warning",
+      "code": "RULE_NOT_CHECKED",
+      "message": "规则未检查：发货数量必填（ship_qty_required），用到暂不支持的写法（暂不支持 Is）"
+    }
+  ],
+  "still_pending": 0
+}

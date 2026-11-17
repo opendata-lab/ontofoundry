@@ -1,0 +1,59 @@
+{
+  "pending": 38,
+  "accepted_all_at_once": false,
+  "refusals": [
+    {
+      "proposal_id": "3a94b72d-e327-53ec-95e8-e0c5208428a4",
+      "target_kind": "property",
+      "display_name": "下单渠道",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：订单：属性 下单渠道（channel）未绑定",
+      "details": null
+    },
+    {
+      "proposal_id": "a5616feb-2c1c-5112-9f84-97cd28e8cbe5",
+      "target_kind": "material_object",
+      "display_name": "O-2001",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：订单「O-2001」：下单时间（ordered_at）必须是日期时间，缺少时间：'2026-03-02'",
+      "details": null
+    },
+    {
+      "proposal_id": "03a8279e-0583-5968-b0ed-a8536ce5ed23",
+      "target_kind": "material_object",
+      "display_name": "F-01",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：发货单「F-01」：发货数量（ship_qty）待补全",
+      "details": null
+    },
+    {
+      "proposal_id": "8ab52688-fdf4-5769-9ad7-43e5fa881cc3",
+      "target_kind": "material_link",
+      "display_name": "F-01 → O-2001",
+      "code": "VALIDATION_FAILED",
+      "message": "候选图校验未通过：订单「O-2001」：下单时间（ordered_at）必须是日期时间，缺少时间：'2026-03-02'；发货单「F-01」：发货数量（ship_qty）待补全",
+      "details": null
+    }
+  ],
+  "warnings": [
+    {
+      "severity": "warning",
+      "code": "RULE_NOT_CHECKED",
+      "message": "规则未检查：高额订单需金卡会员（high_amount_needs_gold），涉及其他对象"
+    },
+    {
+      "severity": "warning",
+      "code": "RULE_NOT_CHECKED",
+      "message": "规则未检查：订单必须有下单会员（order_has_member），用到暂不支持的写法（暂不支持 Is）"
+    }
+  ],
+  "all_at_once_error": {
+    "issues": [
+      "订单「O-2001」：下单时间（ordered_at）必须是日期时间，缺少时间：'2026-03-02'",
+      "发货单「F-01」：发货数量（ship_qty）待补全"
+    ],
+    "code": "VALIDATION_FAILED",
+    "message": "候选图校验未通过：订单「O-2001」：下单时间（ordered_at）必须是日期时间，缺少时间：'2026-03-02'；发货单「F-01」：发货数量（ship_qty）待补全"
+  },
+  "still_pending": 4
+}
