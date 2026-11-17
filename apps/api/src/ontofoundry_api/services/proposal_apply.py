@@ -247,10 +247,14 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
                     raise ValueError("元素 id 与提案目标不一致")
             if item.target_kind in INSTANCE_KINDS:
                 row = db.get(instance_store.RECORDS[item.target_kind], item.target_id)
+                # A published instance this session already changed is at its draft's revision.
+                own_draft = (instance_store.session_drafts(db, workspace_id, session.id, item.target_kind).get(item.target_id)
+                             if row is not None else None)
+                current_revision = own_draft.revision if own_draft is not None else (row.revision if row else None)
                 if (row is None and item.expected_instance_revision is not None) or (row is not None and (
                     row.workspace_id != workspace_id or row.state == "deleted"
                     or (row.state == "staged" and row.session_id != session.id)
-                    or row.revision != item.expected_instance_revision
+                    or current_revision != item.expected_instance_revision
                 )):
                     raise ConflictError("实例已变化或不属于当前会话", code="INSTANCE_REVISION_CHANGED")
                 if item.after is not None:
