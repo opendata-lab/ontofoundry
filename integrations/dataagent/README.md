@@ -15,11 +15,11 @@ build_packages.py             组装包，复制共享资源
 plugin.json、install.sh、迁移说明.md
 ```
 
-`shared/references/` 包含 core-model、principles、examples（含 protocol）、extract-kit、steps/finish.md（合并修正输出，两个建模技能共用）；`shared/scripts/` 包含 init_workflow、read_input、show_element、show_example、check_part、runpaths、check_result、prepare_result 等；`platform_functions.json`（平台拒绝的函数名）与 `table_format.py` 由 generate_output_schemas.py 从平台代码生成，平台改动函数白名单后重新运行 `make -C integrations/dataagent schemas`。源码只存一份，构建时复制到两个建模技能包，每个安装目录均可独立运行；问数技能 semantic-grounding 不用脚本，只带许可文件。各技能的专属方法与 output-schema.json 保留在各自源码目录。不要直接安装未组装的 skills 源码。
+`shared/references/` 包含 core-model、principles、examples/protocol、extract-kit（01–05、update、edit、variants）、steps/finish.md（合并修正输出，两个建模技能共用）；`shared/scripts/` 包含 init_workflow、read_input、show_element、show_example、expand_tables、runpaths、prepare_result 等，不含平台规则的副本（检查都在平台提交时做）；`table_format.py` 由 generate_output_schemas.py 从平台代码生成，平台改动后重新运行 `make -C integrations/dataagent schemas`。源码只存一份，构建时复制到两个建模技能包，每个安装目录均可独立运行；问数技能 semantic-grounding 不用脚本，只带许可文件。各技能的专属方法与 output-schema.json 保留在各自源码目录。不要直接安装未组装的 skills 源码。
 
 ## 入口与步骤（2026-10-22）
 
-每个技能的 SKILL.md 只做路由（≤1100 字节），细节按步骤放在 references/steps/，Agent 每轮只读当前步骤。建模先运行 init_workflow.py，它打印本轮全部路径和可复制命令；prepare_result.py 与 check_part.py 都接受 --work-pack 和片段简称，参数写错时打印本轮正确写法。计划步骤只确认概念：具名的具体事物是实例，只作为“材料中的例子”列出；有新概念必须先确认范围，确认前不写提案。决定见 docs/design/2026-10-22-skill-routing-and-scope.md。
+每个技能的 SKILL.md 只做路由（≤1100 字节），细节按步骤放在 references/steps/，Agent 每轮只读当前步骤。建模先运行 init_workflow.py，它打印本轮全部路径和可复制命令；prepare_result.py 接受 --work-pack 和片段简称，合并后提交平台检查（失败时列出全部问题，平台计修正轮次），参数写错时打印本轮正确写法。计划步骤只确认概念：具名的具体事物是实例，只作为“材料中的例子”列出；有新概念必须先确认范围，确认前不写提案。决定见 docs/design/2026-10-22-skill-routing-and-scope.md。
 
 ## 离线校验与打包
 
@@ -40,7 +40,7 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 - `dist/semantic-grounding.zip`
 - `dist/ontofoundry-dataagent-plugin.zip`：顶层 ontofoundry-dataagent，包含三个已组装技能、plugin.json、install.sh、agents/ 与迁移说明。
 
-隔离测试分别解压三个 ZIP，在临时目录运行 show_example 的 01–05、check_part 与 prepare_result，运行不借用仓库脚本或旧目录。预算保留原上限，组合抽取路线计入两个技能入口；预算和 tests 不打包。
+隔离测试分别解压三个 ZIP，在临时目录运行 show_example 的 01–05 与 prepare_result，运行不借用仓库脚本或旧目录。预算保留原上限，组合抽取路线计入两个技能入口；预算和 tests 不打包。
 
 ## 发布步骤
 

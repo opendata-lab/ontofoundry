@@ -9,4 +9,4 @@
 - update 片段共七项：原 claims Dataset 补列；给已有 claim 实体 create 映射；create 事件 query Dataset；赔偿金额 simple 引用已有赔偿 Dataset；两个 simple 与 ratio 引用本批新事件 Dataset／指标。押金与赔偿各保留日期，UNION ALL 避免多条赔偿重复累计押金；ratio 分量同 Dataset。
 - edit 片段：属性及已有押金指标只改名称／说明并保留引用与证据；create 规则的 owner_id 用已有属性 UUID；delete 只写 operation、target_kind、target_id，after 可省略或 null。先查引用者，再显式更新／删除依赖，最终图检查通过才交付；不自动级联，也不删除无关规则。
 
-写 modeling/parts/01-update.json（编辑可用 02-edit.json），即执行 `check_part.py --work-pack <工作包> modeling/parts/01-update.json`；按 SKILL 的④合并、⑤修正、⑥交付。检查器处理引用闭合与候选图；增量只写变化，不重复创建实体。edit 中删册数非负规则仅演示用户明确要求取消该规则，不是赔偿补齐的步骤。
+写 modeling/parts/01-update.json（编辑可用 02-edit.json），按 SKILL 的④合并、⑤修正、⑥交付。平台检查引用闭合与候选图；增量只写变化，不重复创建实体。edit 中删册数非负规则仅演示用户明确要求取消该规则，不是赔偿补齐的步骤。

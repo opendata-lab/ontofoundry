@@ -21,7 +21,7 @@ EXAMPLES = {
     "映射": "references/extract-mappings.md",
     "指标规则": "references/extract-metrics-rules.md",
     "事实": "entity-extraction/references/extract-facts.md（实例抽取技能）",
-    "查写法": "python <技能目录>/scripts/show_example.py <target_kind> --operation create",
+    "查写法": "python <技能目录>/scripts/show_example.py --part NN（类型在 01–05 中）；少见写法 --variant <名称>",
 }
 
 

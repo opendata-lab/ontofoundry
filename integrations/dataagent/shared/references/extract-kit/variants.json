@@ -1,0 +1,1167 @@
+{
+  "inheritance": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "staff",
+      "after": {
+        "name": "staff",
+        "display_name": "员工"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "staff_no",
+      "after": {
+        "name": "staff_no",
+        "display_name": "工号",
+        "owner_type_id": {
+          "client_ref": "staff"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "staff_ds",
+      "after": {
+        "name": "chengye_staff",
+        "display_name": "澄页员工",
+        "table_name": "demo_staff",
+        "columns": [
+          {
+            "name": "staff_no",
+            "physical_type": "text"
+          },
+          {
+            "name": "level",
+            "physical_type": "integer"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "staff_map",
+      "after": {
+        "type_id": {
+          "client_ref": "staff"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "staff_ds"
+            },
+            "key_columns": [
+              "staff_no"
+            ]
+          }
+        ],
+        "fields": {
+          "staff_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "staff_no"
+          }
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "manager",
+      "after": {
+        "name": "manager",
+        "display_name": "主管",
+        "extends": {
+          "client_ref": "staff"
+        },
+        "derived_by": [
+          {
+            "kind": "simple",
+            "conditions": [
+              {
+                "path": {
+                  "property_id": {
+                    "client_ref": "staff_no"
+                  }
+                },
+                "operator": "eq",
+                "values": [
+                  "E02"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "manager_map",
+      "after": {
+        "type_id": {
+          "client_ref": "manager"
+        },
+        "binding_mode": "shared_parent",
+        "sources": [],
+        "fields": {}
+      }
+    }
+  ],
+  "virtual-parent": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "party",
+      "after": {
+        "name": "party",
+        "display_name": "参与方"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "party_no",
+      "after": {
+        "name": "party_no",
+        "display_name": "参与方编号",
+        "owner_type_id": {
+          "client_ref": "party"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "customer",
+      "after": {
+        "name": "customer",
+        "display_name": "客户",
+        "extends": {
+          "client_ref": "party"
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "customer_ds",
+      "after": {
+        "name": "chengye_customers",
+        "display_name": "澄页客户",
+        "table_name": "demo_customer",
+        "columns": [
+          {
+            "name": "party_no"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "customer_map",
+      "after": {
+        "type_id": {
+          "client_ref": "customer"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "customer_ds"
+            },
+            "key_columns": [
+              "party_no"
+            ]
+          }
+        ],
+        "fields": {
+          "party_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "party_no"
+          }
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "supplier",
+      "after": {
+        "name": "supplier",
+        "display_name": "供应商",
+        "extends": {
+          "client_ref": "party"
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "supplier_ds",
+      "after": {
+        "name": "chengye_suppliers",
+        "display_name": "澄页供应商",
+        "table_name": "demo_supplier",
+        "columns": [
+          {
+            "name": "party_no"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "supplier_map",
+      "after": {
+        "type_id": {
+          "client_ref": "supplier"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "supplier_ds"
+            },
+            "key_columns": [
+              "party_no"
+            ]
+          }
+        ],
+        "fields": {
+          "party_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "party_no"
+          }
+        }
+      }
+    }
+  ],
+  "membership": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "staff",
+      "after": {
+        "name": "staff",
+        "display_name": "员工"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "staff_no",
+      "after": {
+        "name": "staff_no",
+        "display_name": "工号",
+        "owner_type_id": {
+          "client_ref": "staff"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "staff_ds",
+      "after": {
+        "name": "chengye_staff",
+        "display_name": "澄页员工",
+        "table_name": "demo_staff",
+        "columns": [
+          {
+            "name": "staff_no",
+            "physical_type": "text"
+          },
+          {
+            "name": "level",
+            "physical_type": "integer"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "staff_map",
+      "after": {
+        "type_id": {
+          "client_ref": "staff"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "staff_ds"
+            },
+            "key_columns": [
+              "staff_no"
+            ]
+          }
+        ],
+        "fields": {
+          "staff_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "staff_no"
+          }
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "manager",
+      "after": {
+        "name": "manager",
+        "display_name": "主管",
+        "extends": {
+          "client_ref": "staff"
+        },
+        "derived_by": [
+          {
+            "kind": "simple",
+            "conditions": [
+              {
+                "path": {
+                  "property_id": {
+                    "client_ref": "staff_no"
+                  }
+                },
+                "operator": "eq",
+                "values": [
+                  "E01"
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "simple",
+            "conditions": [
+              {
+                "path": {
+                  "property_id": {
+                    "client_ref": "staff_no"
+                  }
+                },
+                "operator": "eq",
+                "values": [
+                  "E02"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "reader_ds",
+      "after": {
+        "name": "chengye_managers",
+        "display_name": "澄页主管成员",
+        "table_name": "demo_managers",
+        "columns": [
+          {
+            "name": "staff_no"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "manager_map",
+      "after": {
+        "type_id": {
+          "client_ref": "manager"
+        },
+        "binding_mode": "shared_parent",
+        "sources": [
+          {
+            "id": "readers",
+            "dataset_id": {
+              "client_ref": "reader_ds"
+            },
+            "key_columns": [
+              "staff_no"
+            ]
+          }
+        ],
+        "fields": {},
+        "membership_source_id": "readers"
+      }
+    }
+  ],
+  "reified-event": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "purchase",
+      "after": {
+        "name": "purchase",
+        "display_name": "澄页购买事件"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "event_no",
+      "after": {
+        "name": "event_no",
+        "display_name": "事件编号",
+        "owner_type_id": {
+          "client_ref": "purchase"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "copy_count",
+      "after": {
+        "name": "copy_count",
+        "display_name": "册数",
+        "owner_type_id": {
+          "client_ref": "purchase"
+        },
+        "value_kind": "integer"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "customer",
+      "after": {
+        "name": "customer",
+        "display_name": "客户"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "purchase_customer",
+      "after": {
+        "name": "has_customer",
+        "display_name": "关联客户",
+        "source_type_id": {
+          "client_ref": "purchase"
+        },
+        "target_type_id": {
+          "client_ref": "customer"
+        },
+        "multiplicity": "many_to_one"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "catalogue",
+      "after": {
+        "name": "catalogue",
+        "display_name": "馆藏"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "purchase_catalogue",
+      "after": {
+        "name": "has_catalogue",
+        "display_name": "关联馆藏",
+        "source_type_id": {
+          "client_ref": "purchase"
+        },
+        "target_type_id": {
+          "client_ref": "catalogue"
+        },
+        "multiplicity": "many_to_one"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "branch",
+      "after": {
+        "name": "branch",
+        "display_name": "分馆"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "purchase_branch",
+      "after": {
+        "name": "has_branch",
+        "display_name": "所属分馆",
+        "source_type_id": {
+          "client_ref": "purchase"
+        },
+        "target_type_id": {
+          "client_ref": "branch"
+        },
+        "multiplicity": "many_to_one"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "P01",
+      "after": {
+        "type_id": {
+          "client_ref": "purchase"
+        },
+        "values": {
+          "event_no": "P01",
+          "copy_count": 2
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "P02",
+      "after": {
+        "type_id": {
+          "client_ref": "purchase"
+        },
+        "values": {
+          "event_no": "P02",
+          "copy_count": 3
+        }
+      }
+    }
+  ],
+  "link-joins": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "staff",
+      "after": {
+        "name": "staff",
+        "display_name": "员工"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "staff_no",
+      "after": {
+        "name": "staff_no",
+        "display_name": "工号",
+        "owner_type_id": {
+          "client_ref": "staff"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "manager_no",
+      "after": {
+        "name": "manager_no",
+        "display_name": "主管工号",
+        "owner_type_id": {
+          "client_ref": "staff"
+        },
+        "value_kind": "string"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "staff_ds",
+      "after": {
+        "name": "chengye_staff",
+        "display_name": "澄页员工",
+        "table_name": "demo_staff",
+        "columns": [
+          {
+            "name": "staff_no",
+            "physical_type": "text"
+          },
+          {
+            "name": "level",
+            "physical_type": "integer"
+          },
+          {
+            "name": "manager_no",
+            "physical_type": "text"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "staff_map",
+      "after": {
+        "type_id": {
+          "client_ref": "staff"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "staff_ds"
+            },
+            "key_columns": [
+              "staff_no"
+            ]
+          }
+        ],
+        "fields": {
+          "staff_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "staff_no"
+          },
+          "manager_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "manager_no"
+          }
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "reports",
+      "after": {
+        "name": "reports_to",
+        "display_name": "汇报给",
+        "source_type_id": {
+          "client_ref": "staff"
+        },
+        "target_type_id": {
+          "client_ref": "staff"
+        },
+        "multiplicity": "many_to_one",
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "manager_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "staff_no"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "pairs",
+      "after": {
+        "name": "chengye_collaborations",
+        "display_name": "澄页协作记录",
+        "table_name": "demo_staff_pairs",
+        "columns": [
+          {
+            "name": "left_no"
+          },
+          {
+            "name": "right_no"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "collaborates",
+      "after": {
+        "name": "collaborates",
+        "display_name": "协作",
+        "source_type_id": {
+          "client_ref": "staff"
+        },
+        "target_type_id": {
+          "client_ref": "staff"
+        },
+        "multiplicity": "many_to_many",
+        "data_join": {
+          "kind": "mapping_table",
+          "dataset_id": {
+            "client_ref": "pairs"
+          },
+          "source_columns": [
+            "left_no"
+          ],
+          "target_columns": [
+            "right_no"
+          ],
+          "source_key": {
+            "kind": "properties",
+            "property_ids": [
+              {
+                "client_ref": "staff_no"
+              }
+            ]
+          },
+          "target_key": {
+            "kind": "properties",
+            "property_ids": [
+              {
+                "client_ref": "staff_no"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expression-binding": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "loans",
+      "after": {
+        "name": "loan",
+        "display_name": "澄页借阅单"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "region",
+      "after": {
+        "owner_type_id": {
+          "client_ref": "loans"
+        },
+        "name": "region",
+        "display_name": "所属区域",
+        "value_kind": "string",
+        "identifier": true,
+        "required": true
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "loan_no",
+      "after": {
+        "owner_type_id": {
+          "client_ref": "loans"
+        },
+        "name": "loan_no",
+        "display_name": "借阅单号",
+        "value_kind": "string",
+        "identifier": true,
+        "required": true
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "reader",
+      "after": {
+        "owner_type_id": {
+          "client_ref": "loans"
+        },
+        "name": "reader_no",
+        "display_name": "读者编号",
+        "value_kind": "string"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "line_amount",
+      "after": {
+        "name": "line_amount",
+        "display_name": "行金额",
+        "owner_type_id": {
+          "client_ref": "loans"
+        },
+        "value_kind": "decimal"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "loans_ds",
+      "after": {
+        "name": "chengye_loan_lines",
+        "display_name": "澄页借阅明细",
+        "table_name": "demo_loans",
+        "dialect": "postgres",
+        "columns": [
+          {
+            "name": "region",
+            "physical_type": "text"
+          },
+          {
+            "name": "loan_no",
+            "physical_type": "text"
+          },
+          {
+            "name": "reader_no",
+            "physical_type": "text"
+          },
+          {
+            "name": "copy_count",
+            "physical_type": "integer"
+          },
+          {
+            "name": "deposit_each",
+            "physical_type": "numeric"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "loans_mapping",
+      "after": {
+        "type_id": {
+          "client_ref": "loans"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "loans_ds"
+            },
+            "key_columns": [
+              "region",
+              "loan_no"
+            ]
+          }
+        ],
+        "fields": {
+          "region": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "region"
+          },
+          "loan_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "loan_no"
+          },
+          "reader_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "reader_no"
+          },
+          "line_amount": {
+            "kind": "expression",
+            "expression": "main.copy_count * main.deposit_each"
+          }
+        }
+      }
+    }
+  ],
+  "derivation": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "staff",
+      "after": {
+        "name": "staff",
+        "display_name": "员工"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "staff_name",
+      "after": {
+        "name": "staff_name",
+        "display_name": "员工姓名",
+        "owner_type_id": {
+          "client_ref": "staff"
+        },
+        "value_kind": "string"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "rule",
+      "after": {
+        "name": "staff_derivation",
+        "display_name": "员工姓名规范化",
+        "owner_kind": "property",
+        "owner_id": {
+          "client_ref": "staff_name"
+        },
+        "rule_kind": "derivation",
+        "expression": "UPPER(staff.staff_name)"
+      }
+    }
+  ],
+  "metric-ratio": [
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "daily",
+      "after": {
+        "name": "chengye_daily",
+        "display_name": "澄页日经营",
+        "table_name": "demo_daily",
+        "columns": [
+          {
+            "name": "deposits",
+            "physical_type": "numeric"
+          },
+          {
+            "name": "claims",
+            "physical_type": "numeric"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "deposits",
+      "after": {
+        "name": "deposits",
+        "display_name": "押金总额",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "daily"
+        },
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": {
+            "client_ref": "daily"
+          },
+          "column": "deposits"
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "claims",
+      "after": {
+        "name": "claims",
+        "display_name": "赔偿金额",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "daily"
+        },
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": {
+            "client_ref": "daily"
+          },
+          "column": "claims"
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "claim_share",
+      "after": {
+        "name": "claim_share",
+        "display_name": "赔偿率",
+        "kind": "ratio",
+        "numerator_id": {
+          "client_ref": "claims"
+        },
+        "denominator_id": {
+          "client_ref": "deposits"
+        }
+      }
+    }
+  ],
+  "metric-expression": [
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "daily",
+      "after": {
+        "name": "chengye_daily",
+        "display_name": "澄页日经营",
+        "table_name": "demo_daily",
+        "columns": [
+          {
+            "name": "deposits",
+            "physical_type": "numeric"
+          },
+          {
+            "name": "claims",
+            "physical_type": "numeric"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "net",
+      "after": {
+        "name": "net_deposits",
+        "display_name": "净押金总额",
+        "kind": "expression",
+        "dataset_id": {
+          "client_ref": "daily"
+        },
+        "expression": "SUM(chengye_daily.deposits) - SUM(chengye_daily.claims)"
+      }
+    }
+  ],
+  "query-dataset": [
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "events",
+      "after": {
+        "name": "chengye_deposit_claim_log",
+        "display_name": "澄页押金与赔偿事件",
+        "source_kind": "query",
+        "connection_id": "33333333-3333-4333-8333-000000000001",
+        "dialect": "mysql",
+        "query_sql": "SELECT o.lent_on AS event_on, o.branch_code, o.deposit AS deposit_total, 0 AS charge FROM demo_loans o WHERE o.status = '已借出' UNION ALL SELECT r.assessed_on AS event_on, o.branch_code, 0 AS deposit_total, r.charge FROM demo_claims r JOIN demo_loans o ON o.loan_no = r.loan_no",
+        "description": "押金按借阅日期、赔偿按赔偿日期各成一行；分别聚合后相除，避免把赔偿明细连接到借阅单后重复计算押金总额"
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "deposits",
+      "after": {
+        "name": "deposit_total",
+        "display_name": "押金总额",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "events"
+        },
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": {
+            "client_ref": "events"
+          },
+          "column": "deposit_total"
+        },
+        "time_field": {
+          "dataset_id": {
+            "client_ref": "events"
+          },
+          "column": "event_on"
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "claims",
+      "after": {
+        "name": "charge",
+        "display_name": "赔偿金额",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "events"
+        },
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": {
+            "client_ref": "events"
+          },
+          "column": "charge"
+        },
+        "time_field": {
+          "dataset_id": {
+            "client_ref": "events"
+          },
+          "column": "event_on"
+        }
+      }
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "claim_share",
+      "after": {
+        "name": "claim_share",
+        "display_name": "赔偿率",
+        "kind": "ratio",
+        "numerator_id": {
+          "client_ref": "claims"
+        },
+        "denominator_id": {
+          "client_ref": "deposits"
+        }
+      }
+    }
+  ],
+  "reuse-fact": [
+    {
+      "operation": "update",
+      "target_kind": "material_object",
+      "target_id": "b62aa9e4-12f0-51ab-bb98-f343a7cc0c34",
+      "after": {
+        "type_id": "5976dd92-f3af-5662-bf15-fa58ce5b18c7",
+        "values": {
+          "staff_name": "小岚"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "7239caac-0a20-5af3-9fde-bf4d89ff39eb",
+            "material_id": "11111111-1111-4111-8111-111111111111",
+            "locator": {
+              "heading": null,
+              "line_start": 1,
+              "line_end": 1
+            },
+            "quote": "澄页图书馆的小岚向小舟汇报。"
+          },
+          {
+            "kind": "manual",
+            "id": "99999999-9999-4999-8999-999999999999",
+            "note": "已确认姓名",
+            "created_by": "fictional-reviewer",
+            "created_at": "2026-10-20T00:00:00Z"
+          }
+        ]
+      }
+    }
+  ]
+}

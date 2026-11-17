@@ -204,9 +204,11 @@ def byte_report():
             work_pack_file="inputs/work-pack.json",
         ),
     )
-    examples = ["facts", "mapping", "metrics", "rules"]
-    selected = b"".join(
-        resource(f"references/examples/{name}.json").read_bytes() for name in examples
+    # A single-topic lookup reads one kit part (design §6: per-kind examples are
+    # gone); the full extract reads them all and is budgeted as its own route.
+    selected = max(
+        (resource(f"references/extract-kit/{name}.json").read_bytes() for name in ("03", "04", "05")),
+        key=len,
     )
     agent_file = (
         ROOT / "integrations/dataagent/agents/agent_ontofoundry.md"
@@ -285,13 +287,13 @@ def byte_report():
         limits[name + "入口"] = (len((BASE / "skills" / name / "SKILL.md").read_bytes()), 1100)
     routes = {}
     for task, method, sample in [
-        ("名称修改", None, "operations"),
-        ("单主题映射", "extract-mappings", "mapping"),
-        ("单主题实例", "extract-facts", "facts"),
-        ("单主题指标规则", "extract-metrics-rules", "metrics"),
+        ("名称修改", None, "edit"),
+        ("单主题映射", "extract-mappings", "03"),
+        ("单主题实例", "extract-facts", "05"),
+        ("单主题指标规则", "extract-metrics-rules", "04"),
     ]:
         extra = len(decisions[method]) if method else 0
-        example_bytes = len(resource(f"references/examples/{sample}.json").read_bytes())
+        example_bytes = len(resource(f"references/extract-kit/{sample}.json").read_bytes())
         # Reuse the same six-table fixture as a conservative, comparable route.
         route_total = (
             len(system_body.encode())
@@ -486,7 +488,6 @@ def byte_report():
         "已批准计划": resource("tests/fixtures/combined-plan.json").read_bytes(),
         "原则": resource("references/principles.md").read_bytes(),
         "实例方法": resource("references/extract-facts.md").read_bytes(),
-        "实例正例": resource("references/examples/facts.json").read_bytes(),
         **{f"写法包/{name}": (kit / name).read_bytes() for name in
            ("guide.md", "values.json", "01.json", "02.json", "03.json", "04.json", "05.json")},
     }

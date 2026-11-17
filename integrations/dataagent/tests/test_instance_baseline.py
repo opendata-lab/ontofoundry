@@ -3,18 +3,22 @@
 import json
 from copy import deepcopy
 
+import platform_check
 import pytest
 from jsonschema import Draft202012Validator
 from ontofoundry_api.contracts.proposals import ProposalContractError
 from ontofoundry_api.domain.instances import instance_hash
-from runpaths import without_material_hashes
+from runpaths import INSTANCE_KINDS, without_material_hashes
 from show_element import ElementIndex
-from test_stepwise_workflow import check_part
-from test_workflow import BASE, SCHEMA, SKILL, checker, pinned, prepare, server_parse
+from test_stepwise_workflow import BASE, prepare
 
 
 def context():
-    return pinned(SKILL / "references/examples/update-material_link.json")
+    return json.loads((BASE / "tests/fixtures/pinned-material_link.json").read_bytes())
+
+
+def server_parse(batch, ctx):
+    return platform_check.parse(batch, ctx)
 
 
 def fragment(ctx, kind, operation):
@@ -27,7 +31,7 @@ def fragment(ctx, kind, operation):
     return item, entry
 
 
-@pytest.mark.parametrize("kind", sorted(checker.INSTANCE_KINDS))
+@pytest.mark.parametrize("kind", sorted(INSTANCE_KINDS))
 @pytest.mark.parametrize("operation", ["update", "delete"])
 @pytest.mark.parametrize("state", ["active", "staged"])
 def test_platform_supplies_the_baseline_before_and_revision_hash(kind, operation, state):
@@ -35,12 +39,10 @@ def test_platform_supplies_the_baseline_before_and_revision_hash(kind, operation
     item, entry = fragment(ctx, kind, operation)
     entry.update(state=state, session_id=ctx["run"]["session_id"] if state == "staged" else None)
     original = deepcopy(ctx)
-    batch = prepare.assemble(ctx, [[item]])
+    batch = prepare.assemble([[item]])
     edit = batch["items"][0]
     assert set(batch) == {"items"} and "before" not in edit and "expected_target_hash" not in edit
     assert "id" not in (edit["after"] or {})
-    assert not checker.check_result(batch, SCHEMA)
-    assert not check_part.check_fragment([item], ctx, SCHEMA)["errors"]
     parsed = server_parse(batch, ctx).items[0]
     assert parsed.before == entry["element"]
     assert parsed.expected_target_hash == entry["hash"] == instance_hash(entry["element"], entry["revision"])
@@ -48,7 +50,7 @@ def test_platform_supplies_the_baseline_before_and_revision_hash(kind, operation
     assert ctx == original
 
 
-@pytest.mark.parametrize("kind", sorted(checker.INSTANCE_KINDS))
+@pytest.mark.parametrize("kind", sorted(INSTANCE_KINDS))
 @pytest.mark.parametrize("operation", ["update", "delete"])
 def test_a_missing_instance_target_is_reported_by_the_platform(kind, operation):
     ctx = context()
@@ -56,7 +58,7 @@ def test_a_missing_instance_target_is_reported_by_the_platform(kind, operation):
     ctx["instance_baseline"]["items"].remove(entry)
     # Stale legacy collections cannot supply instances.
     ctx["draft"][kind + "s"] = [entry["element"]]
-    batch = prepare.assemble(ctx, [[item]])
+    batch = prepare.assemble([[item]])
     with pytest.raises(ProposalContractError) as caught:
         server_parse(batch, ctx)
     assert caught.value.code == "TARGET_NOT_FOUND"

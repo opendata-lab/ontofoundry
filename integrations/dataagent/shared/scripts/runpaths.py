@@ -7,15 +7,50 @@ scripts print the exact commands for the current workspace instead.
 """
 
 import argparse
+import json
 import os
 import re
 import shlex
 import sys
+import tempfile
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 PARTS = Path("modeling/parts")
 PY = '"$DATAAGENT_PYTHON_BIN"'
+COLLECTIONS = {
+    "object_type": "object_types",
+    "property": "properties",
+    "link_type": "link_types",
+    "rule": "rules",
+    "metric": "metrics",
+    "dataset": "datasets",
+    "mapping": "mappings",
+    "value_type": "value_types",
+}
+INSTANCE_KINDS = frozenset({"material_object", "material_link"})
+TARGET_KINDS = COLLECTIONS.keys() | INSTANCE_KINDS
+
+
+def atomic_write(path, data):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(dir=path.parent, prefix=".pending-")
+    try:
+        with os.fdopen(handle, "wb") as target:
+            target.write(data)
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def encode(value):
+    return json.dumps(value, ensure_ascii=False, indent=2).encode()
+
+
+def preview(value):
+    text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return text if len(text.encode()) <= 160 else text.encode()[:150].decode("utf-8", "ignore") + "…"
 
 
 def relative(path):
@@ -83,9 +118,8 @@ def notice(code, what, next_step=None):
 def usage(work_pack="<工作包>"):
     """The commands every step uses, filled with this run's work pack when known."""
     return [
-        f"检查片段（不写片段名则检查 modeling/parts/ 全部）：{command('check_part.py', '--work-pack', work_pack, '01')}",
         f"按 entities.json 展开 01、02、03（抽取时）：{command('expand_tables.py', '--work-pack', work_pack)}",
-        f"合并：{command('prepare_result.py', '--work-pack', work_pack, 'modeling/parts/')}",
+        f"合并并提交（平台检查，失败时列出全部问题）：{command('prepare_result.py', '--work-pack', work_pack, 'modeling/parts/')}",
         f"读材料：{command('read_input.py', '<材料路径>')}",
         f"读已有元素（一次可查多个）：{command('show_element.py', '--work-pack', work_pack, '<名称或id>', '<名称2>')}",
     ]

@@ -6,7 +6,7 @@ import re
 import pytest
 from test_extract_kit import KIT, RETAIL
 from test_stepwise_workflow import lookup
-from test_workflow import CATALOG, SKILL
+from test_workflow import SKILL
 
 # These are reusable metadata words, not retail concepts. No business-specific
 # noun, physical key or metric is exempted; the same list applies to every surface.
@@ -71,16 +71,8 @@ def test_all_kit_files_and_non_protocol_examples_are_separate_from_acceptance():
 
 
 def public_queries():
-    for entry in CATALOG["lookup"]:
-        for operation in ("create", "update", "delete"):
-            yield entry, "--operation", operation
-            yield entry, "--operation", operation, "--with-deps"
-    from show_example import VARIANTS
-
-    for kind, variants in VARIANTS.items():
-        for variant in variants:
-            yield kind, "--variant", variant
-            yield kind, "--variant", variant, "--with-deps"
+    for variant in json.loads((KIT / "variants.json").read_bytes()):
+        yield "--variant", variant
     for part in ("01", "02", "03", "04", "05", "update", "edit"):
         yield "--part", part
     for flag in ("--guide", "--values", "--incremental-guide"):

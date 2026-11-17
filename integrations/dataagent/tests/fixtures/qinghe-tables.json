@@ -17,18 +17,21 @@
     {
      "name": "region_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "大区编号"
     },
     {
      "name": "region_name",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "大区名称"
     },
     {
      "name": "manager_name",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "大区经理"
     }
@@ -51,66 +54,77 @@
     {
      "name": "store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "门店编号"
     },
     {
      "name": "store_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "门店名称"
     },
     {
      "name": "region_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "所属大区"
     },
     {
      "name": "city",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "城市"
     },
     {
      "name": "address",
      "type": "VARCHAR(128)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "地址"
     },
     {
      "name": "store_type",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "门店类型：标准店/社区店/旗舰店"
     },
     {
      "name": "area_sqm",
      "type": "DECIMAL(8, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "经营面积（平方米）"
     },
     {
      "name": "opened_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "开业日期"
     },
     {
      "name": "closed_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "闭店日期，营业中为空"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：营业/装修/闭店"
     },
     {
      "name": "manager_emp_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "店长工号"
     }
@@ -133,42 +147,49 @@
     {
      "name": "emp_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "工号"
     },
     {
      "name": "emp_name",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "姓名"
     },
     {
      "name": "store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "所在门店，总部员工为空"
     },
     {
      "name": "position",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "岗位：店长/收银/理货/采购/仓管"
     },
     {
      "name": "hired_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "入职日期"
     },
     {
      "name": "left_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "离职日期"
     },
     {
      "name": "phone_masked",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "手机号（脱敏）"
     }
@@ -191,24 +212,28 @@
     {
      "name": "wh_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "仓库编号"
     },
     {
      "name": "wh_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "仓库名称"
     },
     {
      "name": "city",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "城市"
     },
     {
      "name": "wh_type",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "仓库类型：常温/冷链"
     }
@@ -231,24 +256,28 @@
     {
      "name": "level_code",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "等级代码"
     },
     {
      "name": "level_name",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "等级名称：普通/银卡/金卡/黑卡"
     },
     {
      "name": "min_points",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "达到该等级所需积分"
     },
     {
      "name": "discount_rate",
      "type": "DECIMAL(4, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "会员折扣率"
     }
@@ -271,78 +300,91 @@
     {
      "name": "member_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "会员编号"
     },
     {
      "name": "member_name",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "姓名"
     },
     {
      "name": "gender",
      "type": "VARCHAR(4)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "性别"
     },
     {
      "name": "birth_month",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "生日月份"
     },
     {
      "name": "mobile_masked",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "手机号（脱敏）"
     },
     {
      "name": "level_code",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "会员等级"
     },
     {
      "name": "points",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "当前积分"
     },
     {
      "name": "city",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "常住城市"
     },
     {
      "name": "register_store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "注册门店"
     },
     {
      "name": "register_channel",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "注册渠道：门店/小程序/APP"
     },
     {
      "name": "registered_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "注册时间"
     },
     {
      "name": "last_order_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "最近下单时间"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：正常/冻结/注销"
     }
@@ -365,24 +407,28 @@
     {
      "name": "category_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "品类编号"
     },
     {
      "name": "category_name",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "品类名称"
     },
     {
      "name": "parent_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "上级品类，一级品类为空"
     },
     {
      "name": "level",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "层级：1 一级，2 二级"
     }
@@ -405,18 +451,21 @@
     {
      "name": "brand_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "品牌编号"
     },
     {
      "name": "brand_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "品牌名称"
     },
     {
      "name": "is_private_label",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "是否自有品牌：1 是 0 否"
     }
@@ -439,36 +488,42 @@
     {
      "name": "supplier_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "供应商编号"
     },
     {
      "name": "supplier_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "供应商名称"
     },
     {
      "name": "city",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "所在城市"
     },
     {
      "name": "settle_days",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "账期（天）"
     },
     {
      "name": "contact_masked",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "联系电话（脱敏）"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：合作中/暂停/终止"
     }
@@ -491,108 +546,126 @@
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "商品编码"
     },
     {
      "name": "product_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "商品名称"
     },
     {
      "name": "barcode",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "条码"
     },
     {
      "name": "category_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "二级品类"
     },
     {
      "name": "brand_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "品牌"
     },
     {
      "name": "supplier_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "主供应商"
     },
     {
      "name": "spec",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "规格"
     },
     {
      "name": "unit",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "销售单位"
     },
     {
      "name": "shelf_life_days",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "保质期（天）"
     },
     {
      "name": "storage_type",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "储存方式：常温/冷藏/冷冻"
     },
     {
      "name": "list_price",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "零售价"
     },
     {
      "name": "member_price",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "会员价"
     },
     {
      "name": "cost_price",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "进价"
     },
     {
      "name": "is_fresh",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "是否生鲜：1 是 0 否"
     },
     {
      "name": "launched_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "上架日期"
     },
     {
      "name": "delisted_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "下架日期"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：在售/停售/淘汰"
     },
     {
      "name": "tax_rate",
      "type": "DECIMAL(4, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "税率"
     }
@@ -615,48 +688,56 @@
     {
      "name": "po_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "采购单号"
     },
     {
      "name": "supplier_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "供应商"
     },
     {
      "name": "wh_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "收货仓库"
     },
     {
      "name": "ordered_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "下单时间"
     },
     {
      "name": "expected_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "预计到货日期"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：草稿/已下单/部分到货/已完成/已取消"
     },
     {
      "name": "total_amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "采购总额"
     },
     {
      "name": "buyer_emp_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "采购员工号"
     }
@@ -680,30 +761,35 @@
     {
      "name": "po_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "采购单号"
     },
     {
      "name": "line_no",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": false,
      "comment": "行号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "商品编码"
     },
     {
      "name": "qty",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "采购数量"
     },
     {
      "name": "unit_cost",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "采购单价"
     }
@@ -726,30 +812,35 @@
     {
      "name": "receipt_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "入库单号"
     },
     {
      "name": "po_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "来源采购单"
     },
     {
      "name": "wh_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "入库仓库"
     },
     {
      "name": "received_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "入库时间"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：待验收/已入库"
     }
@@ -773,42 +864,49 @@
     {
      "name": "receipt_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "入库单号"
     },
     {
      "name": "line_no",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": false,
      "comment": "行号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "商品编码"
     },
     {
      "name": "qty_received",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "实收数量"
     },
     {
      "name": "qty_rejected",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "拒收数量"
     },
     {
      "name": "batch_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "批次号"
     },
     {
      "name": "produced_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "生产日期"
     }
@@ -831,36 +929,42 @@
     {
      "name": "transfer_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "调拨单号"
     },
     {
      "name": "from_wh_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "发货仓库"
     },
     {
      "name": "to_store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "收货门店"
     },
     {
      "name": "shipped_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "发货时间"
     },
     {
      "name": "arrived_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "到店时间"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：在途/已到店/已取消"
     }
@@ -884,24 +988,28 @@
     {
      "name": "transfer_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "调拨单号"
     },
     {
      "name": "line_no",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": false,
      "comment": "行号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "商品编码"
     },
     {
      "name": "qty",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "调拨数量"
     }
@@ -927,36 +1035,42 @@
     {
      "name": "snapshot_date",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": false,
      "comment": "快照日期"
     },
     {
      "name": "location_type",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "库存地点类型：仓库/门店"
     },
     {
      "name": "location_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "仓库或门店编号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "商品编码"
     },
     {
      "name": "on_hand_qty",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "日末库存数量"
     },
     {
      "name": "on_hand_cost",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "日末库存成本"
     }
@@ -979,24 +1093,28 @@
     {
      "name": "stocktake_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "盘点单号"
     },
     {
      "name": "store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "盘点门店"
     },
     {
      "name": "counted_on",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "盘点日期"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：盘点中/已确认"
     }
@@ -1020,24 +1138,28 @@
     {
      "name": "stocktake_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "盘点单号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "商品编码"
     },
     {
      "name": "book_qty",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "账面数量"
     },
     {
      "name": "counted_qty",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "实盘数量"
     }
@@ -1060,78 +1182,91 @@
     {
      "name": "order_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "订单号"
     },
     {
      "name": "store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "成交门店"
     },
     {
      "name": "member_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "会员，散客为空"
     },
     {
      "name": "channel",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "渠道：门店/小程序/外卖"
     },
     {
      "name": "cashier_emp_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "收银员工号，线上订单为空"
     },
     {
      "name": "ordered_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "下单时间"
     },
     {
      "name": "paid_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "支付时间"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：待支付/已完成/已取消"
     },
     {
      "name": "gross_amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "商品原价合计"
     },
     {
      "name": "discount_amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "促销优惠"
     },
     {
      "name": "coupon_amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "优惠券抵扣"
     },
     {
      "name": "pay_amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "实付金额"
     },
     {
      "name": "is_delivery",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "是否配送到家：1 是 0 否"
     }
@@ -1155,48 +1290,56 @@
     {
      "name": "order_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "订单号"
     },
     {
      "name": "line_no",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": false,
      "comment": "行号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "商品编码"
     },
     {
      "name": "qty",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "数量（称重商品可为小数）"
     },
     {
      "name": "list_price",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "零售价"
     },
     {
      "name": "deal_price",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "成交单价"
     },
     {
      "name": "discount_amount",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "行优惠"
     },
     {
      "name": "promotion_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "参与的促销活动"
     }
@@ -1219,30 +1362,35 @@
     {
      "name": "payment_no",
      "type": "VARCHAR(24)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "支付流水号"
     },
     {
      "name": "order_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "订单号"
     },
     {
      "name": "pay_method",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "支付方式：现金/微信/支付宝/储值卡"
     },
     {
      "name": "amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "支付金额"
     },
     {
      "name": "paid_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "支付时间"
     }
@@ -1265,48 +1413,56 @@
     {
      "name": "refund_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "退款单号"
     },
     {
      "name": "order_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "原订单号"
     },
     {
      "name": "refund_type",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "退款类型：整单/部分"
     },
     {
      "name": "applied_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "申请时间"
     },
     {
      "name": "approved_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "审核通过时间"
     },
     {
      "name": "refund_amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "退款金额"
     },
     {
      "name": "reason",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "退款原因"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：待审核/已退款/已驳回"
     }
@@ -1330,30 +1486,35 @@
     {
      "name": "refund_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "退款单号"
     },
     {
      "name": "line_no",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": false,
      "comment": "行号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "商品编码"
     },
     {
      "name": "qty",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "退货数量"
     },
     {
      "name": "amount",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "退款金额"
     }
@@ -1376,36 +1537,42 @@
     {
      "name": "promotion_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "活动编号"
     },
     {
      "name": "promotion_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "活动名称"
     },
     {
      "name": "promo_type",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "类型：满减/折扣/第二件半价"
     },
     {
      "name": "start_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "开始时间"
     },
     {
      "name": "end_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "结束时间"
     },
     {
      "name": "store_scope",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "适用门店范围：全部/指定大区"
     }
@@ -1429,12 +1596,14 @@
     {
      "name": "promotion_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "活动编号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "商品编码"
     }
@@ -1457,36 +1626,42 @@
     {
      "name": "coupon_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "券编号"
     },
     {
      "name": "coupon_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "券名称"
     },
     {
      "name": "face_value",
      "type": "DECIMAL(8, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "面额"
     },
     {
      "name": "threshold_amount",
      "type": "DECIMAL(8, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "使用门槛"
     },
     {
      "name": "valid_from",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "有效期开始"
     },
     {
      "name": "valid_to",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "有效期结束"
     }
@@ -1509,42 +1684,49 @@
     {
      "name": "issue_no",
      "type": "VARCHAR(24)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "发放编号"
     },
     {
      "name": "coupon_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "券编号"
     },
     {
      "name": "member_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "领券会员"
     },
     {
      "name": "issued_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "发放时间"
     },
     {
      "name": "used_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "核销时间"
     },
     {
      "name": "used_order_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "核销订单"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：未使用/已使用/已过期"
     }
@@ -1567,54 +1749,63 @@
     {
      "name": "delivery_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "配送单号"
     },
     {
      "name": "order_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "订单号"
     },
     {
      "name": "rider_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "骑手"
     },
     {
      "name": "dispatched_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "出发时间"
     },
     {
      "name": "promised_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "承诺送达时间"
     },
     {
      "name": "delivered_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "实际送达时间"
     },
     {
      "name": "distance_km",
      "type": "DECIMAL(6, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "配送距离（公里）"
     },
     {
      "name": "delivery_fee",
      "type": "DECIMAL(8, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "配送费"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态：配送中/已送达/异常"
     }
@@ -1637,18 +1828,21 @@
     {
      "name": "rider_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "骑手编号"
     },
     {
      "name": "rider_name",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "姓名"
     },
     {
      "name": "partner_company",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "所属配送商"
     }
@@ -1671,42 +1865,49 @@
     {
      "name": "change_id",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "调价单号"
     },
     {
      "name": "sku",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "商品编码"
     },
     {
      "name": "store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "门店，全国统一调价为空"
     },
     {
      "name": "old_price",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "原价"
     },
     {
      "name": "new_price",
      "type": "DECIMAL(10, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "新价"
     },
     {
      "name": "effective_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "生效时间"
     },
     {
      "name": "reason",
      "type": "VARCHAR(32)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "原因：促销/成本变动/临期"
     }
@@ -1729,36 +1930,42 @@
     {
      "name": "date_key",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": false,
      "comment": "日期键 yyyymmdd"
     },
     {
      "name": "cal_date",
      "type": "DATE",
+     "value_kind": "date",
      "nullable": true,
      "comment": "日期"
     },
     {
      "name": "year",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "年"
     },
     {
      "name": "month",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "月"
     },
     {
      "name": "week_of_year",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "年内周序号"
     },
     {
      "name": "is_holiday",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "是否节假日"
     }
@@ -1781,24 +1988,28 @@
     {
      "name": "id",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": false,
      "comment": "自增编号"
     },
     {
      "name": "table_name",
      "type": "VARCHAR(64)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "同步的表"
     },
     {
      "name": "synced_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "同步时间"
     },
     {
      "name": "row_count",
      "type": "INTEGER",
+     "value_kind": "integer",
      "nullable": true,
      "comment": "同步行数"
     }
@@ -1821,36 +2032,42 @@
     {
      "name": "order_no",
      "type": "VARCHAR(20)",
+     "value_kind": "string",
      "nullable": false,
      "comment": "订单号"
     },
     {
      "name": "store_id",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "门店"
     },
     {
      "name": "member_id",
      "type": "VARCHAR(16)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "会员"
     },
     {
      "name": "ordered_at",
      "type": "DATETIME",
+     "value_kind": "datetime",
      "nullable": true,
      "comment": "下单时间"
     },
     {
      "name": "status",
      "type": "VARCHAR(8)",
+     "value_kind": "string",
      "nullable": true,
      "comment": "状态"
     },
     {
      "name": "pay_amount",
      "type": "DECIMAL(12, 2)",
+     "value_kind": "decimal",
      "nullable": true,
      "comment": "实付金额"
     }

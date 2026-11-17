@@ -7,8 +7,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from check_result import COLLECTIONS, TARGET_KINDS
-from runpaths import command, error, without_material_hashes
+from runpaths import COLLECTIONS, TARGET_KINDS, command, error, without_material_hashes
 
 LIMIT = 8192
 PAGE_BYTES = 3000

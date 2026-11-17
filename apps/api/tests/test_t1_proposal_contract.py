@@ -306,18 +306,17 @@ def test_skill_fact_example_is_valid_as_a_complete_graph():
     import hashlib
     from pathlib import Path
 
-    integration = Path(__file__).parents[3] / "integrations/dataagent"
-    items = json.loads(
-        (integration / "shared/references/examples/create-material_link.json").read_bytes()
-    )
-    material = (integration / "tests/fixtures/material.md").read_bytes()
+    kit = Path(__file__).parents[3] / "integrations/dataagent/shared/references/extract-kit"
+    items = [i for n in ("01", "02", "03", "04", "05") for i in json.loads((kit / f"{n}.json").read_bytes())]
+    material = (kit / "material.md").read_bytes()
     ctx = context(empty_snapshot(uuid4()))
     parsed = parse(
         result(ctx, items),
         ctx,
         lambda _: (hashlib.sha256(material).hexdigest(), material.decode().splitlines()),
     )
-    assert parsed.items[-1].after["source_id"] == parsed.items[-3].target_id
+    loan, claim, link = parsed.items[-3:]
+    assert (link.after["source_id"], link.after["target_id"]) == (claim.target_id, loan.target_id)
 
 
 def test_import_id_rewrite_preserves_reference_named_mapping_fields():

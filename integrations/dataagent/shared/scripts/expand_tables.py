@@ -13,13 +13,9 @@ merge right after them.
 
 import json
 import re
-import subprocess
-import sys
 from pathlib import Path
 
-from check_result import atomic_write
-from materials import material_lines, quote
-from runpaths import PARTS, HintParser, command, error, plan_not_approved
+from runpaths import PARTS, HintParser, atomic_write, command, error, plan_not_approved
 from table_summary import comment_values, load_tables
 
 ENTITIES = Path("modeling/entities.json")
@@ -28,24 +24,15 @@ DATASETS_PART = PARTS / "03-datasets.json"
 LINKS_PART = PARTS / "02-links.json"
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SEPARATORS = re.compile(r"[：:，,（(；;]")
-KINDS = [
-    ({"boolean", "bool"}, "boolean"),
-    ({"tinyint", "smallint", "mediumint", "int", "integer", "bigint", "int2", "int4", "int8", "largeint", "year"}, "integer"),
-    ({"decimal", "numeric", "number", "money"}, "decimal"),
-    ({"float", "double", "real", "float4", "float8"}, "float"),
-    ({"date"}, "date"),
-    ({"datetime", "datetime2", "timestamp", "timestamptz"}, "datetime"),
-]
 
 
 class SpecError(ValueError):
     pass
 
 
-def value_kind(physical_type):
-    """Same classification as the platform's physical_value_kind; unknown types read as text."""
-    name = re.split(r"[\s(]", (physical_type or "").strip().lower())[0]
-    return next((kind for names, kind in KINDS if name in names), "string")
+def value_kind(column):
+    """The value kind the platform gives each column in the tables file."""
+    return column.get("value_kind") or "string"
 
 
 def split_comment(comment, covered=False):
@@ -62,7 +49,7 @@ def split_comment(comment, covered=False):
     return head or comment, "" if covered else rest
 
 
-def evidence(basis, table, texts, tables):
+def evidence(basis, table, tables):
     found = []
     for entry in basis if isinstance(basis, list) else []:
         if not isinstance(entry, dict):
@@ -72,12 +59,9 @@ def evidence(basis, table, texts, tables):
             if not match:
                 raise SpecError(f"basis 的行号 {entry['line']!r} 应写成 12 或 12-15")
             start, end = int(match.group(1)), int(match.group(2) or match.group(1))
-            text = texts.get(entry["material_id"], [])
-            if text and not 0 < start <= end <= len(text):
-                raise SpecError(f"basis 行号 {entry['line']} 超出材料 {entry['material_id']} 的 {len(text)} 行")
-            quoted = quote(text, start, end) if text else ""
+            # The platform quotes the cited lines and checks they exist.
             found.append({"kind": "material", "material_id": entry["material_id"],
-                          "locator": {"line_start": start, "line_end": end}, "quote": quoted})
+                          "locator": {"line_start": start, "line_end": end}})
         elif entry.get("table"):
             source = resolve_table(entry["table"], tables)
             if source is None:
@@ -105,7 +89,7 @@ def source_table(item, tables):
     return table
 
 
-def expand(spec, tables, texts):
+def expand(spec, tables):
     types, datasets, notes = [], [], []
     names = {}  # English names share one namespace across object and value types (case-insensitive)
 
@@ -143,7 +127,7 @@ def expand(spec, tables, texts):
             if column is None:
                 raise SpecError(f"值类型 {vt['name']} 的列 {ref_col} 不存在")
             found.append(column)
-        kinds = {value_kind(c.get("type")) for c in found}
+        kinds = {value_kind(c) for c in found}
         if len(kinds) > 1:
             raise SpecError(f"值类型 {vt['name']} 的列 {', '.join(columns)} 基础类型不同（{', '.join(sorted(kinds))}），不能共用")
         first, column = columns[0], found[0]
@@ -151,13 +135,13 @@ def expand(spec, tables, texts):
         if not values:
             raise SpecError(f"值类型 {vt['name']}：列 {first} 的注释里没有可识别的取值，请写 values")
         ref = "vt_" + vt["name"]
-        numeric = value_kind(column.get("type")) in {"integer", "decimal", "float"}
+        numeric = value_kind(column) in {"integer", "decimal", "float"}
         if numeric and not all(re.fullmatch(r"-?\d+(\.\d+)?", str(v)) for v in values):
             raise SpecError(f"值类型 {vt['name']} 是数值列，取值 {values} 不全是数字；请写 values")
         quoted = ", ".join(str(v) if numeric else "'" + str(v).replace("'", "''") + "'" for v in values)
         types.append({"operation": "create", "target_kind": "value_type", "client_ref": ref, "after": {
             "name": vt["name"], "display_name": vt.get("display_name") or split_comment(column.get("comment"), True)[0],
-            "value_kind": value_kind(column.get("type")),
+            "value_kind": value_kind(column),
             **({"description": vt["description"]} if vt.get("description") else {}),
             "evidence": [{"kind": "table", "ref": first, "quote": column.get("comment") or col}]}})
         types.append({"operation": "create", "target_kind": "rule", "client_ref": ref + "_values", "after": {
@@ -167,7 +151,7 @@ def expand(spec, tables, texts):
         for ref_col in columns:
             if ref_col not in column_owner:
                 notes.append(f"值类型 {vt['name']} 的列 {ref_col} 不属于任何展开的实体，未绑定")
-            bound[ref_col] = (ref, value_kind(column.get("type")))
+            bound[ref_col] = (ref, value_kind(column))
 
     shared_datasets, columns_to_props, key_props = {}, {}, {}
     refs = {i["name"]: f"实体 {i['name']} " for i in entities}
@@ -178,7 +162,7 @@ def expand(spec, tables, texts):
         if item.get("description"):
             obj["description"] = item["description"]
         table = backed.get(name)
-        obj["evidence"] = evidence(item.get("basis"), table, texts, tables)
+        obj["evidence"] = evidence(item.get("basis"), table, tables)
         types.append({"operation": "create", "target_kind": "object_type", "client_ref": name, "after": obj})
         if not table:
             notes.append(f"{name} 没有对应的表，属性请写在 01b 片段里")
@@ -206,7 +190,7 @@ def expand(spec, tables, texts):
             bound_to = bound.get(f"{table['key']}.{col}")
             display, description = split_comment(column.get("comment"), covered=bool(bound_to) or col in flags)
             prop = {"name": prop_name, "display_name": extra.get("display_name") or display or col,
-                    "owner_type_id": {"client_ref": name}, "value_kind": value_kind(column.get("type"))}
+                    "owner_type_id": {"client_ref": name}, "value_kind": value_kind(column)}
             if not IDENTIFIER.match(prop_name):
                 raise SpecError(f"{name}.{col} 不能直接作英文标识，请在 properties 里给 name")
             if col in flags:
@@ -352,7 +336,7 @@ def main():
         pack = json.loads(Path(args.work_pack).read_bytes())
         tables = {t["key"]: t for t in load_tables(pack["tables_file"])}
         spec = json.loads(ENTITIES.read_bytes())
-        types, datasets, notes, links = expand(spec, tables, material_lines(pack))
+        types, datasets, notes, links = expand(spec, tables)
     except SpecError as exc:
         print(error("SPEC_INVALID", str(exc), "未写任何片段", "改 modeling/entities.json 后重新运行：" + command("expand_tables.py", "--work-pack", args.work_pack)))
         return 1
@@ -374,10 +358,7 @@ def main():
     print("这些文件每次运行都会重写；手写的类型、属性放 01b-*.json，特殊关系放 02b-*.json，查询数据集、多表映射放 03b-*.json")
     for note in notes:
         print("- " + note)
-    sys.stdout.flush()
-    checked = subprocess.run([sys.executable, str(Path(__file__).with_name("check_part.py")), "--work-pack", args.work_pack,
-                              *map(str, written)], check=False)
-    return checked.returncode
+    return 0
 
 
 if __name__ == "__main__":

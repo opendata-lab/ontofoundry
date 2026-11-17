@@ -5,7 +5,7 @@ Ossie 是外部交换格式，不是内部提案形状。roles 和 owner_ref 表
 无法确定的业务关系、数据源、时间约定应保留原文并向用户说明，不猜测，也不声称无损。
 不能把文件整体包在结果内，必须翻译成符合本轮 schema 的提案。
 
-关系写法查 `scripts/show_example.py link_type`；内部语义见 [核心模型](core-model.md)。
+关系写法查 `scripts/show_example.py --part 02`；内部语义见 [核心模型](core-model.md)。
 
 Ossie 交换包为纯 Ossie JSON 加 ontofoundry-extension.json；name 对应英文标识，display_name 只在扩展 display_names。支持 ai_context 的节点从 ai_context.synonyms 读取同义词；概念与本体关系在扩展 synonyms。单文件不填显示名，旧版扩展块仅作为外部兼容读取。
 

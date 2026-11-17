@@ -1,34 +1,39 @@
-"""Assemble a pinned proposal batch without inferring business content."""
+"""Merge the fragments into one proposal batch and submit it.
+
+The platform checks the batch (design §6, AI-09) and returns every problem at
+once; this script only merges, submits, and points each problem back at the
+fragment that holds it. It keeps no copy of the platform's rules."""
 
 import json
 from collections import Counter
 from copy import deepcopy
 from pathlib import Path
 
-from check_result import (
-    atomic_write,
-    diagnostic,
-    encode,
-    validate_file,
-)
-from column_refs import local_column_messages
-from function_refs import function_messages
-from materials import fill_quotes, material_lines
 from runpaths import (
     PARTS,
     HintParser,
+    atomic_write,
     command,
+    encode,
     error,
     existing,
     fragment_paths,
     notice,
     plan_not_approved,
+    preview,
     relative,
 )
 
 
 class PrepareInputError(ValueError):
     """A precise fragment diagnostic, before any output is replaced."""
+
+
+def diagnostic(pointer, code, expected, actual, item=None):
+    """错误 [CODE]：位置 [项]，期望…；实际…"""
+    item = item if isinstance(item, dict) else {}
+    label = preview(item.get("client_ref", item.get("target_id", "-")))
+    return f"错误 [{code}]：{pointer} [{label}]，期望 {preview(expected)}；实际 {preview(actual)}。"
 
 
 def effective_ref(item, index):
@@ -40,7 +45,7 @@ def effective_ref(item, index):
     return item.get("client_ref", f"{item.get('target_kind')}-{index + 1}")
 
 
-def assemble(context, fragments):
+def assemble(fragments):
     items, refs = [], set()
     for fragment_index, fragment in enumerate(fragments):
         if not isinstance(fragment, list):
@@ -123,8 +128,8 @@ def located(message, origins):
     )
 
 
-def load_inputs(raw_fragments, context_path):
-    """Fragments with each merged item's origin, and the context; errors name the file."""
+def load_inputs(raw_fragments):
+    """Fragments with each merged item's origin; errors name the file."""
     paths = [p for raw in raw_fragments for p in fragment_paths(raw)]
     fragments, origins = [], []
     try:
@@ -154,7 +159,7 @@ def load_inputs(raw_fragments, context_path):
                 "JSON_INVALID",
                 f"片段 {shown} 第 {exc.lineno} 行第 {exc.colno} 列：{exc.msg}",
                 "文件已存在",
-                f"修正该处后先单独检查：{command('check_part.py', '--work-pack', '<工作包>', shown)}",
+                "修正该处后重新合并",
             ) from None
         fragments.append(fragment)
         origins += (
@@ -162,17 +167,7 @@ def load_inputs(raw_fragments, context_path):
             if isinstance(fragment, list)
             else []
         )
-    try:
-        context = json.loads(Path(context_path).read_bytes())
-    except (OSError, ValueError) as exc:
-        raise InputProblem(
-            "INPUT_UNREADABLE",
-            f"固定上下文 {context_path} 无法读取（{type(exc).__name__}）",
-            "",
-            "路径照工作包的 context_file；文件损坏时重新发起本轮",
-            retry=False,
-        ) from None
-    return fragments, origins, context
+    return fragments, origins
 
 
 class InputProblem(Exception):
@@ -269,7 +264,7 @@ def archive_submitted(pack):
         print(f"本轮成果已移到 {relative(target)}/，下一轮不会重复提交。")
 
 
-def platform_submit(pack, candidate, retry_command):
+def platform_submit(pack, candidate, retry_command, origins=()):
     """Submit to the platform, which checks and stores in one step (SC-05).
     Never duplicate graph rules here: the platform's verdict is the only one."""
     from urllib.error import HTTPError, URLError
@@ -347,15 +342,16 @@ def platform_submit(pack, candidate, retry_command):
         return True
     print(f"平台检查未通过，未入库。最终文件未替换。完整报告：{relative(report_path)}")
     if isinstance(report.get("repair_used"), int) and isinstance(report.get("repair_limit"), int):
-        print(f"修正轮次：已用 {report['repair_used']}/{report['repair_limit']}（平台计数，本地检查不计）")
+        print(f"修正轮次：已用 {report['repair_used']}/{report['repair_limit']}（平台计数）")
     if not {problem.get("code") for problem in report["errors"]} & NOT_CONTENT:
         save_latest_check("platform", report["errors"], candidate)
     # Print a bounded summary: every repeated line is replayed in later turns.
     shown = []
     for problem in report["errors"]:
-        if len("\n".join([*shown, problem["message"]]).encode()) > SHOWN_BYTES:
+        message = located(problem["message"], origins)
+        if len("\n".join([*shown, message]).encode()) > SHOWN_BYTES:
             break
-        shown.append(problem["message"])
+        shown.append(message)
     print("\n".join(shown))
     if len(shown) < len(report["errors"]):
         print(f"共 {len(report['errors'])} 条，已显示 {len(shown)} 条；其余见完整报告：" + command("read_input.py", relative(report_path), "--pointer", f"/errors/{len(shown)}"))
@@ -364,149 +360,43 @@ def platform_submit(pack, candidate, retry_command):
 
 
 def main():
-    parser = HintParser(
-        description="合并片段为提案批次；--work-pack 自动取上下文、Schema 与结果路径"
-    )
-    parser.add_argument(
-        "--work-pack", help="工作包；从中取 context_file、schema_file、result_file"
-    )
-    parser.add_argument("--context")
-    parser.add_argument("--schema")
-    parser.add_argument("--output")
-    parser.add_argument(
-        "fragments",
-        nargs="*",
-        help="片段文件、简称（01、01-types）或目录；省略时合并 modeling/parts/",
-    )
+    parser = HintParser(description="合并 modeling/parts/ 的片段并提交平台检查")
+    parser.add_argument("--work-pack", required=True, help="本轮工作包（init_workflow 打印的路径）")
+    parser.add_argument("fragments", nargs="*", help="片段文件、简称（01、01-types）或目录；省略时合并 modeling/parts/")
     args = parser.parse_args()
     if refusal := plan_not_approved():
         print(refusal)
         return 1
-    outcome = "候选文件未生成，最终文件未替换"
+    outcome = "未提交，最终文件未替换"
+    retry_command = command("prepare_result.py", "--work-pack", args.work_pack)
     if "-" in args.fragments:
-        print(
-            error(
-                "INVALID_ARGUMENT",
-                "片段不能从标准输入读取",
-                outcome,
-                "先写到 modeling/parts/ 再合并："
-                + command(
-                    "prepare_result.py", "--work-pack", args.work_pack or "<工作包>"
-                ),
-            )
-        )
+        print(error("INVALID_ARGUMENT", "片段不能从标准输入读取", outcome, "先写到 modeling/parts/ 再合并：" + retry_command))
         return 2
-    pack = {}
     try:
-        if args.work_pack:
-            pack = json.loads(Path(args.work_pack).read_bytes())
-            args.context = args.context or pack["context_file"]
-            args.schema = args.schema or pack["schema_file"]
-            args.output = args.output or pack["result_file"]
+        pack = json.loads(Path(args.work_pack).read_bytes())
+        output = workspace_path(pack["result_file"])
     except FileNotFoundError:
-        print(
-            error(
-                "FILE_NOT_FOUND",
-                f"工作包 {args.work_pack} 不存在",
-                outcome,
-                "路径照 init_workflow 打印的本轮工作包复制",
-            )
-        )
+        print(error("FILE_NOT_FOUND", f"工作包 {args.work_pack} 不存在", outcome, "路径照 init_workflow 打印的本轮工作包复制"))
         return 1
-    except (OSError, ValueError, KeyError) as exc:
-        print(
-            error(
-                "INPUT_UNREADABLE",
-                f"工作包 {args.work_pack} 无法使用（{type(exc).__name__}）",
-                outcome,
-                retry=False,
-            )
-        )
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(error("INPUT_UNREADABLE", f"工作包 {args.work_pack} 无法使用（{type(exc).__name__}）", outcome, retry=False))
         return 1
-    if not (args.context and args.schema and args.output):
-        parser.error(
-            "需要 --work-pack <工作包>，或同时给出 --context、--schema、--output"
-        )
-    raw_fragments = args.fragments or [str(PARTS) + "/"]
-    report = Path(args.output + ".errors.json")
+    origins = []
     try:
-        output = workspace_path(args.output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        fragments, origins, context = load_inputs(raw_fragments, args.context)
+        fragments, origins = load_inputs(args.fragments or [str(PARTS) + "/"])
         candidate = output.with_suffix(".pending.json")
-        batch = assemble(context, fragments)
-        fill_quotes(batch["items"], material_lines(pack))
-        atomic_write(candidate, encode(batch))
+        # Evidence may give lines only: the platform quotes them.
+        atomic_write(candidate, encode(assemble(fragments)))
     except (InputProblem, PrepareInputError) as exc:
-        message = (
-            exc.text(outcome)
-            if isinstance(exc, InputProblem)
-            else located(str(exc), origins) + f"\n{outcome}"
-        )
-        try:
-            atomic_write(
-                workspace_path(str(report)), encode({"total": 1, "errors": [message]})
-            )
-            saved = f"报告：{report}"
-        except (OSError, ValueError):
-            saved = "报告未保存"
-        print(f"{message}；{saved}")
+        print(exc.text(outcome) if isinstance(exc, InputProblem) else located(str(exc), origins) + f"\n{outcome}")
         return 1
     except ValueError as exc:
-        print(
-            error(
-                "PATH_OUT_OF_SCOPE",
-                str(exc),
-                outcome,
-                "片段、候选与输出都用工作区相对路径",
-                retry=False,
-            )
-        )
+        print(error("PATH_OUT_OF_SCOPE", str(exc), outcome, "片段与输出都用工作区相对路径", retry=False))
         return 1
     except OSError as exc:
-        print(
-            error(
-                "WRITE_FAILED",
-                f"写入 {relative(output) if 'output' in locals() else args.output} 失败：{type(exc).__name__}",
-                outcome,
-                retry=False,
-            )
-        )
+        print(error("WRITE_FAILED", f"写入 {relative(output)} 失败：{type(exc).__name__}", outcome, retry=False))
         return 1
-    checked = validate_file(
-        candidate, args.schema, args.context, origins=origins
-    )
-    if checked:
-        try:
-            local = json.loads(Path(str(candidate) + ".errors.json").read_bytes())
-            save_latest_check("local", local.get("errors") or [], candidate)
-        except (OSError, ValueError):
-            pass
-        return checked
-    # Column names, query locations and platform-rejected functions are checked here,
-    # free of repair rounds (design MS-02, MS-07).
-    column_problems = local_column_messages(batch["items"], pack.get("tables_file")) + function_messages(batch["items"])
-    if column_problems:
-        save_latest_check("local", column_problems, candidate)
-        print(f"本地检查未通过（不计修正轮次），未提交：{len(column_problems)} 处")
-        print("\n".join("  " + line for line in column_problems[:10]))
-        print("改对应片段后重新合并：" + command("prepare_result.py", "--work-pack", args.work_pack or "<工作包>"))
-        return 1
-    retry_command = (
-        command("prepare_result.py", "--work-pack", args.work_pack)
-        if args.work_pack
-        else command(
-            "prepare_result.py",
-            "--context",
-            args.context,
-            "--schema",
-            args.schema,
-            "--output",
-            args.output,
-            *args.fragments,
-        )
-    )
-    if not platform_submit(pack, candidate, retry_command):
+    if not platform_submit(pack, candidate, retry_command, origins):
         return 1
     atomic_write(output, candidate.read_bytes())
     archive_submitted(pack)

@@ -64,3 +64,15 @@
 - 实例历史默认只显示已发布的变化；带 `session_id` 时包含本会话的待发布修改。
 - 迁移 `20261117_000002` 只新建表，不改已有数据：已发布实例保持 active，已有暂存实例继续等待其会话发布。
 - 发版说明需写明：接受的实例在发布后才对外可见。
+
+## 3 技能变薄与示例精简
+
+已实施（Claude），按设计第 6 节：
+
+- 平台先补齐：提交时材料证据没写原文就按起止行补（在生成证据 id 之前，id 稳定）；表结构文件每列给 `value_kind`（平台自己的物理类型分类）。
+- 删除技能里的平台规则副本：`check_part.py`、`check_result.py`、`column_refs.py`、`function_refs.py`、`materials.py`、`platform_functions.json` 及其生成代码。`atomic_write`、集合常量移入 `runpaths.py`；`expand_tables.py` 直接用表结构里的 `value_kind`、证据只写行号，不再调用检查。
+- `prepare_result.py` 只合并、提交、把平台错误的 `/items/N` 指回片段文件，参数只剩 `--work-pack` 和片段（518 → 408 行；其余是提交、错误处理和隐去凭据，没有平台规则）。
+- 示例只留 `extract-kit/`：05 补成两个文档实例和一个关系实例（固定包材料加一行事实）；少见写法合为 `variants.json`（11 个，`--variant <名称>`）；删除 `examples/` 下按类型、按操作的示例和 `catalog.json`，`protocol/` 保留。`show_example.py` 按类型查询时提示对应的 `--part`。
+- 平台报错的“下一步”改为指向固定包入口（`--part NN`、`--part update`／`edit` 或 `--variant`），期望形状在报错本身里。
+- 测试：保留的固定包与全部变体在测试中通过平台的提交解析和图校验（`tests/platform_check.py`，不需要数据库）；DataAgent 测试从 442 个降到 221 个，减少的主要是按类型示例的参数化用例和本地检查器的用例。离线预算的“选中示例”改为一次定点查询读的单个固定包片段（限额不变）。
+- 发版说明需写明：两个建模技能必须整目录替换，升级时不要有进行中的建模。
