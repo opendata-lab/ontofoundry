@@ -370,7 +370,7 @@ export function workspaceRequest<T>(id: string, suffix: string, body?: unknown, 
 // Document instances live in their own store, not in the core-1 draft. Views keep
 // reading them from the draft, so they are merged in after each load and removed
 // before a draft is sent back.
-type InstanceSet = { change_sequence: number; items: { target_kind: "material_object" | "material_link"; state: string; revision: number; element: Record<string, unknown> }[] };
+type InstanceSet = { change_sequence: number; items: { target_kind: "material_object" | "material_link"; state: string; revision: number; element: Record<string, unknown>; pending_change?: boolean }[] };
 async function instancesFor(workspaceId: string, sessionId?: string | null): Promise<Pick<Draft, "material_objects" | "material_links">> {
   try {
     const set = await workspaceRequest<InstanceSet>(workspaceId, sessionId ? `/sessions/${sessionId}/instance-baseline` : "/instances");

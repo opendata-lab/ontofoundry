@@ -56,6 +56,14 @@ def accept_all(client, session, items):
     return response.json()["session"], batch
 
 
+def accept_and_publish(client, session, items):
+    """Accepted instances are visible to others only once the session publishes (AI-11)."""
+    session, batch = accept_all(client, session, items)
+    published = publish(client, session)
+    assert published.status_code == 200, published.text
+    return published.json()["session"], batch
+
+
 def create_instance(session, name="月湾客户"):
     typ = next(o for o in session["draft"]["object_types"] if o["name"] == "customer")
     return create(
@@ -65,7 +73,8 @@ def create_instance(session, name="月湾客户"):
     )
 
 
-def test_instance_only_accept_is_live_without_ontology_version(client):
+def test_accepted_instance_is_visible_only_after_publish(client):
+    """AI-11: an accepted instance waits in the session until it publishes."""
     session = create_session(client)
     original = client.get(ONTOLOGY + "/version").json()
     session, batch = accept_all(client, session, [create_instance(session)])
@@ -74,12 +83,19 @@ def test_instance_only_accept_is_live_without_ontology_version(client):
         and "material_links" not in session["draft"]
     )
     assert client.get(ONTOLOGY + "/version").json() == original
+    target_id = batch["items"][0]["target_id"]
+    staged = next(i for i in baseline(client, session)["items"] if i["target_id"] == target_id)
+    assert staged["state"] == "staged"
+    assert target_id not in {i["target_id"] for i in client.get(ROOT + "/instances").json()["items"]}
+    published = publish(client, session)
+    assert published.status_code == 200, published.text
+    session = published.json()["session"]
     entry = next(
         i
         for i in baseline(client, session)["items"]
-        if i["target_id"] == batch["items"][0]["target_id"]
+        if i["target_id"] == target_id
     )
-    assert entry["state"] == "active" and entry["revision"] == 1
+    assert entry["state"] == "active"
     live = client.get(ROOT + "/instances").json()
     InstanceBaseline.model_validate(live)
     assert entry["target_id"] in {i["target_id"] for i in live["items"]}
@@ -110,14 +126,20 @@ def test_update_undo_history_and_revision_aba_protection(client):
         client, session, [instance_update(entry, values={"label": "新名称"})]
     )
     newer = baseline(client, session)["items"][0]
-    assert newer["revision"] == entry["revision"] + 1
+    assert newer["revision"] == entry["revision"] + 1 and newer["pending_change"]
+    # Others still read the published content until this session publishes (AI-11).
+    public = next(i for i in client.get(ROOT + "/instances").json()["items"] if i["target_id"] == entry["target_id"])
+    assert public["element"] == entry["element"] and public["hash"] == old_hash
     response = decide(client, session, [(batch["items"][0]["id"], "reject")])
     assert response.status_code == 200, response.text
     final = baseline(client, response.json()["session"])["items"][0]
-    assert final["element"] == entry["element"] and final["hash"] != old_hash
-    history = client.get(
-        ROOT + f"/instances/material_object/{entry['target_id']}/history"
-    ).json()["items"]
+    # Undone before publishing: the published instance is shown again, unchanged.
+    assert final["element"] == entry["element"] and final["hash"] == old_hash
+    assert not final["pending_change"]
+    url = ROOT + f"/instances/material_object/{entry['target_id']}/history"
+    # The draft's edits are this session's own history; others never saw them.
+    assert [i["operation"] for i in client.get(url).json()["items"]] == ["create"]
+    history = client.get(url, params={"session_id": session["id"]}).json()["items"]
     assert [i["operation"] for i in history] == ["create", "update", "undo"]
     assert [i["revision"] for i in history] == [1, 2, 3]
     assert history[1]["proposal_item_id"] == batch["items"][0]["id"]
@@ -136,20 +158,28 @@ def test_two_sessions_cannot_overwrite_or_undo_each_other(client):
     response = decide(client, first, [(one["items"][0]["id"], "accept")])
     assert response.status_code == 200, response.text
     first = response.json()["session"]
+    # One pending change per instance: the other session waits (AI-11).
+    refused = decide(client, other, [(two["items"][0]["id"], "accept")])
+    assert (
+        refused.status_code == 409 and refused.json()["error"]["code"] == "INSTANCE_PENDING_ELSEWHERE"
+    )
+    assert baseline(client, other)["items"][0]["element"] == entry["element"]
+    # The first session publishes; the other's proposal was made on older content.
+    published = publish(client, first)
+    assert published.status_code == 200, published.text
     refused = decide(client, other, [(two["items"][0]["id"], "accept")])
     assert (
         refused.status_code == 409 and refused.json()["error"]["code"] == "PROPOSAL_TARGET_CHANGED"
     )
     assert decide(client, other, [(two["items"][0]["id"], "reject")]).status_code == 200
     current = baseline(client, other)["items"][0]
+    assert current["element"]["values"]["label"] == "第一位修改"
     other, _ = accept_all(
         client, other, [instance_update(current, values={"label": "重新审阅后修改"})]
     )
-    refused = decide(client, first, [(one["items"][0]["id"], "reject")])
-    assert (
-        refused.status_code == 409
-        and refused.json()["error"]["code"] == "PROPOSAL_UNDO_CONFLICT"
-    )
+    # Published work is closed; the first session cannot undo it any more.
+    refused = decide(client, published.json()["session"], [(one["items"][0]["id"], "reject")])
+    assert refused.status_code == 409
     assert (
         baseline(client, other)["items"][0]["element"]["values"]["label"]
         == "重新审阅后修改"
@@ -345,12 +375,12 @@ def test_description_display_name_and_synonyms_do_not_block(client, route):
 
 def test_new_instance_invalidates_preview_and_rest_mcp_cursor(client):
     session = create_session(client)
-    accept_all(client, create_session(client), [create_instance(session, "翻页客户")])
+    accept_and_publish(client, create_session(client), [create_instance(session, "翻页客户")])
     previous_preview = preview(client, session).json()
     rest = client.get(ONTOLOGY + "/objects", params={"limit": 1}).json()
     mcp = call(client, "search_objects", {"limit": 1})["structuredContent"]
     assert rest["next_cursor"] and mcp["next_cursor"]
-    accept_all(client, create_session(client), [create_instance(session, "又一位客户")])
+    accept_and_publish(client, create_session(client), [create_instance(session, "又一位客户")])
     response = client.post(
         ROOT + f"/sessions/{session['id']}/publish",
         json={
@@ -392,7 +422,7 @@ def test_fixed_version_filters_new_values_and_relations(client):
     session = publish(client, save(client, session, session["draft"]).json()).json()[
         "session"
     ]
-    session, _ = accept_all(
+    session, _ = accept_and_publish(
         client,
         session,
         [
@@ -690,7 +720,7 @@ def test_relation_reads_and_endpoint_delete_preserve_evidence_and_history(client
     customer = baseline(client, session)["items"][0]
     order = next(t for t in session["draft"]["object_types"] if t["name"] == "order")
     link = session["draft"]["link_types"][0]
-    session, batch = accept_all(
+    session, batch = accept_and_publish(
         client,
         session,
         [
@@ -733,11 +763,15 @@ def test_relation_reads_and_endpoint_delete_preserve_evidence_and_history(client
         )
         db.commit()
         history = instance_store.history(
-            db, session["workspace_id"], "material_link", batch["items"][1]["target_id"]
+            db, session["workspace_id"], "material_link", batch["items"][1]["target_id"], session["id"]
         )
         assert history[-1].operation == "endpoint_deleted"
         assert history[-1].after["state"] == "deleted"
+    # Deleted in the session's draft: still readable until it publishes.
+    assert client.get(ONTOLOGY + f"/objects/doc.{customer['target_id']}").status_code == 200
+    assert publish(client, session).status_code == 200
     assert client.get(ONTOLOGY + f"/objects/doc.{customer['target_id']}").status_code == 404
+    assert client.get(ONTOLOGY + f"/objects/doc.{customer['target_id']}/neighborhood").status_code == 404
 
 
 def test_mixed_batch_failure_rolls_back_definition_instances_history_and_decision(client):
@@ -800,7 +834,7 @@ def test_delete_proposal_cascades_relations_and_undo_restores_them(client):
     session = create_session(client)
     customer = baseline(client, session)["items"][0]
     order = next(t for t in session["draft"]["object_types"] if t["name"] == "order")
-    session, relation_batch = accept_all(
+    session, relation_batch = accept_and_publish(
         client,
         session,
         [
@@ -840,7 +874,7 @@ def test_relation_endpoint_definition_change_blocks_both_publish_paths(client):
     session = create_session(client)
     customer = baseline(client, session)["items"][0]
     order = next(t for t in session["draft"]["object_types"] if t["name"] == "order")
-    session, _ = accept_all(
+    session, _ = accept_and_publish(
         client,
         session,
         [

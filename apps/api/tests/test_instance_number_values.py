@@ -98,7 +98,11 @@ def test_a_proposal_may_say_text_but_accepting_needs_a_number(client):
     assert response.status_code >= 400
     assert "到店次数（visits）必须是整数，不能写成文本 '42'" in response.text
 
-    accept_all(client, session, [fact(42)])
+    rejected = decide(client, session, [(batch["items"][0]["id"], "reject")])
+    assert rejected.status_code == 200, rejected.text
+    session, _ = accept_all(client, rejected.json()["session"], [fact(42)])
+    published = publish(client, session)
+    assert published.status_code == 200, published.text
     values = [o["values"].get("visits") for o in client.get(ONTOLOGY + "/objects").json()["items"]]
     assert 42 in values
 

@@ -2,13 +2,14 @@
 
 from copy import deepcopy
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from ontofoundry_api.db_models import (
     DocumentInstanceRecord,
+    InstanceDraftRecord,
     InstanceEvidenceRecord,
     InstanceHistoryRecord,
     InstanceLinkRecord,
@@ -157,22 +158,47 @@ def baseline(db, workspace_id, session_id=None, *, include_deleted=False):
                 .order_by(InstanceEvidenceRecord.id)
             ):
                 evidence.setdefault(entry.owner_id, []).append(entry)
+        drafts = session_drafts(db, workspace_id, session_id, kind) if session_id else {}
         for row in rows:
-            element = content(db, kind, row, evidence.get(row.id, []))
+            draft = drafts.get(row.id) if row.state == "active" else None
+            if draft is not None and draft.content_json is None:
+                continue  # deleted in this session's draft
+            element = draft.content_json if draft is not None else content(db, kind, row, evidence.get(row.id, []))
+            revision = draft.revision if draft is not None else row.revision
             items.append(
                 {
                     "target_kind": kind,
                     "target_id": row.id,
-                    "revision": row.revision,
-                    "state": row.state,
-                    "session_id": row.session_id,
+                    "revision": revision,
+                    # A pending change reads like a staged instance in its session.
+                    "state": "staged" if draft is not None else row.state,
+                    "session_id": session_id if draft is not None else row.session_id,
                     "element": element,
-                    "hash": instance_hash(element, row.revision),
+                    "hash": instance_hash(element, revision),
+                    **({"pending_change": True} if draft is not None else {}),
                 }
             )
     if sequence != change_sequence(db, workspace_id):
         fail("INSTANCE_SET_CHANGED", "实例集合在读取期间已变化，请重新读取")
     return {"change_sequence": sequence, "items": items}
+
+
+def session_drafts(db, workspace_id, session_id, kind=None) -> dict:
+    """This session's pending changes to published instances, by target id."""
+    query = select(InstanceDraftRecord).where(
+        InstanceDraftRecord.workspace_id == workspace_id, InstanceDraftRecord.session_id == session_id,
+    )
+    if kind is not None:
+        query = query.where(InstanceDraftRecord.kind == kind)
+    return {d.target_id: d for d in db.scalars(query)}
+
+
+def _draft_for(db, workspace_id, kind, target_id):
+    return db.scalar(select(InstanceDraftRecord).where(
+        InstanceDraftRecord.workspace_id == workspace_id,
+        InstanceDraftRecord.kind == kind,
+        InstanceDraftRecord.target_id == target_id,
+    ).with_for_update())
 
 
 def session_snapshot(db, workspace_id, session_id, draft):
@@ -253,8 +279,12 @@ def write(
     model=None,
     validated=False,
     cascades=None,
+    next_revision=None,
 ):
-    """Compare-and-set content, evidence and history. Deleted IDs are never reused."""
+    """Compare-and-set content, evidence and history. Deleted IDs are never reused.
+
+    A session's change to a published instance waits in its draft (AI-11): the
+    published row is untouched until the session publishes (activate)."""
     if kind not in INSTANCE_KINDS:
         fail("INSTANCE_KIND_INVALID", "实例种类无效", 422)
     lock_workspace(db, workspace_id)
@@ -275,19 +305,25 @@ def write(
         or (row.state == "staged" and row.session_id != session_id)
     ):
         fail("INSTANCE_REVISION_CHANGED", "实例已变化或不属于当前会话")
+    draft_mode = row is not None and row.state == "active" and session_id is not None and state != "active"
+    pending = _draft_for(db, workspace_id, kind, target_id) if draft_mode else None
+    if pending is not None and pending.session_id != session_id:
+        fail("INSTANCE_PENDING_ELSEWHERE", "该实例在另一会话中有待发布的修改，请先在那个会话发布或撤销")
+    current_revision = pending.revision if pending is not None else (row.revision if row else None)
     if (row is None and expected_revision is not None) or (
-        row is not None and row.revision != expected_revision
+        row is not None and current_revision != expected_revision
     ):
         fail("INSTANCE_REVISION_CHANGED", "实例已被其他操作修改，请重新生成或审阅提案")
     if row is None and after is None:
         raise NotFoundError("实例不存在")
-    before_element = content(db, kind, row) if row else None
+    published_element = content(db, kind, row) if row else None
+    before_element = pending.content_json if pending is not None else published_element
     previous = (
         {
             "element": before_element,
-            "state": row.state,
-            "revision": row.revision,
-            "session_id": row.session_id,
+            "state": "staged" if pending is not None else row.state,
+            "revision": current_revision,
+            "session_id": session_id if pending is not None else row.session_id,
         }
         if row
         else None
@@ -345,7 +381,7 @@ def write(
                 )
             except ValueError as exc:
                 raise ServiceError(str(exc), code="VALIDATION_FAILED", status_code=422) from exc
-        state = state or state_for(
+        state = "staged" if draft_mode else state or state_for(
             effective,
             published_model(db, workspace_id),
             kind,
@@ -355,7 +391,13 @@ def write(
         )
     else:
         state = "deleted"
-    revision = row.revision + 1 if row else 1
+    if draft_mode:
+        return _write_draft(
+            db, workspace_id, session_id, kind, target_id, row, pending, after, published_element,
+            previous, current_revision, actor=actor, proposal_item_id=proposal_item_id,
+            operation=operation, cascades=cascades,
+        )
+    revision = next_revision or (row.revision + 1 if row else 1)
     values = {
         "state": state,
         "session_id": session_id if state == "staged" else None,
@@ -631,10 +673,68 @@ def check_publish(db, workspace_id, draft, session_id=None):
     return impact
 
 
+def _next_revision(db, kind, target_id, current):
+    """A revision above every one in the instance's history (drafts record theirs too)."""
+    recorded = db.scalar(
+        select(func.max(InstanceHistoryRecord.revision)).where(
+            InstanceHistoryRecord.owner_kind == OWNERS[kind], InstanceHistoryRecord.owner_id == target_id,
+        )
+    )
+    return max(current or 0, recorded or 0) + 1
+
+
+def _write_draft(db, workspace_id, session_id, kind, target_id, row, pending, after, published_element,
+                 previous, current_revision, *, actor, proposal_item_id, operation, cascades):
+    """Keep a session's change to a published instance as a draft; the row stays as published."""
+    from ontofoundry_api.domain.canonical import canonical
+
+    now = utc_now()
+    revision = _next_revision(db, kind, target_id, current_revision)
+    reverted = after is not None and canonical(after) == canonical(published_element)
+    if reverted:
+        if pending is not None:
+            db.delete(pending)
+    elif pending is None:
+        db.add(InstanceDraftRecord(
+            id=str(uuid4()), workspace_id=workspace_id, session_id=session_id, kind=kind,
+            target_id=target_id, revision=revision, content_json=after, updated_at=now,
+        ))
+    else:
+        pending.revision, pending.content_json, pending.updated_at = revision, after, now
+    state = "active" if reverted else ("staged" if after is not None else "deleted")
+    # Back to the published content: readers see the published row and its revision.
+    shown = row.revision if reverted else revision
+    result = {"element": after or previous["element"], "state": state, "revision": shown, "session_id": session_id}
+    db.add(InstanceHistoryRecord(
+        workspace_id=workspace_id, owner_kind=OWNERS[kind], owner_id=target_id, revision=revision,
+        operation=operation or ("delete" if after is None else "update"),
+        before=previous, after=result, proposal_item_id=proposal_item_id, actor=actor, at=now,
+    ))
+    _bump(db, workspace_id)
+    db.flush()
+    # Deleting an object deletes its relations in the same draft.
+    if after is None and kind == "material_object":
+        for item in baseline(db, workspace_id, session_id)["items"]:
+            element = item["element"]
+            if item["target_kind"] != "material_link" or target_id not in {element["source_id"], element["target_id"]}:
+                continue
+            link_result = write(
+                db, workspace_id, session_id, "material_link", item["target_id"], None,
+                expected_revision=item["revision"], actor=actor, proposal_item_id=proposal_item_id,
+                operation="endpoint_deleted", cascades=cascades,
+            )
+            if cascades is not None:
+                cascades.append({
+                    "action": "removed", "target_kind": "material_link", "target_id": item["target_id"],
+                    "proposal_id": proposal_item_id, "before": deepcopy(link_result["element"]), "after": None,
+                })
+    return result
+
+
 def activate(db, workspace_id, session_id, actor, model):
     current = baseline(db, workspace_id, session_id)
     for item in current["items"]:
-        if item["state"] == "staged":
+        if item["state"] == "staged" and not item.get("pending_change"):
             write(
                 db,
                 workspace_id,
@@ -648,6 +748,23 @@ def activate(db, workspace_id, session_id, actor, model):
                 operation="activate",
                 model=model,
             )
+    # Then the session's changes to published instances, relations first: an
+    # object deleted later takes its remaining relations with it.
+    drafts = sorted(session_drafts(db, workspace_id, session_id).values(), key=lambda d: d.kind != "material_link")
+    for pending in drafts:
+        cls = RECORDS[pending.kind]
+        row = db.get(cls, pending.target_id)
+        if row is not None and row.state == "active":
+            write(
+                db, workspace_id, None, pending.kind, pending.target_id, pending.content_json,
+                expected_revision=row.revision, actor=actor,
+                state="active" if pending.content_json is not None else None,
+                operation="activate", model=model, validated=True,
+                # Draft writes already used revisions in this instance's history.
+                next_revision=_next_revision(db, pending.kind, pending.target_id, row.revision),
+            )
+        db.delete(pending)
+    db.flush()
 
 
 def abandon(db, workspace_id, session_id, actor):
@@ -677,7 +794,8 @@ def abandon(db, workspace_id, session_id, actor):
     for item in sorted(
         current["items"], key=lambda i: i["target_kind"] == "material_object"
     ):
-        if item["state"] == "staged":
+        # Pending changes to published instances are simply dropped below.
+        if item["state"] == "staged" and not item.get("pending_change"):
             write(
                 db,
                 workspace_id,
@@ -689,6 +807,8 @@ def abandon(db, workspace_id, session_id, actor):
                 actor=actor,
                 operation="abandon_session",
             )
+    for pending in session_drafts(db, workspace_id, session_id).values():
+        db.delete(pending)
     session.abandoned_at, session.abandoned_by = utc_now(), actor
     session.personal_owner_id = None
     session.dataagent_run_token = None

@@ -563,6 +563,27 @@ class InstanceEvidenceRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class InstanceDraftRecord(Base):
+    """A session's pending change to a published instance (AI-11).
+
+    The published row keeps what everyone reads; the session's accepted change
+    waits here (content, or null for a delete) and is applied when the session
+    publishes. One pending change per instance at a time."""
+
+    __tablename__ = "instance_drafts"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "kind", "target_id", name="uq_instance_draft_target"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    session_id: Mapped[str] = mapped_column(String(36), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    target_id: Mapped[str] = mapped_column(String(36))
+    revision: Mapped[int] = mapped_column(Integer)
+    content_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class InstanceHistoryRecord(Base):
     __tablename__ = "instance_history"
     __table_args__ = (
