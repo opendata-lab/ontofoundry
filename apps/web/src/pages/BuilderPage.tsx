@@ -1,6 +1,6 @@
 import { Ban, ChevronDown, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Alert, Button, Checkbox, Dropdown, Popconfirm, Segmented, Tooltip, Typography, Upload } from "antd";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Alert, Button, Checkbox, Dropdown, Popconfirm, Segmented, Splitter, Tooltip, Typography, Upload } from "antd";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { datasetApi, modelingApi } from "../api/client";
 import type { Capabilities, Material, RegisteredTable, SessionMode } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -22,7 +22,7 @@ import { createOntoFoundryConversationTransport } from "../lib/agentConversation
 
 // Bridge the SDK's public custom properties to existing design tokens.
 const CONVERSATION = [
-  "block h-full min-h-0 w-full flex-1 overflow-hidden",
+  "block h-full min-h-0 min-w-0 w-full flex-1 overflow-hidden",
   "[--dac-font-family:var(--font-body)] [--dac-font-size:var(--text-sm)] [--dac-text-color:var(--color-ink)] [--dac-text-muted:var(--color-muted)]",
   "[--dac-content-max-width:100%] [--dac-content-padding-inline:var(--builder-conversation-padding)] [--dac-content-padding-block:var(--space-xl)] [--dac-message-gap:var(--space-lg)]",
   "[--dac-primary:var(--color-accent)] [--dac-primary-dark:var(--color-accent-hover)] [--dac-primary-hover:var(--color-accent-hover)] [--dac-primary-color:var(--color-accent)] [--dac-accent:var(--color-accent)] [--dac-user-bubble-bg:var(--color-accent-soft)]",
@@ -54,6 +54,39 @@ const MODE_ITEMS = (Object.keys(MODES) as SessionMode[]).map((key) => ({
   ),
 }));
 
+const RESULTS_WIDTH_KEY = "ontofoundry.builder.results.width";
+
+function readCssToken(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function readPxToken(name: string, fallback: number): number {
+  const raw = Number.parseFloat(readCssToken(name, ""));
+  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+}
+
+function readRatioToken(name: string, fallback: number): number {
+  const value = readCssToken(name, "");
+  if (value.endsWith("%")) {
+    const pct = Number.parseFloat(value);
+    if (Number.isFinite(pct) && pct > 0 && pct <= 100) return pct / 100;
+  }
+  return fallback;
+}
+
+function storedResultsWidth(minWidth: number, defaultWidth: number): number {
+  try {
+    const stored = localStorage.getItem(RESULTS_WIDTH_KEY);
+    if (stored === null) return defaultWidth;
+    const parsed = Number.parseFloat(stored);
+    return Number.isFinite(parsed) && parsed >= minWidth ? Math.round(parsed) : defaultWidth;
+  } catch {
+    return defaultWidth;
+  }
+}
+
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const { canEdit } = useWorkspacePermissions();
@@ -77,7 +110,35 @@ export function BuilderPage() {
   // A plan card expanded from the conversation takes the results column
   // until it is closed.
   const [openPlan, setOpenPlan] = useState<OpenPlan | null>(null);
-  useEffect(() => setOpenPlan(null), [sessionId]);
+  useEffect(() => setOpenPlan(null), [sessionId, mode]);
+  const conversationMinWidth = useMemo(() => readPxToken("--builder-conversation-min-width", 360), []);
+  const resultsMinWidth = useMemo(() => readPxToken("--builder-results-min-width", 340), []);
+  const resultsMaxWidth = useMemo(() => readCssToken("--builder-results-max-width", "65%"), []);
+  const resultsMaxRatio = useMemo(() => readRatioToken("--builder-results-max-width", 0.65), []);
+  const [resultsWidth, setResultsWidth] = useState(() =>
+    storedResultsWidth(resultsMinWidth, readPxToken("--builder-results-default-width", 360)),
+  );
+  const latestResultsWidth = useRef(resultsWidth);
+  const splitAreaRef = useRef<HTMLDivElement>(null);
+  const [splitAreaWidth, setSplitAreaWidth] = useState(0);
+  useEffect(() => {
+    const el = splitAreaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      if (width > 0) setSplitAreaWidth(width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const effectiveResultsWidth = useMemo(() => {
+    if (splitAreaWidth <= 0) return resultsWidth;
+    const maxAllowed = Math.max(
+      resultsMinWidth,
+      Math.min(Math.floor(splitAreaWidth * resultsMaxRatio), Math.floor(splitAreaWidth - conversationMinWidth)),
+    );
+    return Math.min(resultsWidth, maxAllowed);
+  }, [conversationMinWidth, resultsMaxRatio, resultsMinWidth, resultsWidth, splitAreaWidth]);
   const conversation = useRef<AgentConversationElement>(null);
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
@@ -186,9 +247,10 @@ export function BuilderPage() {
     const onDraft = (event: Event) => setComposerDraft((event as CustomEvent<{ value: string }>).detail.value);
 
     const onPlanOpen = (event: Event) => {
-      const { title, body, markdown } = (event as CustomEvent<PlanOpenDetail>).detail;
+      if (sendState.current.mode !== "model") return;
+      const { title, body, markdown, requestId } = (event as CustomEvent<PlanOpenDetail>).detail;
       event.preventDefault();
-      setOpenPlan({ title, body, markdown });
+      setOpenPlan({ title, body, markdown, requestId });
     };
 
     const onRun = (event: Event) => {
@@ -502,72 +564,103 @@ export function BuilderPage() {
               </div>
             )}
           </Panel>}
-          <Panel fill className="min-w-0">
-            <PanelToolbar extra={<>
-              <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} presentation="dialog" disabled={busy || uploading} />
-              {canEdit && (
-                <>
-                  <Tooltip title="新建会话">
-                    <Button size="small" type="text" aria-label="新建会话" icon={<Plus size={15} />} disabled={busy || uploading}
-                      onClick={() => act(async () => { await model.create(undefined, mode); })} />
-                  </Tooltip>
-                  {session && !session.abandoned_at && (
-                    <Popconfirm
-                      title="放弃这个会话？"
-                      description={`将丢弃本会话 ${session.draft.material_objects.filter((o) => o.state === "staged").length + session.draft.material_links.filter((l) => l.state === "staged").length} 条待发布实例；已发布的本体和已生效的实例不受影响。放弃后不能再在本会话中建模或发布。`}
-                      okText="放弃会话"
-                      okButtonProps={{ danger: true }}
-                      cancelText="取消"
-                      onConfirm={() => act(async () => {
-                        await modelingApi.abandon(session);
-                        setSession(await modelingApi.get(session.workspace_id, session.id));
-                      })}
-                    >
-                      <Tooltip title="放弃会话">
-                        <Button size="small" type="text" aria-label="放弃会话" icon={<Ban size={15} />} disabled={busy || uploading || running} />
-                      </Tooltip>
-                    </Popconfirm>
+          <div ref={splitAreaRef} className="flex min-h-0 min-w-0 flex-1">
+            <Splitter
+              className="builder-splitter"
+              onResize={([, next]) => {
+                if (typeof next === "number" && Number.isFinite(next)) {
+                  latestResultsWidth.current = next;
+                  setResultsWidth(next);
+                }
+              }}
+              onResizeEnd={(sizes) => {
+                const next = sizes[1] ?? latestResultsWidth.current;
+                if (typeof next !== "number" || !Number.isFinite(next)) return;
+                const rounded = Math.max(resultsMinWidth, Math.round(next));
+                latestResultsWidth.current = rounded;
+                setResultsWidth(rounded);
+                try {
+                  localStorage.setItem(RESULTS_WIDTH_KEY, String(rounded));
+                } catch {
+                  // Ignore storage write failures in private mode or constrained quotas.
+                }
+              }}
+            >
+              <Splitter.Panel min={conversationMinWidth} className="flex min-h-0 min-w-0 flex-col">
+                <Panel fill className="min-w-0">
+                  <PanelToolbar extra={<>
+                    <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} presentation="dialog" disabled={busy || uploading} />
+                    {canEdit && (
+                      <>
+                        <Tooltip title="新建会话">
+                          <Button size="small" type="text" aria-label="新建会话" icon={<Plus size={15} />} disabled={busy || uploading}
+                            onClick={() => act(async () => { await model.create(undefined, mode); })} />
+                        </Tooltip>
+                        {session && !session.abandoned_at && (
+                          <Popconfirm
+                            title="放弃这个会话？"
+                            description={`将丢弃本会话 ${session.draft.material_objects.filter((o) => o.state === "staged").length + session.draft.material_links.filter((l) => l.state === "staged").length} 条待发布实例；已发布的本体和已生效的实例不受影响。放弃后不能再在本会话中建模或发布。`}
+                            okText="放弃会话"
+                            okButtonProps={{ danger: true }}
+                            cancelText="取消"
+                            onConfirm={() => act(async () => {
+                              await modelingApi.abandon(session);
+                              setSession(await modelingApi.get(session.workspace_id, session.id));
+                            })}
+                          >
+                            <Tooltip title="放弃会话">
+                              <Button size="small" type="text" aria-label="放弃会话" icon={<Ban size={15} />} disabled={busy || uploading || running} />
+                            </Tooltip>
+                          </Popconfirm>
+                        )}
+                      </>
+                    )}
+                  </>}>
+                    {!canEdit ? (
+                      <Typography.Text type="secondary" className="text-xs whitespace-nowrap">{MODES[mode].label} · 只读</Typography.Text>
+                    ) : modeLocked ? (
+                      <Typography.Text type="secondary" className="text-xs whitespace-nowrap" role="status">{MODES[mode].label} · 模式已固定</Typography.Text>
+                    ) : (
+                      <Dropdown trigger={["click"]} disabled={busy || uploading}
+                        menu={{ selectable: true, selectedKeys: [mode], items: MODE_ITEMS, onClick: ({ key }) => changeMode(key as SessionMode) }}>
+                        <Button size="small" type="text" aria-label="选择会话模式" icon={<ChevronDown size={14} />} iconPosition="end" disabled={busy || uploading}>
+                          {MODES[mode].label}
+                        </Button>
+                      </Dropdown>
+                    )}
+                    <SectionTitle title={<span className="block max-w-40 truncate" title={session?.title}>{session?.title ?? (mode === "model" ? "建模对话" : "日常对话")}</span>} />
+                  </PanelToolbar>
+                  {session?.abandoned_at && (
+                    <Alert type="warning" showIcon banner message="本会话已放弃，待发布实例已丢弃，不能继续建模或发布。请新建会话。" />
                   )}
-                </>
+                  {/* The endpoint is derived from sessionId, never from `session`.
+                    That object is null while a session loads, and an endpoint that
+                    momentarily goes empty reads as a conversation switch — the
+                    element would clear itself and reload for no reason. */}
+                  <dataagent-conversation ref={conversation} disabled={!canEdit || !!session?.abandoned_at} placeholder={canEdit ? (mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…") : "只读模式下不可发送消息"} className={CONVERSATION}>
+                    <BuilderConversationEmpty mode={mode} />
+                    {blockedReason && (
+                      <div slot="composer-overlay" className="px-1 pb-1">
+                        <Typography.Text type="secondary" className="text-xs" role="status">{blockedReason}</Typography.Text>
+                      </div>
+                    )}
+                  </dataagent-conversation>
+                </Panel>
+              </Splitter.Panel>
+              {mode === "model" && (
+                <Splitter.Panel
+                  size={effectiveResultsWidth}
+                  min={resultsMinWidth}
+                  max={resultsMaxWidth}
+                  className="flex min-h-0 min-w-0 flex-col"
+                >
+                  {openPlan
+                    ? <PlanPanel key={openPlan.requestId ?? openPlan.markdown} plan={openPlan} onClose={() => setOpenPlan(null)} />
+                    : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} canEdit={canEdit} />}
+                </Splitter.Panel>
               )}
-            </>}>
-              {!canEdit ? (
-                <Typography.Text type="secondary" className="text-xs whitespace-nowrap">{MODES[mode].label} · 只读</Typography.Text>
-              ) : modeLocked ? (
-                <Typography.Text type="secondary" className="text-xs whitespace-nowrap" role="status">{MODES[mode].label} · 模式已固定</Typography.Text>
-              ) : (
-                <Dropdown trigger={["click"]} disabled={busy || uploading}
-                  menu={{ selectable: true, selectedKeys: [mode], items: MODE_ITEMS, onClick: ({ key }) => changeMode(key as SessionMode) }}>
-                  <Button size="small" type="text" aria-label="选择会话模式" icon={<ChevronDown size={14} />} iconPosition="end" disabled={busy || uploading}>
-                    {MODES[mode].label}
-                  </Button>
-                </Dropdown>
-              )}
-              <SectionTitle title={<span className="block max-w-40 truncate" title={session?.title}>{session?.title ?? (mode === "model" ? "建模对话" : "日常对话")}</span>} />
-            </PanelToolbar>
-            {session?.abandoned_at && (
-              <Alert type="warning" showIcon banner message="本会话已放弃，待发布实例已丢弃，不能继续建模或发布。请新建会话。" />
-            )}
-            {/* The endpoint is derived from sessionId, never from `session`.
-              That object is null while a session loads, and an endpoint that
-              momentarily goes empty reads as a conversation switch — the
-              element would clear itself and reload for no reason. */}
-            <dataagent-conversation ref={conversation} disabled={!canEdit || !!session?.abandoned_at} placeholder={canEdit ? (mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…") : "只读模式下不可发送消息"} className={CONVERSATION}>
-              <BuilderConversationEmpty mode={mode} />
-              {blockedReason && (
-                <div slot="composer-overlay" className="px-1 pb-1">
-                  <Typography.Text type="secondary" className="text-xs" role="status">{blockedReason}</Typography.Text>
-                </div>
-              )}
-            </dataagent-conversation>
-          </Panel>
-          {mode === "model" && (
-            <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
-              {openPlan
-                ? <PlanPanel plan={openPlan} onClose={() => setOpenPlan(null)} />
-                : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} canEdit={canEdit} />}
-            </div>
-          )}
+            </Splitter>
+          </div>
         </div>
       </PageBody>
     </div>

@@ -1,23 +1,32 @@
 import { Button, Tooltip, Typography } from "antd";
 import { Check, Copy, Download, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { copyText, downloadText } from "../lib/clipboard";
 import { Panel } from "./layout";
 import { Markdown } from "./Markdown";
 
-export type OpenPlan = { title: string; body: string; markdown: string };
+export type OpenPlan = { title: string; body: string; markdown: string; requestId?: string };
 
 /** A plan expanded from the conversation's plan card, shown beside it. */
 export function PlanPanel({ plan, onClose }: { plan: OpenPlan; onClose: () => void }) {
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
-  const copy = () =>
+  const resetTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+  }, []);
+  const copy = () => {
+    if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
     copyText(plan.markdown)
-      .then(() => setCopied("done"))
+      .then(() => {
+        setCopied("done");
+        resetTimer.current = window.setTimeout(() => setCopied("idle"), 1500);
+      })
       .catch(() => setCopied("failed"));
+  };
   const fileName = `${plan.title.replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-+|-+$/g, "") || "plan"}.md`;
   return (
     <Panel fill className="min-w-0">
-      <div className="flex items-start gap-2 border-b border-rule px-4 py-3" role="toolbar" aria-label="计划">
+      <div className="flex shrink-0 items-start gap-2 border-b border-rule px-4 py-3" role="toolbar" aria-label="计划">
         <Typography.Title level={5} className="m-0 min-w-0 flex-1 leading-base">{plan.title}</Typography.Title>
         <Tooltip title="下载 Markdown">
           <Button size="small" type="text" aria-label="下载计划" icon={<Download size={15} />} onClick={() => downloadText(fileName, plan.markdown)} />
@@ -29,8 +38,8 @@ export function PlanPanel({ plan, onClose }: { plan: OpenPlan; onClose: () => vo
           <Button size="small" type="text" aria-label="关闭计划" icon={<X size={15} />} onClick={onClose} />
         </Tooltip>
       </div>
-      {/* A wide concept table scrolls on its own; the column keeps its width. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm leading-base text-ink [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_td]:min-w-20 [&_th]:min-w-20">
+      {/* A wide concept table scrolls on its own; long identifiers wrap so the column keeps its width. */}
+      <div className="min-h-0 min-w-0 flex-1 select-text overflow-y-auto px-4 py-3 text-sm leading-base text-ink wrap-anywhere [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_td]:min-w-20 [&_th]:min-w-20">
         <Markdown>{plan.body}</Markdown>
       </div>
     </Panel>

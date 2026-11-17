@@ -74,6 +74,150 @@ test("builder shows an expanded plan in the results column", async ({ page }) =>
   await expect(page.getByLabel("提案审核面板", { exact: true })).toBeVisible();
 });
 
+test("builder opens plan panel when clicking the plan card", async ({ page }) => {
+  await mockCanvasApi(page);
+  await page.route(
+    (url) => url.pathname === `/api/v1/workspaces/${WORKSPACE_ID}/sessions/${REVIEW_SESSION_ID}/agent-conversation`,
+    (route) =>
+      route.fulfill({
+        json: {
+          messages: [
+            {
+              id: "msg-plan",
+              role: "assistant",
+              content: "",
+              status: "success",
+              blocks: [
+                {
+                  type: "permission_request",
+                  request_id: "plan-1",
+                  tool_name: "ExitPlanMode",
+                  risk_level: "plan",
+                  summary: [
+                    "# 星河采购建模计划",
+                    "",
+                    "## 目标",
+                    "请校验字段 `very_long_unbroken_identifier_name_that_wraps_cleanly_inside_the_plan_panel_1234567890`。",
+                    "",
+                    "| 概念名称 | 英文标识 | 来源材料 | 对应数据表 | 关键属性 | 备注说明 |",
+                    "| --- | --- | --- | --- | --- | --- |",
+                    "| 供应商 | Supplier | 星河采购业务说明.md 第 3 行 | dwd_dim_supplier_master | supplier_id, supplier_name | 主数据 |",
+                    "",
+                    "## 步骤",
+                    ...Array.from({ length: 40 }, (_, i) => `${i + 1}. 新建对象 **供应商_${i + 1}**`),
+                  ].join("\n"),
+                  decision: "allow",
+                },
+              ],
+            },
+          ],
+          run: null,
+        },
+      }),
+  );
+  await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
+  const conversation = page.locator("dataagent-conversation");
+  const planCard = conversation.locator(".dac-plan-doc");
+  const planBody = conversation.locator(".dac-plan-body");
+  const expandBar = conversation.locator(".dac-plan-expand-bar");
+  const viewBtn = conversation.getByRole("button", { name: "查看完整计划", exact: true });
+  await expect(planBody).toBeVisible();
+  await expect(expandBar).toHaveCSS("opacity", "0");
+  await expect(viewBtn).toHaveCSS("pointer-events", "none");
+
+  // Clicking the card body, header, or toolbar actions keeps the body selectable and does not open PlanPanel.
+  await planBody.click();
+  await conversation.locator(".dac-plan-head").click();
+  await conversation.locator(".dac-plan-tools").getByRole("button", { name: "复制", exact: true }).click();
+  await expect(page.getByRole("toolbar", { name: "计划", exact: true })).toHaveCount(0);
+
+  // Hovering the plan card reveals "查看完整计划", which opens the right-hand PlanPanel without expanding in place.
+  await planCard.hover();
+  await expect(expandBar).toHaveCSS("opacity", "1");
+  await expect(viewBtn).toHaveCSS("pointer-events", "auto");
+  await viewBtn.click();
+  const planToolbar = page.getByRole("toolbar", { name: "计划", exact: true });
+  await expect(planToolbar).toBeVisible();
+  await expect(planToolbar.getByRole("heading", { name: "星河采购建模计划", exact: true })).toBeVisible();
+  await expect(planBody).not.toHaveClass(/is-full/);
+
+  // PlanPanel scrolls vertically, keeps long tokens wrapped without overflowing horizontally,
+  // and keeps the wide concept table horizontally scrollable on its own.
+  const scrollBox = page.locator('[role="toolbar"][aria-label="计划"] + div');
+  await expect.poll(() => scrollBox.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  const overflow = await scrollBox.evaluate((el) => {
+    const table = el.querySelector("table");
+    return {
+      panelScrollW: el.scrollWidth,
+      panelClientW: el.clientWidth,
+      tableScrollW: table ? table.scrollWidth : 0,
+      tableClientW: table ? table.clientWidth : 0,
+    };
+  });
+  expect(overflow.panelScrollW).toBeLessThanOrEqual(overflow.panelClientW + 1);
+  expect(overflow.tableScrollW).toBeGreaterThan(overflow.tableClientW);
+
+  const box = (await scrollBox.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 400);
+  await expect.poll(() => scrollBox.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const scrollBeforeCopy = await scrollBox.evaluate((el) => el.scrollTop);
+
+  // Copy via plain-HTTP fallback keeps the current scroll position.
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, get: () => undefined });
+  });
+  await planToolbar.getByRole("button", { name: "复制计划", exact: true }).click();
+  await expect.poll(() => scrollBox.evaluate((el) => el.scrollTop)).toBe(scrollBeforeCopy);
+
+  // Closing and clicking the top-right expand button re-opens it.
+  await page.getByRole("button", { name: "关闭计划", exact: true }).click();
+  await expect(page.getByLabel("提案审核面板", { exact: true })).toBeVisible();
+  await conversation.locator(".dac-plan-tools").getByRole("button", { name: "展开", exact: true }).click();
+  await expect(planToolbar).toBeVisible();
+  await expect(planToolbar.getByRole("heading", { name: "星河采购建模计划", exact: true })).toBeVisible();
+
+  // Dragging the splitter divider resizes PlanPanel and preserves width across ModelResults and reloads.
+  const rightPanel = page.locator(".builder-splitter > .ant-splitter-panel").last();
+  const leftPanel = page.locator(".builder-splitter > .ant-splitter-panel").first();
+  const separator = page.getByRole("separator");
+  await expect(separator).toBeVisible();
+  const initialRightBox = (await rightPanel.boundingBox())!;
+  expect(initialRightBox.width).toBeCloseTo(360, 0);
+
+  const sepBox = (await separator.boundingBox())!;
+  const startX = sepBox.x + sepBox.width / 2;
+  const startY = sepBox.y + sepBox.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX - 140, startY, { steps: 10 });
+  await page.mouse.up();
+
+  await expect.poll(async () => (await rightPanel.boundingBox())!.width).toBeGreaterThan(initialRightBox.width + 120);
+  const widenedRightBox = (await rightPanel.boundingBox())!;
+  expect((await leftPanel.boundingBox())!.width).toBeGreaterThanOrEqual(340);
+
+  // Closing back to ModelResults keeps the resized column width, and reloading restores it.
+  await page.getByRole("button", { name: "关闭计划", exact: true }).click();
+  await expect(page.getByLabel("提案审核面板", { exact: true })).toBeVisible();
+  expect((await rightPanel.boundingBox())!.width).toBeCloseTo(widenedRightBox.width, 0);
+
+  await page.reload();
+  await expect(page.getByLabel("提案审核面板", { exact: true })).toBeVisible();
+  expect((await rightPanel.boundingBox())!.width).toBeCloseTo(widenedRightBox.width, 0);
+
+  // Dragging beyond bounds clamps without collapsing either panel.
+  const afterReloadSep = (await separator.boundingBox())!;
+  const rx = afterReloadSep.x + afterReloadSep.width / 2;
+  const ry = afterReloadSep.y + afterReloadSep.height / 2;
+  await page.mouse.move(rx, ry);
+  await page.mouse.down();
+  await page.mouse.move(rx + 400, ry, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(async () => (await rightPanel.boundingBox())!.width).toBeGreaterThanOrEqual(339);
+  expect((await rightPanel.boundingBox())!.width).toBeLessThan(widenedRightBox.width);
+});
+
 test("semantic canvas releases explorer space and preserves zoom controls", async ({ page }) => {
   await mockCanvasApi(page);
   await page.goto(`${base}/view`);
