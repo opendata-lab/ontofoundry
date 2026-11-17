@@ -1,3 +1,10 @@
+/** The focused element, looking inside open shadow roots (the conversation is a web component). */
+function deepActiveElement(): HTMLElement | null {
+  let active: Element | null = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  return active instanceof HTMLElement ? active : null;
+}
+
 function focusWithoutScroll(el: HTMLElement | null) {
   if (!el || typeof el.focus !== "function") return;
   try {
@@ -20,7 +27,7 @@ export async function copyText(text: string): Promise<void> {
       // Fall through to the textarea path.
     }
   }
-  const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const active = deepActiveElement();
   const area = document.createElement("textarea");
   area.value = text;
   area.setAttribute("readonly", "");
