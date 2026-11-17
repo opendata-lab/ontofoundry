@@ -188,8 +188,11 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
     const extra = changed.filter((id) => !requested.includes(id));
     const names = extra.map((id) => byId.get(id)?.display_name ?? id).slice(0, 5);
     const also = { accept: "同时接受了", reject: "同时撤销了", restore: "同时恢复了", back_to_pending: "同时退回待审" }[decision];
+    // Rules the platform could not evaluate on these instances (AC-07); a note, not a refusal.
+    const unchecked = (result.validation?.warnings ?? []).filter((w) => w.code === "RULE_NOT_CHECKED").map((w) => w.message);
     setToast(
-      `${verb} ${requested.length} 条${extra.length ? `；${also}：${names.join("、")}${extra.length > names.length ? ` 等 ${extra.length} 条` : ""}` : ""}`,
+      `${verb} ${requested.length} 条${extra.length ? `；${also}：${names.join("、")}${extra.length > names.length ? ` 等 ${extra.length} 条` : ""}` : ""}` +
+        (unchecked.length ? `。${unchecked.slice(0, 3).join("；")}${unchecked.length > 3 ? ` 等 ${unchecked.length} 条` : ""}` : ""),
     );
     const step = (values: string[], next: ReviewDecision) => values.map((proposal_id) => ({ proposal_id, decision: next }));
     const wasAccepted = changed.filter((id) => byId.get(id)?.status === "accepted");

@@ -218,6 +218,19 @@ describe("proposal review", () => {
     expect(await screen.findByText("已退回待审 1 条；同时退回待审：采购订单")).toBeInTheDocument();
   });
 
+  it("says which rules the platform could not check after an accept", async () => {
+    const proposals = state({
+      decide: vi.fn(async (decisions: { proposal_id: string }[]) => ({
+        session: session(),
+        results: decisions.map((d) => ({ proposal_id: d.proposal_id, status: "accepted", triggered_by: null })),
+        validation: { warnings: [{ code: "RULE_NOT_CHECKED", message: "规则未检查：买方有名称（buyer_named），涉及其他对象" }] },
+      }) as unknown as DecisionResult),
+    });
+    panel(proposals);
+    fireEvent.click(screen.getByRole("button", { name: "接受 采购订单" }));
+    expect(await screen.findByText("已接受 1 条。规则未检查：买方有名称（buyer_named），涉及其他对象")).toBeInTheDocument();
+  });
+
   it("filters by status, kind and search text", async () => {
     panel();
     fireEvent.click(screen.getByRole("tab", { name: /已拒绝\s*1/ }));
