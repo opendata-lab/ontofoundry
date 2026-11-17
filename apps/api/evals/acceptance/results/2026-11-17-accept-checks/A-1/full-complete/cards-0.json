@@ -1,0 +1,27 @@
+{
+  "answers": [
+    {
+      "question": "订单的“下单渠道”属性在 orders 表里无对应列，无法绑定。怎么处理？",
+      "selected": [
+        "删除属性与值域，待表增列后重建"
+      ]
+    },
+    {
+      "question": "会员「林汀」等级为“钻石”，不满足“普通/金卡”值域。该实例已不在当前草稿中，需你定口径：",
+      "selected": [
+        "保留“钻石”，标注待核冲突"
+      ]
+    },
+    {
+      "question": "发货单「F-01」缺发货数量（属性为必填），原文未给值。如何处理？",
+      "selected": [
+        "保留空発，说明原文未记载"
+      ]
+    }
+  ],
+  "response": {
+    "task_id": "task_4c2d2791ac3846c483b9035d",
+    "request_id": "1824f454496947f7abacc23f50d5da42:call_00_Y5rHvsIxOWkCNGYUCxuS3029",
+    "accepted": true
+  }
+}

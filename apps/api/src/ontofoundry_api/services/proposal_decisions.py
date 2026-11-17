@@ -51,6 +51,13 @@ def _session_elements(draft):
     }
 
 
+def _with_notices(report: dict, trial) -> dict:
+    """Rules this accept could not check (AC-07): a warning, never a refusal."""
+    for message in getattr(trial, "notices", None) or []:
+        report.setdefault("warnings", []).append({"severity": "warning", "code": "RULE_NOT_CHECKED", "message": message})
+    return report
+
+
 def _request_sha256(body) -> str:
     payload = body.model_dump()
     payload["decisions"] = sorted(
@@ -560,7 +567,7 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
         {
             "session": session_response(db, session),
             "results": results,
-            "validation": validation_report(deepcopy(session.draft_json)),
+            "validation": _with_notices(validation_report(deepcopy(session.draft_json)), trial),
         }
     )
     record = ProposalDecisionRequestRecord(

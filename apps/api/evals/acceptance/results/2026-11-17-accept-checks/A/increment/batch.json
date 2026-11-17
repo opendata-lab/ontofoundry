@@ -1,0 +1,633 @@
+{
+  "id": "72df4fa1-6144-534a-b7cd-0c5cf6563a5e",
+  "status": "available",
+  "created_at": "2026-11-17T15:06:30.664533Z",
+  "source_session_revision": 29,
+  "base_version_id": "44b2fbc7-85b6-4cf1-816f-22678842aef1",
+  "counts": {
+    "pending": 6,
+    "accepted": 0,
+    "rejected": 0
+  },
+  "error": null,
+  "producer": {
+    "agent_id": "agent_86a932ae04f440198da2476f",
+    "skill": "ontology-discovery+entity-extraction",
+    "mode": "model"
+  },
+  "read_only": false,
+  "items": [
+    {
+      "source_diagnostics": [],
+      "id": "9c62e148-5826-5b6d-abc5-9ab9b2266529",
+      "batch_id": "72df4fa1-6144-534a-b7cd-0c5cf6563a5e",
+      "ordinal": 0,
+      "client_ref": "shipment_order_no",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "e2d6cc21-2736-5ca0-abd6-917dd19f562b",
+      "display_name": "订单号",
+      "owner_label": "发货单",
+      "before": null,
+      "after": {
+        "id": "e2d6cc21-2736-5ca0-abd6-917dd19f562b",
+        "owner_type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "name": "order_no",
+        "display_name": "订单号",
+        "description": "发货单对应的订单号",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "2a7aa67b-2614-599b-9c98-b5b8082f7caf",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "对应一张订单"
+          },
+          {
+            "kind": "material",
+            "id": "cbbd1085-00ad-58a0-8c49-04b53e35b7af",
+            "material_id": "83a6cea0-269d-4bbd-b803-1169c5f52247",
+            "material_sha256": "49b2564d9dd0d65dcb1f4506aa3441b0fef81457f39a8b3835ba58aae57c065a",
+            "locator": {
+              "heading": "lanting_shop.shipments.order_no",
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "订单号"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "2a7aa67b-2614-599b-9c98-b5b8082f7caf",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "对应一张订单",
+          "material_name": "material.md",
+          "material_archived": false
+        },
+        {
+          "kind": "material",
+          "id": "cbbd1085-00ad-58a0-8c49-04b53e35b7af",
+          "material_id": "83a6cea0-269d-4bbd-b803-1169c5f52247",
+          "material_sha256": "49b2564d9dd0d65dcb1f4506aa3441b0fef81457f39a8b3835ba58aae57c065a",
+          "locator": {
+            "heading": "lanting_shop.shipments.order_no",
+            "line_start": 5,
+            "line_end": 5
+          },
+          "quote": "订单号",
+          "material_name": "表结构收据 · 本轮提交",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [
+        {
+          "id": "a1073993-ce0c-5364-acee-3bc5fadb2997",
+          "kind": "property",
+          "display_name": "订单号",
+          "name": "order_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "order_no"
+          }
+        },
+        {
+          "id": "2b60c4e8-1ffc-5050-b5ec-9727d08bcc08",
+          "kind": "property",
+          "display_name": "会员编号",
+          "name": "member_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "no"
+          }
+        },
+        {
+          "id": "a2042f8f-f022-5093-b426-1524c4cdd667",
+          "kind": "property",
+          "display_name": "发货单号",
+          "name": "shipment_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "no"
+          }
+        },
+        {
+          "id": "fbbd10e1-888d-521f-a1d6-2434d2b1ca21",
+          "kind": "property",
+          "display_name": "下单会员",
+          "name": "member_no",
+          "match": {
+            "by": "name_in_query",
+            "text": "no"
+          }
+        }
+      ],
+      "physical_differences": [],
+      "depends_on": [
+        "a615e6e1-6eb1-59a8-a62f-ddea8f1b1845"
+      ],
+      "dependency_group": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642",
+        "9c62e148-5826-5b6d-abc5-9ab9b2266529",
+        "a615e6e1-6eb1-59a8-a62f-ddea8f1b1845"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "7de24cfa-ac90-5051-a746-29019344c865",
+      "batch_id": "72df4fa1-6144-534a-b7cd-0c5cf6563a5e",
+      "ordinal": 1,
+      "client_ref": null,
+      "operation": "update",
+      "target_kind": "link_type",
+      "target_id": "3cefc5a7-8133-53f2-85fd-b6dbdd21592d",
+      "display_name": "对应订单",
+      "owner_label": null,
+      "before": {
+        "id": "3cefc5a7-8133-53f2-85fd-b6dbdd21592d",
+        "name": "shipment_order",
+        "tags": [],
+        "evidence": [
+          {
+            "id": "089a5d0f-566c-5ed0-8ee8-ba62e00cb8fc",
+            "kind": "material",
+            "quote": "对应一张订单",
+            "locator": {
+              "heading": null,
+              "line_end": 6,
+              "line_start": 6
+            },
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b"
+          }
+        ],
+        "synonyms": [],
+        "data_join": null,
+        "verbalizes": [
+          "{source}对应订单{target}",
+          "{target}对应{source}"
+        ],
+        "description": "发货单对应一张订单；shipments 表尚未同步，暂不声明物理连接",
+        "display_name": "对应订单",
+        "multiplicity": "many_to_one",
+        "source_type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "target_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "source_role_name": null,
+        "target_role_name": null
+      },
+      "after": {
+        "id": "3cefc5a7-8133-53f2-85fd-b6dbdd21592d",
+        "display_name": "对应订单",
+        "name": "shipment_order",
+        "description": "发货单对应一张订单，按发货单的订单号与订单主键直连",
+        "verbalizes": [
+          "{source}对应订单{target}",
+          "{target}对应{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "target_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "e2d6cc21-2736-5ca0-abd6-917dd19f562b"
+          ],
+          "target_property_ids": [
+            "a1073993-ce0c-5364-acee-3bc5fadb2997"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "089a5d0f-566c-5ed0-8ee8-ba62e00cb8fc",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "对应一张订单"
+          }
+        ]
+      },
+      "field_changes": [
+        {
+          "path": "data_join",
+          "before": null,
+          "after": {
+            "kind": "direct",
+            "source_property_ids": [
+              "e2d6cc21-2736-5ca0-abd6-917dd19f562b"
+            ],
+            "target_property_ids": [
+              "a1073993-ce0c-5364-acee-3bc5fadb2997"
+            ]
+          }
+        },
+        {
+          "path": "description",
+          "before": "发货单对应一张订单；shipments 表尚未同步，暂不声明物理连接",
+          "after": "发货单对应一张订单，按发货单的订单号与订单主键直连"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "089a5d0f-566c-5ed0-8ee8-ba62e00cb8fc",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "对应一张订单",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "9c62e148-5826-5b6d-abc5-9ab9b2266529"
+      ],
+      "dependency_group": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642",
+        "7de24cfa-ac90-5051-a746-29019344c865",
+        "9c62e148-5826-5b6d-abc5-9ab9b2266529",
+        "a615e6e1-6eb1-59a8-a62f-ddea8f1b1845"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "2e0547e9-078e-5775-acf9-26d8c1ca9642",
+      "batch_id": "72df4fa1-6144-534a-b7cd-0c5cf6563a5e",
+      "ordinal": 2,
+      "client_ref": "ds_shipments",
+      "operation": "create",
+      "target_kind": "dataset",
+      "target_id": "48830860-5371-5ce8-8acf-dcc88af4261d",
+      "display_name": "发货单数据",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "48830860-5371-5ce8-8acf-dcc88af4261d",
+        "name": "shipments",
+        "display_name": "发货单数据",
+        "connection_id": "b5317878-46fd-4437-9fb9-561947da6a04",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "lanting_shop",
+        "table_name": "shipments",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "shipment_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "发货单号"
+          },
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "订单号"
+          },
+          {
+            "name": "qty",
+            "physical_type": "INTEGER",
+            "comment": "发货数量"
+          },
+          {
+            "name": "shipped_at",
+            "physical_type": "DATETIME",
+            "comment": "发货时间"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "a615e6e1-6eb1-59a8-a62f-ddea8f1b1845",
+      "batch_id": "72df4fa1-6144-534a-b7cd-0c5cf6563a5e",
+      "ordinal": 3,
+      "client_ref": "map_shipment",
+      "operation": "create",
+      "target_kind": "mapping",
+      "target_id": "a253f8b0-36dc-576e-b1e7-bc59c47754b6",
+      "display_name": "发货单",
+      "owner_label": "发货单",
+      "before": null,
+      "after": {
+        "id": "a253f8b0-36dc-576e-b1e7-bc59c47754b6",
+        "type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "48830860-5371-5ce8-8acf-dcc88af4261d",
+            "key_columns": [
+              "shipment_no"
+            ]
+          }
+        ],
+        "fields": {
+          "shipment_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shipment_no"
+          },
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "ship_qty": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "qty"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642",
+        "9c62e148-5826-5b6d-abc5-9ab9b2266529"
+      ],
+      "dependency_group": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642",
+        "9c62e148-5826-5b6d-abc5-9ab9b2266529",
+        "a615e6e1-6eb1-59a8-a62f-ddea8f1b1845"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "3c9d5691-acbc-523b-87a5-58d91a9ac80f",
+      "batch_id": "72df4fa1-6144-534a-b7cd-0c5cf6563a5e",
+      "ordinal": 4,
+      "client_ref": "shipped_qty",
+      "operation": "create",
+      "target_kind": "metric",
+      "target_id": "db558c0a-093b-590e-8a99-e77b9dbbe04f",
+      "display_name": "发货件数",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "db558c0a-093b-590e-8a99-e77b9dbbe04f",
+        "name": "shipped_qty",
+        "display_name": "发货件数",
+        "description": "发货单发货数量求和；材料第 8 行写为 shipments.ship_qty，实际物理列为 qty（注释“发货数量”），按 qty 求和；时间维度取发货时间 shipped_at",
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "69016875-741a-54cd-8e47-78b0cab5ff39",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "指标“发货件数”：发货单表 shipments 的 ship_qty 列求和。"
+          }
+        ],
+        "kind": "simple",
+        "dataset_id": "48830860-5371-5ce8-8acf-dcc88af4261d",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "48830860-5371-5ce8-8acf-dcc88af4261d",
+          "column": "qty"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "48830860-5371-5ce8-8acf-dcc88af4261d",
+          "column": "shipped_at"
+        }
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "69016875-741a-54cd-8e47-78b0cab5ff39",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 8,
+            "line_end": 8
+          },
+          "quote": "指标“发货件数”：发货单表 shipments 的 ship_qty 列求和。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642"
+      ],
+      "dependency_group": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642",
+        "3c9d5691-acbc-523b-87a5-58d91a9ac80f"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "66165f0b-c44e-59fc-9c33-aa520d885a41",
+      "batch_id": "72df4fa1-6144-534a-b7cd-0c5cf6563a5e",
+      "ordinal": 5,
+      "client_ref": null,
+      "operation": "update",
+      "target_kind": "material_object",
+      "target_id": "2613991a-5070-5715-bddf-09b215a2deda",
+      "display_name": "F-01",
+      "owner_label": "发货单",
+      "before": {
+        "id": "2613991a-5070-5715-bddf-09b215a2deda",
+        "type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "values": {
+          "shipment_no": "F-01"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "f13f86a2-f30a-5175-afb1-b3079e290cc1",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。"
+          }
+        ]
+      },
+      "after": {
+        "id": "2613991a-5070-5715-bddf-09b215a2deda",
+        "type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "values": {
+          "shipment_no": "F-01",
+          "order_no": "O-2001"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "f13f86a2-f30a-5175-afb1-b3079e290cc1",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。"
+          }
+        ]
+      },
+      "field_changes": [
+        {
+          "path": "values",
+          "before": {
+            "shipment_no": "F-01"
+          },
+          "after": {
+            "shipment_no": "F-01",
+            "order_no": "O-2001"
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "f13f86a2-f30a-5175-afb1-b3079e290cc1",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 16,
+            "line_end": 16
+          },
+          "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "9c62e148-5826-5b6d-abc5-9ab9b2266529"
+      ],
+      "dependency_group": [
+        "2e0547e9-078e-5775-acf9-26d8c1ca9642",
+        "66165f0b-c44e-59fc-9c33-aa520d885a41",
+        "9c62e148-5826-5b6d-abc5-9ab9b2266529",
+        "a615e6e1-6eb1-59a8-a62f-ddea8f1b1845"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": 2,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    }
+  ]
+}

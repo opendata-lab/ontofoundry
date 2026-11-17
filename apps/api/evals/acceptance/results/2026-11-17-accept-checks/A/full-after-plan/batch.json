@@ -1,0 +1,2892 @@
+{
+  "id": "7d20c776-8959-5eb0-a76b-10149418049a",
+  "status": "available",
+  "created_at": "2026-11-17T15:04:40.489044Z",
+  "source_session_revision": 3,
+  "base_version_id": null,
+  "counts": {
+    "pending": 38,
+    "accepted": 0,
+    "rejected": 0
+  },
+  "error": null,
+  "producer": {
+    "agent_id": "agent_86a932ae04f440198da2476f",
+    "skill": "ontology-discovery+entity-extraction",
+    "mode": "model"
+  },
+  "read_only": false,
+  "items": [
+    {
+      "source_diagnostics": [],
+      "id": "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 0,
+      "client_ref": "vt_member_level",
+      "operation": "create",
+      "target_kind": "value_type",
+      "target_id": "0376c2df-ea34-5d15-95cc-f137f5f8651d",
+      "display_name": "会员等级",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "0376c2df-ea34-5d15-95cc-f137f5f8651d",
+        "name": "member_level",
+        "display_name": "会员等级",
+        "description": "",
+        "value_kind": "string",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "8e7f4560-e3de-5043-aa7d-8e6c694be097",
+            "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+            "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+            "locator": {
+              "heading": "lanting_shop.members.member_level",
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "会员等级：普通/金卡"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "8e7f4560-e3de-5043-aa7d-8e6c694be097",
+          "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+          "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+          "locator": {
+            "heading": "lanting_shop.members.member_level",
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "会员等级：普通/金卡",
+          "material_name": "表结构收据 · 本轮提交",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "100f2228-9675-5f0d-821b-36a0b3f7cc1d",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 1,
+      "client_ref": "vt_member_level_values",
+      "operation": "create",
+      "target_kind": "rule",
+      "target_id": "a307c09c-45f7-5d5c-89be-5c3a3b3d86af",
+      "display_name": "会员等级取值",
+      "owner_label": "会员等级",
+      "before": null,
+      "after": {
+        "id": "a307c09c-45f7-5d5c-89be-5c3a3b3d86af",
+        "name": "member_level_values",
+        "display_name": "会员等级取值",
+        "description": "",
+        "owner_kind": "value_type",
+        "owner_id": "0376c2df-ea34-5d15-95cc-f137f5f8651d",
+        "rule_kind": "constraint",
+        "expression": "member_level IN ('普通', '金卡')",
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "100f2228-9675-5f0d-821b-36a0b3f7cc1d"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 2,
+      "client_ref": "vt_order_status",
+      "operation": "create",
+      "target_kind": "value_type",
+      "target_id": "1dde9dfb-751a-52dc-b01c-869bb42c25e5",
+      "display_name": "订单状态",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "1dde9dfb-751a-52dc-b01c-869bb42c25e5",
+        "name": "order_status",
+        "display_name": "订单状态",
+        "description": "",
+        "value_kind": "string",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "dd033afd-9834-5f2b-805c-1d26c4baa0de",
+            "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+            "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+            "locator": {
+              "heading": "lanting_shop.orders.status",
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "订单状态：待支付/已支付/已取消"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "dd033afd-9834-5f2b-805c-1d26c4baa0de",
+          "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+          "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+          "locator": {
+            "heading": "lanting_shop.orders.status",
+            "line_start": 16,
+            "line_end": 16
+          },
+          "quote": "订单状态：待支付/已支付/已取消",
+          "material_name": "表结构收据 · 本轮提交",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "d70bb1e7-9feb-5dd1-8471-cd5983df9928",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 3,
+      "client_ref": "vt_order_status_values",
+      "operation": "create",
+      "target_kind": "rule",
+      "target_id": "9db5c22d-ed87-52a0-9322-b41acd67f3ac",
+      "display_name": "订单状态取值",
+      "owner_label": "订单状态",
+      "before": null,
+      "after": {
+        "id": "9db5c22d-ed87-52a0-9322-b41acd67f3ac",
+        "name": "order_status_values",
+        "display_name": "订单状态取值",
+        "description": "",
+        "owner_kind": "value_type",
+        "owner_id": "1dde9dfb-751a-52dc-b01c-869bb42c25e5",
+        "rule_kind": "constraint",
+        "expression": "order_status IN ('待支付', '已支付', '已取消')",
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0"
+      ],
+      "dependency_group": [
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d70bb1e7-9feb-5dd1-8471-cd5983df9928"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "d4fa9bc6-49c7-5384-abb5-5c695a74745a",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 4,
+      "client_ref": "member",
+      "operation": "create",
+      "target_kind": "object_type",
+      "target_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+      "display_name": "会员",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "name": "member",
+        "display_name": "会员",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "95322ccc-e123-5248-9d68-7153ea4d33a1",
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "c86722ed-c519-5cbe-9bba-403a03b561dd",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "岚汀文具记录会员、订单和发货单三类业务。"
+          },
+          {
+            "kind": "material",
+            "id": "63755b9e-21bb-5d32-b848-adebe1188a3b",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 4,
+              "line_end": 4
+            },
+            "quote": "会员以会员编号唯一标识，会员等级只有“普通”和“金卡”两种。"
+          },
+          {
+            "kind": "material",
+            "id": "db0fcbe5-a5e2-54cc-98f2-e574dcb658d0",
+            "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+            "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+            "locator": {
+              "heading": "lanting_shop.members",
+              "line_start": 1,
+              "line_end": 1
+            },
+            "quote": "会员"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "c86722ed-c519-5cbe-9bba-403a03b561dd",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 3,
+            "line_end": 3
+          },
+          "quote": "岚汀文具记录会员、订单和发货单三类业务。",
+          "material_name": "material.md",
+          "material_archived": false
+        },
+        {
+          "kind": "material",
+          "id": "63755b9e-21bb-5d32-b848-adebe1188a3b",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 4,
+            "line_end": 4
+          },
+          "quote": "会员以会员编号唯一标识，会员等级只有“普通”和“金卡”两种。",
+          "material_name": "material.md",
+          "material_archived": false
+        },
+        {
+          "kind": "material",
+          "id": "db0fcbe5-a5e2-54cc-98f2-e574dcb658d0",
+          "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+          "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+          "locator": {
+            "heading": "lanting_shop.members",
+            "line_start": 1,
+            "line_end": 1
+          },
+          "quote": "会员",
+          "material_name": "表结构收据 · 本轮提交",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": "95802741-e9df-577a-b40e-c9af24211adf",
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "6b84d41f-3b46-51eb-940c-3ea97536565e",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 5,
+      "client_ref": "member_member_no",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "2b60c4e8-1ffc-5050-b5ec-9727d08bcc08",
+      "display_name": "会员编号",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "2b60c4e8-1ffc-5050-b5ec-9727d08bcc08",
+        "owner_type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "name": "member_no",
+        "display_name": "会员编号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "8645e409-2e79-5eef-bf43-e19363360760",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 6,
+      "client_ref": "member_member_name",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "95322ccc-e123-5248-9d68-7153ea4d33a1",
+      "display_name": "会员姓名",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "95322ccc-e123-5248-9d68-7153ea4d33a1",
+        "owner_type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "name": "member_name",
+        "display_name": "会员姓名",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": "95802741-e9df-577a-b40e-c9af24211adf",
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "815f98cb-8ba2-56db-b572-7b2691d34b08",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 7,
+      "client_ref": "member_member_level",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "22f3eed8-73ca-5d8e-8ccf-7b5acd0f4890",
+      "display_name": "会员等级",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "22f3eed8-73ca-5d8e-8ccf-7b5acd0f4890",
+        "owner_type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "name": "member_level",
+        "display_name": "会员等级",
+        "description": "会员等级只有普通、金卡两档",
+        "value_kind": "string",
+        "value_type_id": "0376c2df-ea34-5d15-95cc-f137f5f8651d",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 8,
+      "client_ref": "member_joined_on",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "c93acb23-2aea-5990-87f3-1ee16dd8717b",
+      "display_name": "入会日期",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "c93acb23-2aea-5990-87f3-1ee16dd8717b",
+        "owner_type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "name": "joined_on",
+        "display_name": "入会日期",
+        "description": "",
+        "value_kind": "date",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 9,
+      "client_ref": "order",
+      "operation": "create",
+      "target_kind": "object_type",
+      "target_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+      "display_name": "订单",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "order",
+        "display_name": "订单",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "678da22a-dad8-56cd-bcaf-1c8478fbcf05",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "岚汀文具记录会员、订单和发货单三类业务。"
+          },
+          {
+            "kind": "material",
+            "id": "4c787aa8-fa7e-5d88-a95f-44e1df1b9df8",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "订单以订单号唯一标识，每张订单只属于一位会员；订单记录件数（整数）、实付金额、下单时间（精确到分钟）、订单状态和下单渠道（门店或线上）。"
+          },
+          {
+            "kind": "material",
+            "id": "bc757549-b9c8-599e-970c-da5486f7d199",
+            "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+            "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+            "locator": {
+              "heading": "lanting_shop.orders",
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "订单"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "678da22a-dad8-56cd-bcaf-1c8478fbcf05",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 3,
+            "line_end": 3
+          },
+          "quote": "岚汀文具记录会员、订单和发货单三类业务。",
+          "material_name": "material.md",
+          "material_archived": false
+        },
+        {
+          "kind": "material",
+          "id": "4c787aa8-fa7e-5d88-a95f-44e1df1b9df8",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 5,
+            "line_end": 5
+          },
+          "quote": "订单以订单号唯一标识，每张订单只属于一位会员；订单记录件数（整数）、实付金额、下单时间（精确到分钟）、订单状态和下单渠道（门店或线上）。",
+          "material_name": "material.md",
+          "material_archived": false
+        },
+        {
+          "kind": "material",
+          "id": "bc757549-b9c8-599e-970c-da5486f7d199",
+          "material_id": "19ea1657-35cd-43f5-8306-c33821e09bfb",
+          "material_sha256": "7370a9e1433e7b463ec4ccdefdf47c51e93a352f8eeab98fc63cbbdc020ad7a9",
+          "locator": {
+            "heading": "lanting_shop.orders",
+            "line_start": 8,
+            "line_end": 8
+          },
+          "quote": "订单",
+          "material_name": "表结构收据 · 本轮提交",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 10,
+      "client_ref": "order_order_no",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "a1073993-ce0c-5364-acee-3bc5fadb2997",
+      "display_name": "订单号",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "a1073993-ce0c-5364-acee-3bc5fadb2997",
+        "owner_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "order_no",
+        "display_name": "订单号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "abaa0e1d-006a-55f2-a43d-166717fed143",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 11,
+      "client_ref": "order_member_no",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "fbbd10e1-888d-521f-a1d6-2434d2b1ca21",
+      "display_name": "下单会员",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "fbbd10e1-888d-521f-a1d6-2434d2b1ca21",
+        "owner_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "member_no",
+        "display_name": "下单会员",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "8021e750-5c72-572a-9514-026756c3220b",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 12,
+      "client_ref": "order_item_count",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "297e1fe5-1083-55f6-95de-0cb53d6bb761",
+      "display_name": "件数",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "297e1fe5-1083-55f6-95de-0cb53d6bb761",
+        "owner_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "item_count",
+        "display_name": "件数",
+        "description": "整数件数",
+        "value_kind": "integer",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "738f891b-1edd-5e97-80b5-c7d684f1111f",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 13,
+      "client_ref": "order_pay_amount",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "7af89d97-905d-566c-9815-8a9f01add150",
+      "display_name": "实付金额",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "7af89d97-905d-566c-9815-8a9f01add150",
+        "owner_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "pay_amount",
+        "display_name": "实付金额",
+        "description": "",
+        "value_kind": "decimal",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "f7dbf6fc-7c57-5c75-956a-4931834dad74",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 14,
+      "client_ref": "order_ordered_at",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "3160a817-8aa4-51f8-94f4-b28271dc5371",
+      "display_name": "下单时间",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "3160a817-8aa4-51f8-94f4-b28271dc5371",
+        "owner_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "ordered_at",
+        "display_name": "下单时间",
+        "description": "精确到分钟",
+        "value_kind": "datetime",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 15,
+      "client_ref": "order_status",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "b7632a88-a4f8-53d4-9dd5-20cc2b660476",
+      "display_name": "订单状态",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "b7632a88-a4f8-53d4-9dd5-20cc2b660476",
+        "owner_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "status",
+        "display_name": "订单状态",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": "1dde9dfb-751a-52dc-b01c-869bb42c25e5",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "a92e9f31-ba2c-556f-9eff-403397970916",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 16,
+      "client_ref": "shipment",
+      "operation": "create",
+      "target_kind": "object_type",
+      "target_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+      "display_name": "发货单",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "name": "shipment",
+        "display_name": "发货单",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "6da667de-8392-5b4a-ac57-1980e3f707e5",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "岚汀文具记录会员、订单和发货单三类业务。"
+          },
+          {
+            "kind": "material",
+            "id": "a5ffe22c-4ffb-5af7-8d7f-992c13944d34",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "发货单以发货单号唯一标识，对应一张订单；发货数量必须填写。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "6da667de-8392-5b4a-ac57-1980e3f707e5",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 3,
+            "line_end": 3
+          },
+          "quote": "岚汀文具记录会员、订单和发货单三类业务。",
+          "material_name": "material.md",
+          "material_archived": false
+        },
+        {
+          "kind": "material",
+          "id": "a5ffe22c-4ffb-5af7-8d7f-992c13944d34",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "发货单以发货单号唯一标识，对应一张订单；发货数量必须填写。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "84f4229b-0d22-5866-88de-5ebde1af211c",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 17,
+      "client_ref": "vt_order_channel",
+      "operation": "create",
+      "target_kind": "value_type",
+      "target_id": "b011ee57-6b2f-55d8-8a69-45db5dde5a39",
+      "display_name": "下单渠道",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "b011ee57-6b2f-55d8-8a69-45db5dde5a39",
+        "name": "order_channel",
+        "display_name": "下单渠道",
+        "description": "",
+        "value_kind": "string",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "4e2e8f86-945a-5da2-b52e-a78d4ae786af",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "下单渠道（门店或线上）"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "4e2e8f86-945a-5da2-b52e-a78d4ae786af",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 5,
+            "line_end": 5
+          },
+          "quote": "下单渠道（门店或线上）",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "84f4229b-0d22-5866-88de-5ebde1af211c"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "888b87c8-ef68-5258-b825-549e5fd03873",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 18,
+      "client_ref": "vt_order_channel_values",
+      "operation": "create",
+      "target_kind": "rule",
+      "target_id": "6e3d7477-e767-576e-b1f6-9373fa04dd04",
+      "display_name": "下单渠道取值",
+      "owner_label": "下单渠道",
+      "before": null,
+      "after": {
+        "id": "6e3d7477-e767-576e-b1f6-9373fa04dd04",
+        "name": "order_channel_values",
+        "display_name": "下单渠道取值",
+        "description": "",
+        "owner_kind": "value_type",
+        "owner_id": "b011ee57-6b2f-55d8-8a69-45db5dde5a39",
+        "rule_kind": "constraint",
+        "expression": "order_channel IN ('门店', '线上')",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "b3639e8c-ca13-5772-ae42-29752b86026e",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "下单渠道（门店或线上）"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "b3639e8c-ca13-5772-ae42-29752b86026e",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 5,
+            "line_end": 5
+          },
+          "quote": "下单渠道（门店或线上）",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "84f4229b-0d22-5866-88de-5ebde1af211c"
+      ],
+      "dependency_group": [
+        "84f4229b-0d22-5866-88de-5ebde1af211c",
+        "888b87c8-ef68-5258-b825-549e5fd03873"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "3a94b72d-e327-53ec-95e8-e0c5208428a4",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 19,
+      "client_ref": "order_channel",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "81617123-bddb-5d54-8d65-9fab6cb08f16",
+      "display_name": "下单渠道",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "81617123-bddb-5d54-8d65-9fab6cb08f16",
+        "owner_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "name": "channel",
+        "display_name": "下单渠道",
+        "description": "材料第 5 行记为订单业务属性；orders 表当前无对应列，暂不做列映射",
+        "value_kind": "string",
+        "value_type_id": "b011ee57-6b2f-55d8-8a69-45db5dde5a39",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "53b27eac-e90a-5298-89af-865a616f73a2",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "下单渠道（门店或线上）"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "53b27eac-e90a-5298-89af-865a616f73a2",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 5,
+            "line_end": 5
+          },
+          "quote": "下单渠道（门店或线上）",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "84f4229b-0d22-5866-88de-5ebde1af211c"
+      ],
+      "dependency_group": [
+        "3a94b72d-e327-53ec-95e8-e0c5208428a4",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "84f4229b-0d22-5866-88de-5ebde1af211c"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "59647173-b281-57f1-9172-f613117b58e2",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 20,
+      "client_ref": "shipment_shipment_no",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "a2042f8f-f022-5093-b426-1524c4cdd667",
+      "display_name": "发货单号",
+      "owner_label": "发货单",
+      "before": null,
+      "after": {
+        "id": "a2042f8f-f022-5093-b426-1524c4cdd667",
+        "owner_type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "name": "shipment_no",
+        "display_name": "发货单号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "e59bdc19-fafd-59b4-b3e3-9b9c6531e972",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "发货单以发货单号唯一标识，对应一张订单"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "e59bdc19-fafd-59b4-b3e3-9b9c6531e972",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "发货单以发货单号唯一标识，对应一张订单",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "dependency_group": [
+        "59647173-b281-57f1-9172-f613117b58e2",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "7795b071-0e20-5379-bcdf-c0fd553fc29e",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 21,
+      "client_ref": "shipment_ship_qty",
+      "operation": "create",
+      "target_kind": "property",
+      "target_id": "085c8e43-2190-5919-b0a3-95ac3188584a",
+      "display_name": "发货数量",
+      "owner_label": "发货单",
+      "before": null,
+      "after": {
+        "id": "085c8e43-2190-5919-b0a3-95ac3188584a",
+        "owner_type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "name": "ship_qty",
+        "display_name": "发货数量",
+        "description": "发货数量必须填写",
+        "value_kind": "integer",
+        "value_type_id": null,
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "57316810-6abf-5227-a181-7570c48f40ac",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "发货数量必须填写"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "57316810-6abf-5227-a181-7570c48f40ac",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "发货数量必须填写",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "dependency_group": [
+        "7795b071-0e20-5379-bcdf-c0fd553fc29e",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "3016a14b-bde6-50e2-ab84-82de82de9642",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 22,
+      "client_ref": "ship_qty_required",
+      "operation": "create",
+      "target_kind": "rule",
+      "target_id": "11c30508-d6ff-5c8e-95fa-770f0cbcd1a7",
+      "display_name": "发货数量必填",
+      "owner_label": "发货数量",
+      "before": null,
+      "after": {
+        "id": "11c30508-d6ff-5c8e-95fa-770f0cbcd1a7",
+        "name": "ship_qty_required",
+        "display_name": "发货数量必填",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "085c8e43-2190-5919-b0a3-95ac3188584a",
+        "rule_kind": "constraint",
+        "expression": "shipment.ship_qty IS NOT NULL",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "0423a418-bd2a-5b19-9144-3a9d04536712",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "发货数量必须填写"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "0423a418-bd2a-5b19-9144-3a9d04536712",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "发货数量必须填写",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "7795b071-0e20-5379-bcdf-c0fd553fc29e",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "dependency_group": [
+        "3016a14b-bde6-50e2-ab84-82de82de9642",
+        "7795b071-0e20-5379-bcdf-c0fd553fc29e",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "9cc0990a-f0ff-59b7-90cb-3c3d9e0efe07",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 23,
+      "client_ref": "order_member",
+      "operation": "create",
+      "target_kind": "link_type",
+      "target_id": "a6090a4f-723d-5fc8-9168-621a3452bfb4",
+      "display_name": "下单会员",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "a6090a4f-723d-5fc8-9168-621a3452bfb4",
+        "display_name": "下单会员",
+        "name": "order_member",
+        "description": "",
+        "verbalizes": [
+          "{source}由会员{target}下单",
+          "{target}下过{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "target_type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "fbbd10e1-888d-521f-a1d6-2434d2b1ca21"
+          ],
+          "target_property_ids": [
+            "2b60c4e8-1ffc-5050-b5ec-9727d08bcc08"
+          ]
+        },
+        "evidence": []
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "9cc0990a-f0ff-59b7-90cb-3c3d9e0efe07",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "88862bff-bac7-5852-800c-fb160fe63b6b",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 24,
+      "client_ref": "shipment_order",
+      "operation": "create",
+      "target_kind": "link_type",
+      "target_id": "3cefc5a7-8133-53f2-85fd-b6dbdd21592d",
+      "display_name": "对应订单",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "3cefc5a7-8133-53f2-85fd-b6dbdd21592d",
+        "display_name": "对应订单",
+        "name": "shipment_order",
+        "description": "发货单对应一张订单；shipments 表尚未同步，暂不声明物理连接",
+        "verbalizes": [
+          "{source}对应订单{target}",
+          "{target}对应{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "target_type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": null,
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "089a5d0f-566c-5ed0-8ee8-ba62e00cb8fc",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "对应一张订单"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "089a5d0f-566c-5ed0-8ee8-ba62e00cb8fc",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 6,
+            "line_end": 6
+          },
+          "quote": "对应一张订单",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "dependency_group": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "88862bff-bac7-5852-800c-fb160fe63b6b",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 25,
+      "client_ref": "ds_members",
+      "operation": "create",
+      "target_kind": "dataset",
+      "target_id": "0c781494-a76b-54c1-b6a6-0f2452e245a0",
+      "display_name": "会员数据",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "0c781494-a76b-54c1-b6a6-0f2452e245a0",
+        "name": "members",
+        "display_name": "会员数据",
+        "connection_id": "b5317878-46fd-4437-9fb9-561947da6a04",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "lanting_shop",
+        "table_name": "members",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "member_no",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "会员编号"
+          },
+          {
+            "name": "member_name",
+            "physical_type": "VARCHAR(64) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "会员姓名"
+          },
+          {
+            "name": "member_level",
+            "physical_type": "VARCHAR(8) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "会员等级：普通/金卡"
+          },
+          {
+            "name": "joined_on",
+            "physical_type": "DATE",
+            "comment": "入会日期"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 26,
+      "client_ref": "map_member",
+      "operation": "create",
+      "target_kind": "mapping",
+      "target_id": "f6ce63fb-4e6b-5341-a7db-93b678333be9",
+      "display_name": "会员",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "f6ce63fb-4e6b-5341-a7db-93b678333be9",
+        "type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "0c781494-a76b-54c1-b6a6-0f2452e245a0",
+            "key_columns": [
+              "member_no"
+            ]
+          }
+        ],
+        "fields": {
+          "member_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_no"
+          },
+          "member_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_name"
+          },
+          "member_level": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_level"
+          },
+          "joined_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "joined_on"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 27,
+      "client_ref": "ds_orders",
+      "operation": "create",
+      "target_kind": "dataset",
+      "target_id": "5d385696-4f48-5dcb-8b0c-62253c5b5fda",
+      "display_name": "订单数据",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "5d385696-4f48-5dcb-8b0c-62253c5b5fda",
+        "name": "orders",
+        "display_name": "订单数据",
+        "connection_id": "b5317878-46fd-4437-9fb9-561947da6a04",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "lanting_shop",
+        "table_name": "orders",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "订单号"
+          },
+          {
+            "name": "member_no",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "下单会员"
+          },
+          {
+            "name": "item_count",
+            "physical_type": "INTEGER",
+            "comment": "件数"
+          },
+          {
+            "name": "pay_amount",
+            "physical_type": "DECIMAL(12, 2)",
+            "comment": "实付金额"
+          },
+          {
+            "name": "ordered_at",
+            "physical_type": "DATETIME",
+            "comment": "下单时间"
+          },
+          {
+            "name": "status",
+            "physical_type": "VARCHAR(8) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "订单状态：待支付/已支付/已取消"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [],
+      "dependency_group": [
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 28,
+      "client_ref": "map_order",
+      "operation": "create",
+      "target_kind": "mapping",
+      "target_id": "a75f1cb8-0b7a-54a9-9b28-ad41ca0f8ed5",
+      "display_name": "订单",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "a75f1cb8-0b7a-54a9-9b28-ad41ca0f8ed5",
+        "type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "5d385696-4f48-5dcb-8b0c-62253c5b5fda",
+            "key_columns": [
+              "order_no"
+            ]
+          }
+        ],
+        "fields": {
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "member_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_no"
+          },
+          "item_count": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "item_count"
+          },
+          "pay_amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "pay_amount"
+          },
+          "ordered_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "ordered_at"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "status"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      "field_changes": [],
+      "evidence": [],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "5dd6ec1a-03d4-50a9-8290-962b4f877422",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 29,
+      "client_ref": "paid_amount",
+      "operation": "create",
+      "target_kind": "metric",
+      "target_id": "ba02365f-e862-562e-bdf1-57e2310dc6c8",
+      "display_name": "已支付金额",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "ba02365f-e862-562e-bdf1-57e2310dc6c8",
+        "name": "paid_amount",
+        "display_name": "已支付金额",
+        "description": "订单状态为已支付的订单实付金额求和",
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "04bc8f66-ce71-5d77-9ecb-de1cad754bca",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 9,
+              "line_end": 9
+            },
+            "quote": "指标“已支付金额”：订单状态为“已支付”的订单实付金额求和。"
+          }
+        ],
+        "kind": "simple",
+        "dataset_id": "5d385696-4f48-5dcb-8b0c-62253c5b5fda",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "5d385696-4f48-5dcb-8b0c-62253c5b5fda",
+          "column": "pay_amount"
+        },
+        "filters": [
+          {
+            "column": {
+              "dataset_id": "5d385696-4f48-5dcb-8b0c-62253c5b5fda",
+              "column": "status"
+            },
+            "operator": "eq",
+            "values": [
+              "已支付"
+            ]
+          }
+        ],
+        "time_field": {
+          "dataset_id": "5d385696-4f48-5dcb-8b0c-62253c5b5fda",
+          "column": "ordered_at"
+        }
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "04bc8f66-ce71-5d77-9ecb-de1cad754bca",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 9,
+            "line_end": 9
+          },
+          "quote": "指标“已支付金额”：订单状态为“已支付”的订单实付金额求和。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208"
+      ],
+      "dependency_group": [
+        "5dd6ec1a-03d4-50a9-8290-962b4f877422",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "145b388b-71f9-5e2d-a07c-8962095bf937",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 30,
+      "client_ref": "high_amount_needs_gold",
+      "operation": "create",
+      "target_kind": "rule",
+      "target_id": "d9e5dcc3-cd0f-59be-b226-7176bf1e6444",
+      "display_name": "高额订单需金卡会员",
+      "owner_label": "下单会员",
+      "before": null,
+      "after": {
+        "id": "d9e5dcc3-cd0f-59be-b226-7176bf1e6444",
+        "name": "high_amount_needs_gold",
+        "display_name": "高额订单需金卡会员",
+        "description": "",
+        "owner_kind": "link_type",
+        "owner_id": "a6090a4f-723d-5fc8-9168-621a3452bfb4",
+        "rule_kind": "constraint",
+        "expression": "order.pay_amount <= 5000 OR order.order_member.member_level = '金卡'",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "acbbc635-5b12-5dbd-b1a4-18e2af262949",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "金额超过 5000 元的订单，下单会员必须是金卡会员。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "acbbc635-5b12-5dbd-b1a4-18e2af262949",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 7,
+            "line_end": 7
+          },
+          "quote": "金额超过 5000 元的订单，下单会员必须是金卡会员。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "9cc0990a-f0ff-59b7-90cb-3c3d9e0efe07"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "145b388b-71f9-5e2d-a07c-8962095bf937",
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "9cc0990a-f0ff-59b7-90cb-3c3d9e0efe07",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "70bdaa16-233d-51f2-be4c-2814fbca6a6b",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 31,
+      "client_ref": "order_has_member",
+      "operation": "create",
+      "target_kind": "rule",
+      "target_id": "0da87c17-f3b3-590d-823d-fb011d147bf9",
+      "display_name": "订单必须有下单会员",
+      "owner_label": "下单会员",
+      "before": null,
+      "after": {
+        "id": "0da87c17-f3b3-590d-823d-fb011d147bf9",
+        "name": "order_has_member",
+        "display_name": "订单必须有下单会员",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "fbbd10e1-888d-521f-a1d6-2434d2b1ca21",
+        "rule_kind": "constraint",
+        "expression": "order.member_no IS NOT NULL",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "7136eb83-981b-544e-83ce-943934a659c0",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "每张订单只属于一位会员"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "7136eb83-981b-544e-83ce-943934a659c0",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 5,
+            "line_end": 5
+          },
+          "quote": "每张订单只属于一位会员",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "abaa0e1d-006a-55f2-a43d-166717fed143"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "70bdaa16-233d-51f2-be4c-2814fbca6a6b",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "7966b41c-4325-5ec8-a68e-984ab31302b6",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 32,
+      "client_ref": "member_m101",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "bf05d2a4-9a60-5280-9190-0205575c407b",
+      "display_name": "林汀",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "bf05d2a4-9a60-5280-9190-0205575c407b",
+        "type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "values": {
+          "member_no": "M101",
+          "member_name": "林汀"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "9f4f3b2e-c761-5a01-a623-e452edacd193",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 13,
+              "line_end": 13
+            },
+            "quote": "会员 M101 林汀，等级为钻石。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "9f4f3b2e-c761-5a01-a623-e452edacd193",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 13,
+            "line_end": 13
+          },
+          "quote": "会员 M101 林汀，等级为钻石。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "7966b41c-4325-5ec8-a68e-984ab31302b6",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "695363e2-a852-559a-b215-7eb80a36c1d6",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 33,
+      "client_ref": "member_m102",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "176710af-05c3-53b5-b2a5-e872ee03d3fc",
+      "display_name": "M102",
+      "owner_label": "会员",
+      "before": null,
+      "after": {
+        "id": "176710af-05c3-53b5-b2a5-e872ee03d3fc",
+        "type_id": "b287b28d-efa3-5220-b941-3dcee8c48f93",
+        "values": {
+          "member_no": "M102"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "653066c5-a4d2-5aa0-813d-30954a4f6803",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 15,
+              "line_end": 15
+            },
+            "quote": "订单 O-2002 由会员 M101 和会员 M102 共同下单"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "653066c5-a4d2-5aa0-813d-30954a4f6803",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 15,
+            "line_end": 15
+          },
+          "quote": "订单 O-2002 由会员 M101 和会员 M102 共同下单",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "dependency_group": [
+        "07698ba5-8d28-5398-a8d3-62e41ab9ecc8",
+        "53b18152-3923-5ff2-b34f-b6a56e3d256f",
+        "695363e2-a852-559a-b215-7eb80a36c1d6",
+        "6b84d41f-3b46-51eb-940c-3ea97536565e",
+        "815f98cb-8ba2-56db-b572-7b2691d34b08",
+        "8645e409-2e79-5eef-bf43-e19363360760",
+        "bb0abb30-6f8b-5a9b-963b-7cd0658e3a69",
+        "c883c0cd-8102-5bfb-b012-6f51d03c6b36",
+        "d4fa9bc6-49c7-5384-abb5-5c695a74745a"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "a5616feb-2c1c-5112-9f84-97cd28e8cbe5",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 34,
+      "client_ref": "order_o2001",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "158607d1-0452-5213-9f65-f92803618de7",
+      "display_name": "O-2001",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "158607d1-0452-5213-9f65-f92803618de7",
+        "type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "values": {
+          "order_no": "O-2001",
+          "member_no": "M101",
+          "item_count": 42,
+          "pay_amount": 680,
+          "ordered_at": "2026-03-02",
+          "channel": "门店"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "212cf6ac-98d2-5d19-a261-81987c8c6aae",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 14,
+              "line_end": 14
+            },
+            "quote": "订单 O-2001 由会员 M101 下单，共 四十二 件，实付 680 元，下单时间 2026 年 3 月 2 日，渠道为门店。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "212cf6ac-98d2-5d19-a261-81987c8c6aae",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 14,
+            "line_end": 14
+          },
+          "quote": "订单 O-2001 由会员 M101 下单，共 四十二 件，实付 680 元，下单时间 2026 年 3 月 2 日，渠道为门店。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "订单「O-2001」：下单时间（ordered_at）必须是日期时间，缺少时间：'2026-03-02'"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "3a94b72d-e327-53ec-95e8-e0c5208428a4",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "3a94b72d-e327-53ec-95e8-e0c5208428a4",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "84f4229b-0d22-5866-88de-5ebde1af211c",
+        "a5616feb-2c1c-5112-9f84-97cd28e8cbe5",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "8b07fa79-99ac-5e6d-b7fa-d71b0a8ae6c2",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 35,
+      "client_ref": "order_o2002",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "8c18d062-ae5c-5ef1-a0d1-a107c4a4be9d",
+      "display_name": "O-2002",
+      "owner_label": "订单",
+      "before": null,
+      "after": {
+        "id": "8c18d062-ae5c-5ef1-a0d1-a107c4a4be9d",
+        "type_id": "926b9616-f82f-5dd7-8af1-5358985cf860",
+        "values": {
+          "order_no": "O-2002",
+          "pay_amount": 120
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "57022449-fd64-5f7f-88c5-9109e9911522",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 15,
+              "line_end": 15
+            },
+            "quote": "订单 O-2002 由会员 M101 和会员 M102 共同下单，实付 120 元。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "57022449-fd64-5f7f-88c5-9109e9911522",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 15,
+            "line_end": 15
+          },
+          "quote": "订单 O-2002 由会员 M101 和会员 M102 共同下单，实付 120 元。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4"
+      ],
+      "dependency_group": [
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "8b07fa79-99ac-5e6d-b7fa-d71b0a8ae6c2",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "03a8279e-0583-5968-b0ed-a8536ce5ed23",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 36,
+      "client_ref": "shipment_f01",
+      "operation": "create",
+      "target_kind": "material_object",
+      "target_id": "2613991a-5070-5715-bddf-09b215a2deda",
+      "display_name": "F-01",
+      "owner_label": "发货单",
+      "before": null,
+      "after": {
+        "id": "2613991a-5070-5715-bddf-09b215a2deda",
+        "type_id": "123e9eac-7e4a-509a-bb59-e9f7b9ba1166",
+        "values": {
+          "shipment_no": "F-01"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "f13f86a2-f30a-5175-afb1-b3079e290cc1",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "f13f86a2-f30a-5175-afb1-b3079e290cc1",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 16,
+            "line_end": 16
+          },
+          "quote": "发货单 F-01 对应订单 O-2001，发货数量没有记录。",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "59647173-b281-57f1-9172-f613117b58e2",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "dependency_group": [
+        "03a8279e-0583-5968-b0ed-a8536ce5ed23",
+        "59647173-b281-57f1-9172-f613117b58e2",
+        "a92e9f31-ba2c-556f-9eff-403397970916"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    },
+    {
+      "source_diagnostics": [],
+      "id": "8ab52688-fdf4-5769-9ad7-43e5fa881cc3",
+      "batch_id": "7d20c776-8959-5eb0-a76b-10149418049a",
+      "ordinal": 37,
+      "client_ref": "shipment_f01_order_o2001",
+      "operation": "create",
+      "target_kind": "material_link",
+      "target_id": "b9297677-348f-542c-9465-d72d1d6ab136",
+      "display_name": "F-01 → O-2001",
+      "owner_label": null,
+      "before": null,
+      "after": {
+        "id": "b9297677-348f-542c-9465-d72d1d6ab136",
+        "type_id": "3cefc5a7-8133-53f2-85fd-b6dbdd21592d",
+        "source_id": "2613991a-5070-5715-bddf-09b215a2deda",
+        "target_id": "158607d1-0452-5213-9f65-f92803618de7",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "62bf1ba9-0393-5842-a1db-de5d876fa24c",
+            "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+            "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+            "locator": {
+              "heading": null,
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "发货单 F-01 对应订单 O-2001"
+          }
+        ]
+      },
+      "field_changes": [],
+      "evidence": [
+        {
+          "kind": "material",
+          "id": "62bf1ba9-0393-5842-a1db-de5d876fa24c",
+          "material_id": "63c17ac1-6b3a-44e8-a67f-fcfb579b72d6",
+          "material_sha256": "6a206d945d252fce52a2b0a744a76256adf0cee2ecb65a29a9b87ab9501bc79b",
+          "locator": {
+            "heading": null,
+            "line_start": 16,
+            "line_end": 16
+          },
+          "quote": "发货单 F-01 对应订单 O-2001",
+          "material_name": "material.md",
+          "material_archived": false
+        }
+      ],
+      "reason": "",
+      "atomic_group_id": null,
+      "duplicate_candidates": [],
+      "acceptance_issues": [
+        "订单「O-2001」：下单时间（ordered_at）必须是日期时间，缺少时间：'2026-03-02'"
+      ],
+      "similar_definitions": [],
+      "physical_differences": [],
+      "depends_on": [
+        "03a8279e-0583-5968-b0ed-a8536ce5ed23",
+        "88862bff-bac7-5852-800c-fb160fe63b6b",
+        "a5616feb-2c1c-5112-9f84-97cd28e8cbe5"
+      ],
+      "dependency_group": [
+        "03a8279e-0583-5968-b0ed-a8536ce5ed23",
+        "2fa3062d-3d29-53c2-aee3-bb1a15ca6c4f",
+        "3a94b72d-e327-53ec-95e8-e0c5208428a4",
+        "59647173-b281-57f1-9172-f613117b58e2",
+        "6db22615-1b4d-5c89-bb01-eb746cf310c2",
+        "738f891b-1edd-5e97-80b5-c7d684f1111f",
+        "77cb96c6-df72-52ed-8af6-cf31cac08fa4",
+        "8021e750-5c72-572a-9514-026756c3220b",
+        "84f4229b-0d22-5866-88de-5ebde1af211c",
+        "88862bff-bac7-5852-800c-fb160fe63b6b",
+        "8ab52688-fdf4-5769-9ad7-43e5fa881cc3",
+        "a5616feb-2c1c-5112-9f84-97cd28e8cbe5",
+        "a92e9f31-ba2c-556f-9eff-403397970916",
+        "abaa0e1d-006a-55f2-a43d-166717fed143",
+        "cc12fed2-dc65-57cd-8779-f7d2272ab0b0",
+        "d5405906-ef9c-5db4-9ff8-b38b946b1f11",
+        "db3c9605-0509-5fe6-9a29-6506ff7c4208",
+        "f7dbf6fc-7c57-5c75-956a-4931834dad74"
+      ],
+      "status": "pending",
+      "stored_status": "pending",
+      "status_reason": "",
+      "accepted_revision": null,
+      "expected_instance_revision": null,
+      "accepted_instance_revision": null,
+      "decided_at": null
+    }
+  ]
+}

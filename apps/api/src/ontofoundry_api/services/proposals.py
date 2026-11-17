@@ -189,6 +189,10 @@ def run_review_context(db: Session, session) -> dict[str, Any]:
         unpublished = element_changes(_base_snapshot(db, session), session_draft(session))
     except ValueError:
         unpublished = []
+    from ontofoundry_api.services.instance_store import baseline
+    from ontofoundry_api.services.pending_merge import instance_overlay
+
+    instances = instance_overlay(baseline(db, session.workspace_id, session.id), pending, session.id)
     return {
         "pending_proposals": [
             {
@@ -199,6 +203,7 @@ def run_review_context(db: Session, session) -> dict[str, Any]:
             for item in pending
         ],
         "unpublished_changes": unpublished,
+        "instance_baseline": instances,
         **({"candidate_draft": candidate_for(db, session)} if pending else {}),
     }
 

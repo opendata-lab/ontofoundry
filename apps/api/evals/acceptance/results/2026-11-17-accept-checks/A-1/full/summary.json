@@ -1,0 +1,52 @@
+{
+  "status": "finished",
+  "result_state": "done",
+  "observed_wall_seconds": 85.204379,
+  "turns": 22,
+  "tool_calls": 30,
+  "tool_calls_by_kind": {
+    "read:SKILL.md": 2,
+    "bash:init_workflow.py": 1,
+    "bash:read_input.py": 3,
+    "read:plan.md": 1,
+    "bash:show_element.py": 1,
+    "write": 6,
+    "AskUserQuestion": 1,
+    "read:extract.md": 1,
+    "read:notes.md": 1,
+    "bash:show_example.py": 3,
+    "read:entities.json": 1,
+    "bash:expand_tables.py": 2,
+    "edit": 1,
+    "bash:cd": 1,
+    "read:facts.md": 1,
+    "read:extract-facts.md": 1,
+    "read:issues.json": 1,
+    "bash:prepare_result.py": 1,
+    "read:finish.md": 1
+  },
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 385664,
+    "input_tokens": 16949,
+    "output_tokens": 14046
+  },
+  "platform_submits": 1,
+  "repair_used": 0,
+  "repair_limit": 9,
+  "proposal_counts": {
+    "value_type": 3,
+    "rule": 4,
+    "object_type": 3,
+    "property": 13,
+    "link_type": 2,
+    "dataset": 2,
+    "mapping": 2,
+    "metric": 1,
+    "material_object": 5,
+    "material_link": 4
+  },
+  "model_errors": [],
+  "cards": 1,
+  "dataagent_status": null
+}

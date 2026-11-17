@@ -25,3 +25,10 @@
 
 - 每条规则：拦截、消息、补全后通过；无关提案不被连带阻止；只接受定义时不查实例。
 - 批次读取的 `acceptance_issues` 与接受时的拒绝一致。
+
+## AC-07 已实施（2026-11-17，Claude）
+
+- `domain/rule_evaluation.py`：只对允许清单求值（比较、IN、BETWEEN、AND/OR/NOT、Decimal 四则运算、LIKE/ILIKE、REGEXP_LIKE、LOWER/UPPER/TRIM/LENGTH）；数字与文本相比、除数为零、清单外函数（如 ROUND、COALESCE）一律“规则未检查”，不猜测。
+- 接受文档实例时（`proposal_apply._instances`）求值：值类型约束（对使用它的每个属性）、只引用本对象属性的对象／属性约束；不满足则拒绝，消息为“客户「测试客户」：名称（label）为 '测试客户'，不满足规则 不收测试客户（no_test_customer）（表达式）”。关系上的规则、经关系跳转的规则提示“规则未检查：规则名，涉及其他对象”；派生规则和空值不求值。
+- 提示放在决定响应的 `validation.warnings`（`code = RULE_NOT_CHECKED`），审阅面板的结果提示里显示，不改契约。
+- 测试：`tests/test_rule_evaluation.py`（各写法、精确小数、清单外、跨对象、派生、空值）、`tests/test_rule_acceptance.py`（经接口拒绝与提示）、面板测试。

@@ -1,0 +1,33 @@
+{
+  "answers": [
+    {
+      "question": "材料第 37–49 行给出 11 条经营指标口径（销售额、客单价、毛利、动销率、准时送达率等）和若干业务规则（临期商品、盘亏、只统计已完成订单）。本轮是否一并写入本体？",
+      "selected": [
+        "指标+规则都写入（推荐）"
+      ]
+    },
+    {
+      "question": "ods_sync_log（同步日志）、tmp_sales_orders_bak_20250101（迁移遗留备份）、dim_date（日期维表）三张表，材料第 53–54 行明确前两者非业务数据、后者供报表明细汇总，如何处理？",
+      "selected": [
+        "都不建实体，仅登记数据集（推荐）"
+      ]
+    },
+    {
+      "question": "采购单/入库单/调拨单/销售订单/退款单/盘点单都带明细表，粒度如何确定？",
+      "selected": [
+        "单据与明细都建独立实体（推荐）"
+      ]
+    },
+    {
+      "question": "categories 表用 parent_id + level 表达一级/二级品类，本体怎么写？",
+      "selected": [
+        "单实体“商品品类”自关联（推荐）"
+      ]
+    }
+  ],
+  "response": {
+    "task_id": "task_4bfab06d33274fbfa11be97f",
+    "request_id": "47740ba0cd424099b06f570b5c916ea7:call_00_SLocVyeX3VlKgvIsT6y00588",
+    "accepted": true
+  }
+}

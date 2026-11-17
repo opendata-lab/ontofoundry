@@ -1,5 +1,5 @@
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pydantic import TypeAdapter
 from sqlalchemy import delete, or_
@@ -54,6 +54,8 @@ class Trial:
     items: list[ParsedItem]
     candidate: dict
     instance_states: dict[str, str | None]
+    # Rules the accept could not check (AC-07); shown, never blocking.
+    notices: list[str] = field(default_factory=list)
 
 
 def stored_items(rows, dependencies):
@@ -120,10 +122,11 @@ def _instances(model, candidate, items, accepting=False):
     """Check changed instances together with the relations that touch them.
 
     An instance whose type changes can break a relation the batch does not
-    edit; acceptance checks those relations, so the trial does too."""
+    edit; acceptance checks those relations, so the trial does too. Returns
+    the rules acceptance could not check."""
     changed = {i.target_id for i in items if i.target_kind in INSTANCE_KINDS}
     if not changed:
-        return
+        return []
     objects = {o["id"]: o for o in candidate.get("material_objects", [])}
     # Deleting an instance cascades to its relations.
     deleted = {i.target_id for i in items if i.operation == "delete"}
@@ -147,9 +150,39 @@ def _instances(model, candidate, items, accepting=False):
             and not {link["source_id"], link["target_id"]} & deleted
         ]
         issues.extend(link_count_issues(model, objects, surviving, changed - deleted))
+        rule_issues, notices = _rule_checks(model, [objects[key] for key in sorted(changed & objects.keys())])
+        issues.extend(rule_issues)
         if issues:
             raise ServiceError("候选图校验未通过：" + "；".join(issues), code="VALIDATION_FAILED",
                                status_code=422, details={"issues": issues})
+        return notices
+    return []
+
+
+def _rule_checks(model, objects):
+    """Constraint rules on the accepted instances (AC-07): violations, and rules not checked."""
+    from uuid import UUID
+
+    from ontofoundry_api.domain.graph import draft_index
+    from ontofoundry_api.domain.instance_display import document_display_text
+    from ontofoundry_api.domain.rule_evaluation import (
+        check_instance_rules,
+        unchecked_message,
+        violation_message,
+    )
+
+    index = draft_index(model)
+    issues, notices = [], []
+    for raw in objects:
+        obj = MaterialObject.model_validate(raw)
+        owner = index.objects[obj.type_id]
+        where = f"{owner.display_name or owner.name}「{document_display_text(model, obj)}」"
+        for outcome in check_instance_rules(model, UUID(str(obj.type_id)), obj.values):
+            if outcome.passed is False:
+                issues.append(violation_message(where, outcome))
+            elif outcome.passed is None and (message := unchecked_message(outcome)) not in notices:
+                notices.append(message)
+    return issues, notices
 
 
 def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, draft=None, accepting=False):
@@ -211,7 +244,7 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
         group_items(before, items, references_resolved=True)
         candidate = apply_items(before, items)
         model = OntologyDraft.model_validate(definitions(candidate))
-        _instances(model, candidate, items, accepting)
+        notices = _instances(model, candidate, items, accepting)
         if accepting:
             issues = definition_issues(model, [
                 Change(i.target_kind, i.target_id, i.after, i.before)
@@ -235,14 +268,14 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
                 active.add(item.target_id)
             else:
                 active.discard(item.target_id)
-        return Trial(items, candidate, states)
+        return Trial(items, candidate, states, notices)
     except EvidenceError as exc:
         raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
     except ValueError as exc:
         raise ServiceError("候选图校验未通过：" + str(exc), code="VALIDATION_FAILED", status_code=422) from exc
 
 
-def parse_agent(db, settings, session, raw, context):
+def parse_agent(db, settings, session, raw, context, *, check=True):
     from ontofoundry_api.services.changes import check_proposal
     from ontofoundry_api.services.table_submission import prepare_table_submission
 
@@ -254,7 +287,9 @@ def parse_agent(db, settings, session, raw, context):
         problems = getattr(exc, "problems", None) or [(exc.code, str(exc))]
         raise ServiceError(str(exc), code=exc.code, status_code=422,
                            details={"problems": problems}) from exc
-    # Against the draft the run was pinned to, which includes pending proposals.
+    if not check:
+        # Merged with the pending proposals first, then checked against the real draft.
+        return parsed
     trial = check_proposal(db, context.workspace_id, session, parsed.items, settings, draft=context.draft)
     return ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
 

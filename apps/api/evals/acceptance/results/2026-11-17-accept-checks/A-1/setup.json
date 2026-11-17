@@ -1,0 +1,8 @@
+{
+  "commit": "749bc19e6fee9179c51afd11c75374647d8f8819",
+  "synced_tables": [
+    "members",
+    "orders"
+  ],
+  "empty_database": true
+}

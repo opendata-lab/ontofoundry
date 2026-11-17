@@ -1,0 +1,11 @@
+{
+  "commit": "749bc19e6fee9179c51afd11c75374647d8f8819",
+  "synced_tables": [
+    "members",
+    "order_items",
+    "orders",
+    "products",
+    "stores"
+  ],
+  "empty_database": true
+}

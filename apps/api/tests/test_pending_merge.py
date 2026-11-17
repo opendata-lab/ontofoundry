@@ -117,3 +117,22 @@ def test_only_the_merged_batch_is_pending_and_it_can_be_accepted(client):
     assert accepted.status_code == 200, accepted.text
     detail = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{pending['id']}").json()
     assert detail["counts"] == {"pending": 0, "accepted": 0, "rejected": 0}
+
+
+def test_a_run_can_revise_a_pending_instance(client):
+    """Pending instances are in the run's instance baseline, as pending definitions are in its draft."""
+    from test_instance_store import create_instance
+
+    session = create_session(client)
+    pending = seed_batch(client, session, [create_instance(session, "钻石会员")])
+    target = pending["items"][0]["target_id"]
+    manifest, _, url, headers = run_on_top_of_pending(client, session)
+    entry = next(e for e in manifest["instance_baseline"]["items"] if e["target_id"] == target)
+    assert entry["element"]["values"]["label"] == "钻石会员"
+    revised = {"operation": "update", "target_kind": "material_object", "target_id": target,
+               "after": {**{k: v for k, v in entry["element"].items() if k != "id"}, "values": {"label": "金卡会员"}}}
+    response = client.post(url, json={"items": items_only([revised])}, headers=headers)
+    assert response.status_code == 200 and response.json()["passed"], response.text
+    new = [r for r in items_of(client, session["id"]) if r[1] == response.json()["batch_id"]]
+    assert [(r[3], r[4], r[5]["values"]["label"]) for r in new] == [("create", target, "金卡会员")]
+    assert {r[2] for r in items_of(client, session["id"]) if r[1] == pending["id"]} == {"superseded"}
