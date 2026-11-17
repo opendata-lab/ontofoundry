@@ -154,29 +154,26 @@ def test_main_preserves_final_result_when_platform_rejects(
 ):
     monkeypatch.chdir(tmp_path)
     Path("parts.json").write_text("[]")
-    Path("context.json").write_text(
-        json.dumps({"run": {}, "draft": {}, "element_hashes": {}})
-    )
+    Path("pack.json").write_text(json.dumps({"result_file": "final.json"}))
     Path("final.json").write_text("previous-result")
-    monkeypatch.setattr(prepare, "validate_file", lambda *_args, **_kwargs: 0)
+    monkeypatch.setattr(prepare, "plan_not_approved", lambda: None)
     monkeypatch.setattr(prepare, "platform_submit", lambda *_args: False)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prepare_result.py",
-            "--context",
-            "context.json",
-            "--schema",
-            "schema.json",
-            "--output",
-            "final.json",
-            "parts.json",
-        ],
-    )
+    monkeypatch.setattr(sys, "argv", ["prepare_result.py", "--work-pack", "pack.json", "parts.json"])
     assert prepare.main() == 1
     assert Path("final.json").read_text() == "previous-result"
     assert Path("final.pending.json").is_file()
+
+
+def test_platform_errors_point_back_at_the_fragment(tmp_path, monkeypatch, capsys, platform):
+    origin, handler = platform
+    handler.report = {
+        "passed": False, "reviewable_count": 0, "warnings": [],
+        "errors": [{"code": "ELEMENT_INVALID", "message": "/items/2/after [\"loan\"] 缺少名称；期望 …；实际 …"}],
+    }
+    pack, _batch, candidate = inputs(tmp_path, monkeypatch, origin)
+    origins = [("modeling/parts/01-types.json", 0), ("modeling/parts/01-types.json", 1), ("modeling/parts/02-links.json", 0)]
+    assert not prepare.platform_submit(pack, candidate, "retry", origins)
+    assert "modeling/parts/02-links.json#/0（合并后 /items/2）" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(

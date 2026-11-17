@@ -8,7 +8,7 @@
 
 坑：两行提交数3和5，SUM=8而行数COUNT=2；可空列值为7和NULL，COUNT(列)=1而行数=2。1单完成、1单取消，完成率1/2；分母也过滤完成会成1。逐行比率1/2与9/10的平均0.7不等于总体10/12。各分量过滤和时间独立，零分母NULL不改成0。
 
-跨Dataset销售100、退款10/20：先提议基于表达式的Dataset，用 UNION ALL 让销售和退款各成一行、各带业务日期，再建销售额、退款金额两个simple和退款率ratio，结果30%；若把退款明细JOIN到订单后求和，销售变200、退款率变15%。查写法用 show_example metric。
+跨Dataset销售100、退款10/20：先提议基于表达式的Dataset，用 UNION ALL 让销售和退款各成一行、各带业务日期，再建销售额、退款金额两个simple和退款率ratio，结果30%；若把退款明细JOIN到订单后求和，销售变200、退款率变15%。查写法用 show_example.py --part 04（--variant query-dataset／metric-ratio）。
 
 ## 时间与完整算法
 

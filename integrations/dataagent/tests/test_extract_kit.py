@@ -1,22 +1,31 @@
 from pathlib import Path
+
 BASE = Path(__file__).resolve().parents[1]
 
 """Fixed extraction examples and conservative/incremental proofs, without services."""
 
 import hashlib
 import json
-import shlex
-import subprocess
-import sys
 from copy import deepcopy
 
 import pytest
 from ontofoundry_api.contracts.proposals import RunContext, apply_items, parse_result
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
-from test_stepwise_workflow import check_part, init_workflow, invoke, lookup, write_json
-from test_workflow import SCHEMA, SCHEMA_PATH, SKILL, checker, pinned, prepare
+from runpaths import COLLECTIONS
+
+import platform_check
+from test_stepwise_workflow import (
+    SKILL,
+    init_workflow,
+    invoke,
+    lookup,
+    prepare,
+    write_json,
+)
+from test_workflow import kit_material
 
 KIT = SKILL / "references/extract-kit"
+SCHEMA = json.loads((BASE.parents[1] / "apps/api/src/ontofoundry_api/contracts/ontofoundry.proposals.v1.schema.json").read_bytes())
 RETAIL = BASE / "tests/fixtures/extract-retail"
 PART_NAMES = ["01-types", "02-links", "03-datasets", "04-metrics-rules", "05-facts"]
 MATERIAL_ID = "0b2f2b9b-938b-4452-8a7a-45587024538d"
@@ -38,23 +47,16 @@ def parse(batch, ctx, material, material_id):
 def prove(parts, ctx, material, material_id, tmp_path, monkeypatch):
     tmp_path.mkdir(parents=True, exist_ok=True)
     monkeypatch.chdir(tmp_path)
-    context = write_json(tmp_path / "context.json", ctx)
     output = tmp_path / "output/result.json"
-    # As in a real run, the work pack lists the materials whose hashes the merge fills in.
-    pack = write_json(tmp_path / "work-pack.json", {
-        "context_file": str(context), "schema_file": str(SCHEMA_PATH), "result_file": str(output),
-        "materials": [{"id": material_id, "sha256": hashlib.sha256(material).hexdigest()}],
-    })
+    pack = write_json(tmp_path / "work-pack.json", {"result_file": str(output)})
     directory = tmp_path / "parts"
     directory.mkdir()
     for name, part in zip(PART_NAMES, parts, strict=True):
-        fragment = write_json(directory / f"{name}.json", part)
-        assert invoke(monkeypatch, check_part, "--work-pack", pack, fragment) == 0
-        report = json.loads((tmp_path / f"modeling/checks/{name}.json").read_bytes())
-        assert report["errors"] == []
+        write_json(directory / f"{name}.json", part)
     assert invoke(monkeypatch, prepare, "--work-pack", pack, directory) == 0
     batch = json.loads(output.read_bytes())
-    assert checker.check_result(batch, SCHEMA, ctx) == []
+    lookup_material = lambda mid: (hashlib.sha256(material).hexdigest(), material.decode().splitlines()) if mid == material_id else None
+    assert platform_check.errors(batch, ctx, lookup_material) == []
     parsed = parse(batch, ctx, material, material_id)
     assert len(parsed.items) == sum(map(len, parts))
     return parsed
@@ -94,7 +96,7 @@ def test_fixed_kit_is_bounded_bare_arrays_and_passes_all_validators(tmp_path, mo
     for option in ("--guide", "--values"):
         result = lookup(option)
         assert result.returncode == 0 and len(result.stdout) <= 8192
-    ctx = pinned(SKILL / "references/examples/create-object_type.json")
+    ctx = platform_check.empty_pinned()
     prove(parts, ctx, (KIT / "material.md").read_bytes(), "11111111-1111-4111-8111-111111111111", tmp_path, monkeypatch)
 
 
@@ -120,8 +122,7 @@ def test_values_are_exactly_derived_from_current_contract():
 def test_named_entity_title_is_a_closed_reference_and_composite_detail_has_none():
     items = json.loads(lookup("--part", "01").stdout)
     by_ref = {item["client_ref"]: item for item in items}
-    report = check_part.check_fragment(items, pinned(SKILL / "references/examples/create-object_type.json"), SCHEMA)
-    assert report["errors"] == report["pending_refs"] == []
+    assert platform_check.errors({"items": items}, platform_check.empty_pinned(), kit_material) == []
     branch = by_ref["branch"]["after"]
     assert branch["title_property_id"] == {"client_ref": "branch_name"}
     title = by_ref[branch["title_property_id"]["client_ref"]]
@@ -191,12 +192,13 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
         else:
             assert all(not p["unique"] for p in group)
             shapes.add("复合标识")
-    assert parts[-1] == []
-    shapes.add("空实例")
+    facts = parts[-1]
+    assert {i["target_kind"] for i in facts} == {"material_object", "material_link"}
+    shapes.add("文档实例与关系实例")
     assert shapes == {
         "单标识", "复合标识", "值类型引用属性", "规则/value_type", "规则/property", "规则/link_type",
         "跨关系约束", "direct与正反读法", "表列", "UNION各带日期", "普通映射", "复合键映射",
-        "指标/simple", "指标/ratio", "sum", "count", "过滤与时间", "材料证据", "空实例",
+        "指标/simple", "指标/ratio", "sum", "count", "过滤与时间", "材料证据", "文档实例与关系实例",
     }
     covered = set().union(*(atoms(i) for i in items))
     for version in ("conservative", "supplemented"):
@@ -237,11 +239,11 @@ def test_retail_candidates_and_no_unknown_refund_columns(version, count, tmp_pat
 def test_sync_refunds_then_incrementally_complete_existing_graph(tmp_path, monkeypatch):
     ctx = json.loads((RETAIL / "context.json").read_bytes())
     material = (RETAIL / "material.md").read_bytes()
-    conservative = parse(prepare.assemble(ctx, load_parts(RETAIL / "conservative")), ctx, material, MATERIAL_ID)
+    conservative = parse(prepare.assemble(load_parts(RETAIL / "conservative")), ctx, material, MATERIAL_ID)
     existing = {i.client_ref: i.target_id for i in conservative.items}
     ctx["draft"] = apply_items(ctx["draft"], conservative.items)
     ctx["run"].update(run_token="offline-refunds-increment", source_session_revision=2, source_draft_sha256=snapshot_sha256(ctx["draft"]))
-    ctx["element_hashes"] = {e["id"]: element_sha256(e, collection=collection) for collection in checker.COLLECTIONS.values() for e in ctx["draft"][collection]}
+    ctx["element_hashes"] = {e["id"]: element_sha256(e, collection=collection) for collection in COLLECTIONS.values() for e in ctx["draft"][collection]}
 
     def resolve(value):
         if isinstance(value, dict):
@@ -272,7 +274,7 @@ def test_sync_refunds_then_incrementally_complete_existing_graph(tmp_path, monke
     assert len(refund["columns"]) == 5
     assert not any(i.target_kind in {"object_type", "property", "link_type"} for i in parsed.items)
     full_ctx = json.loads((RETAIL / "context.json").read_bytes())
-    full = parse(prepare.assemble(full_ctx, load_parts(RETAIL / "supplemented")), full_ctx, material, MATERIAL_ID)
+    full = parse(prepare.assemble(load_parts(RETAIL / "supplemented")), full_ctx, material, MATERIAL_ID)
 
     def logical_graph(graph, refs):
         ids = {identity: ref for ref, identity in refs.items()}
@@ -283,32 +285,9 @@ def test_sync_refunds_then_incrementally_complete_existing_graph(tmp_path, monke
             if isinstance(value, list):
                 return [normalize(v) for v in value]
             return ids.get(value, value) if isinstance(value, str) else value
-        return {c: sorted((normalize(e) for e in graph[c]), key=lambda e: e["id"]) for c in checker.COLLECTIONS.values()}
+        return {c: sorted((normalize(e) for e in graph[c]), key=lambda e: e["id"]) for c in COLLECTIONS.values()}
     final_refs = {**existing, **{i.client_ref: i.target_id for i in parsed.items if i.client_ref}}
     assert logical_graph(final, final_refs) == logical_graph(apply_items(full_ctx["draft"], full.items), {i.client_ref: i.target_id for i in full.items})
-
-
-@pytest.mark.parametrize("kind,after,pointer,expected", [
-    ("metric", {"kind": "simple"}, "/after/filters/0/operator", "--part 04"),
-    ("metric", {"kind": "simple", "aggregation": "count"}, "/after/measure", "--part 04"),
-    ("metric", {"kind": "ratio"}, "/after/numerator_id", "--variant ratio"),
-    ("metric", {"kind": "expression"}, "/after/expression", "--variant expression"),
-    ("dataset", {"source_kind": "query"}, "/after/columns", "--part 03"),
-    ("dataset", {}, "/after/query_sql", "--part 03"),
-    ("link_type", {}, "/after/data_join/source_property_ids", "--part 02"),
-    ("link_type", {"data_join": {"kind": "mapping_table"}}, "/after/data_join", "--variant mapping_table"),
-    ("mapping", {"fields": {"amount": {"kind": "expression"}}}, "/after/fields/amount/expression", "--variant expression"),
-])
-def test_error_routes_are_structural_and_executable(kind, after, pointer, expected):
-    # Business strings resembling variants must not influence routing.
-    after.update(name="filter_ratio_query", description="COUNT data_join expression")
-    command = checker.example_command(kind, "create", after, pointer)
-    assert expected in command
-    result = subprocess.run([sys.executable, *shlex.split(command)[1:]], capture_output=True, check=False)
-    assert result.returncode == 0 and len(result.stdout) <= 8192
-    for operation in ("update", "delete"):
-        command = checker.example_command(kind, operation, after, pointer)
-        assert f"--operation {operation}" in command and "--part" not in command
 
 
 def test_init_creates_the_result_parent_directory_idempotently(tmp_path, monkeypatch):
@@ -321,7 +300,7 @@ def test_init_creates_the_result_parent_directory_idempotently(tmp_path, monkeyp
 
 
 def test_every_fixed_payload_is_registered_and_invalid_combinations_fail():
-    assert {p.name for p in KIT.iterdir()} == {"01.json", "02.json", "03.json", "04.json", "05.json", "values.json", "guide.md", "material.md", "update.json", "edit.json", "incremental.md"}
+    assert {p.name for p in KIT.iterdir()} == {"01.json", "02.json", "03.json", "04.json", "05.json", "values.json", "guide.md", "material.md", "update.json", "edit.json", "incremental.md", "variants.json"}
     for args in (("--part", "06"), ("--part", "01", "metric"), ("--values", "--operation", "update"), ("--part", "01", "--with-deps")):
         result = lookup(*args)
         assert result.returncode != 0
@@ -346,7 +325,7 @@ def test_event_query_preserves_months_and_does_not_duplicate_sales():
 
 
 def test_abstract_route_budget_cannot_hide_extraction_overflow(monkeypatch):
-    from test_workflow import budget
+    import offline_budget as budget
 
     monkeypatch.setattr(budget, "EXTRACT_ROUTE_LIMIT", 1)
     report = budget.byte_report()

@@ -1,235 +1,140 @@
-"""Executable examples, final-graph checks, bounded diagnostics and atomic output."""
+"""The fixed kit and its variants pass the platform's submission checks; scripts stay bounded."""
 
 import hashlib
 import json
-import re
+import shlex
 import subprocess
 import sys
-from copy import deepcopy
 from pathlib import Path
 
+import offline_budget as budget
+import platform_check
+import prepare_result as prepare
 import pytest
-from ontofoundry_api.contracts.proposals import (
-    ProposalContractError,
-    RunContext,
-    parse_result,
-)
-from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.snapshot import empty_snapshot
+from ontofoundry_api.contracts.proposal_diagnostics import diagnostic
+from runpaths import TARGET_KINDS
 
 BASE = Path(__file__).resolve().parents[1]
 SKILL = BASE / "shared"
-sys.path.insert(0, str(BASE / "scripts"))
-sys.path.insert(0, str(SKILL / "scripts"))
-import check_result as checker
-import offline_budget as budget
-import prepare_result as prepare
-
-SCHEMA_PATH = (
-    BASE.parents[1]
-    / "apps/api/src/ontofoundry_api/contracts/ontofoundry.proposals.v1.schema.json"
-)
-SCHEMA = json.loads(SCHEMA_PATH.read_bytes())
-CATALOG = json.loads((SKILL / "references/examples/catalog.json").read_bytes())
-EXAMPLES = [SKILL / "references/examples" / e["file"] for e in CATALOG["examples"]]
+KIT = SKILL / "references/extract-kit"
+MATERIAL = (KIT / "material.md").read_bytes()
+SHOW = [sys.executable, str(SKILL / "scripts/show_example.py")]
 
 
-# Examples leave material_sha256 out; the merge fills it from the work pack's materials.
-MATERIAL_HASHES = {
-    "11111111-1111-4111-8111-111111111111": "0425cde725fc030b9f379fc14eed7e7bcadbf4e5c275bdc87e0f714bbf429e26",
-}
+def show(*args):
+    return subprocess.run([*SHOW, *args], capture_output=True, check=False)
 
 
-def pinned(example):
-    entry = next(e for e in CATALOG["examples"] if e["file"] == example.name)
-    ctx = json.loads(
-        (BASE / "tests/fixtures" / (entry["context"] or "context.json")).read_bytes()
-    )
-    if not entry["context"]:
-        ctx["draft"] = empty_snapshot(ctx["run"]["workspace_id"])
-        ctx["element_hashes"] = {}
-        ctx["run"]["source_draft_sha256"] = snapshot_sha256(ctx["draft"])
-    ctx["material_hashes"] = MATERIAL_HASHES
-    return ctx
+def kit_material(_material_id):
+    return hashlib.sha256(MATERIAL).hexdigest(), MATERIAL.decode().splitlines()
 
 
-def server_parse(batch, ctx):
-    run = {k: v for k, v in ctx["run"].items() if k != "schema_version"}
-    material = (BASE / "tests/fixtures/material.md").read_bytes()
-    return parse_result(
-        json.dumps(batch).encode(),
-        RunContext(**run, draft=ctx["draft"], instance_baseline=ctx["instance_baseline"]),
-        lambda mid: (
-            (hashlib.sha256(material).hexdigest(), material.decode().splitlines())
-            if mid == "11111111-1111-4111-8111-111111111111"
-            else None
-        ),
-    )
+def kit_batch():
+    return {"items": [i for n in ("01", "02", "03", "04", "05") for i in json.loads((KIT / f"{n}.json").read_bytes())]}
 
 
-@pytest.mark.parametrize("example", EXAMPLES, ids=lambda p: p.stem)
-def test_every_example_through_cli_and_final_graph(example, tmp_path):
-    ctx = pinned(example)
-    batch = prepare.assemble(ctx, [json.loads(example.read_bytes())])
-    context = tmp_path / "context.json"
-    context.write_text(json.dumps(ctx))
-    result = tmp_path / "result.json"
-    result.write_text(json.dumps(batch))
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(SKILL / "scripts/check_result.py"),
-            "--schema",
-            str(SCHEMA_PATH),
-            "--context",
-            str(context),
-            str(result),
-        ],
-        capture_output=True,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stdout.decode()
-    assert server_parse(batch, ctx)
+def test_the_kit_passes_the_platform_with_its_real_material():
+    assert platform_check.errors(kit_batch(), platform_check.empty_pinned(), kit_material) == []
 
 
-def test_examples_cover_targets_and_operations():
-    items = [item for p in EXAMPLES for item in json.loads(p.read_bytes())]
-    assert {i["target_kind"] for i in items} == set(checker.TARGET_KINDS)
+def test_the_kit_shows_every_kind_operation_and_chinese_names():
+    items = kit_batch()["items"] + [i for n in ("update", "edit") for i in json.loads((KIT / f"{n}.json").read_bytes())]
+    assert {i["target_kind"] for i in items} >= set(TARGET_KINDS) - {"material_link"} | {"material_link"}
     assert {i["operation"] for i in items} == {"create", "update", "delete"}
-
-
-def test_examples_show_chinese_names():
-    # The agent copies examples, so every named element demonstrates display_name.
     named = {"object_type", "property", "link_type", "rule", "metric", "dataset"}
-    missing = [
-        (p.name, item["after"]["name"])
-        for p in EXAMPLES
-        for item in json.loads(p.read_bytes())
-        if item["target_kind"] in named and item["operation"] != "delete"
-        and not item["after"].get("display_name")
-    ]
-    assert missing == []
+    assert [i["client_ref"] for i in items if i["target_kind"] in named and i["operation"] == "create"
+            and not i["after"].get("display_name")] == []
 
 
-@pytest.mark.parametrize(
-    "mutation", ["cross_dataset", "manual_evidence", "bad_quote", "bad_lines"]
-)
-def test_final_graph_and_evidence_still_reject(mutation):
-    path = (
-        SKILL
-        / "references/examples"
-        / ("metrics.json" if mutation == "cross_dataset" else "facts.json")
-    )
-    ctx = pinned(path)
-    batch = prepare.assemble(ctx, [json.loads(path.read_bytes())])
-    if mutation == "cross_dataset":
-        batch["items"].append(
-            {
-                "operation": "create",
-                "target_kind": "dataset",
-                "client_ref": "other",
-                "after": {"name": "yunfan_refunds", "display_name": "云帆退款", "table_name": "demo_other"},
-            }
-        )
-        component = batch["items"][2]["after"]
-        component["dataset_id"] = {"client_ref": "other"}
-        component["measure"]["dataset_id"] = {"client_ref": "other"}
+@pytest.mark.parametrize("name", sorted(json.loads((KIT / "variants.json").read_bytes())))
+def test_every_variant_is_bounded_and_passes_the_platform(name):
+    completed = show("--variant", name)
+    assert completed.returncode == 0 and len(completed.stdout) <= 8192, completed.stdout.decode()
+    pinned = (json.loads((BASE / "tests/fixtures/reuse-fact-context.json").read_bytes())
+              if name == "reuse-fact" else platform_check.empty_pinned())
+    assert platform_check.errors({"items": json.loads(completed.stdout)}, pinned) == []
+
+
+@pytest.mark.parametrize("mutation", ["manual_evidence", "bad_quote", "bad_lines", "cross_dataset_ratio"])
+def test_the_platform_still_rejects_broken_kit_content(mutation):
+    batch = kit_batch()
+    fact = next(i for i in batch["items"] if i["target_kind"] == "material_object")
+    if mutation == "manual_evidence":
+        fact["after"]["evidence"] = [{"id": "77777777-7777-4777-8777-777777777777", "kind": "manual",
+                                      "created_by": "fictional-member", "created_at": "2026-10-20T00:00:00Z", "note": "伪造"}]
+    elif mutation == "bad_quote":
+        fact["after"]["evidence"][0]["quote"] = "不存在的原文"
+    elif mutation == "bad_lines":
+        fact["after"]["evidence"][0]["locator"]["line_end"] = 50
     else:
-        evidence = batch["items"][3]["after"]["evidence"][0]
-        if mutation == "manual_evidence":
-            batch["items"][3]["after"]["evidence"] = [
-                {
-                    "id": "77777777-7777-4777-8777-777777777777",
-                    "kind": "manual",
-                    "created_by": "fictional-member",
-                    "created_at": "2026-10-20T00:00:00Z",
-                    "note": "伪造人工证据",
-                }
-            ]
-        elif mutation == "bad_quote":
-            evidence["quote"] = "不存在的原文"
-        else:
-            evidence["locator"]["line_end"] = 50
-    with pytest.raises(ProposalContractError):
-        server_parse(batch, ctx)
+        # 平均押金 = 押金 / 赔偿（另一数据集）: ratio components must share a dataset.
+        ratio = next(i for i in batch["items"] if i["client_ref"] == "mean_deposit")
+        ratio["after"]["denominator_id"] = {"client_ref": "charge"}
+    assert platform_check.errors(batch, platform_check.empty_pinned(), kit_material)
 
 
-def test_discriminator_error_is_short_and_report_is_complete(tmp_path, capsys):
-    ctx = pinned(SKILL / "references/examples/metrics.json")
-    items = json.loads((SKILL / "references/examples/metrics.json").read_bytes())
-    items[1]["after"]["aggregation"] = "total"
-    batch = prepare.assemble(ctx, [items])
-    batch["items"] *= 40
-    result = tmp_path / "result.json"
-    result.write_text(json.dumps(batch))
-    assert checker.validate_file(result, SCHEMA_PATH) == 1
-    output = capsys.readouterr().out
-    assert len(output.encode()) <= 4096
-    assert "SCHEMA_ENUM" in output and "show_example.py --part 04" in output
-    report = json.loads(Path(str(result) + ".errors.json").read_bytes())
-    assert report["total"] >= 40 and len(report["errors"]) == report["total"]
-    assert report["schema_details"]
-    result.write_text("{")
-    assert checker.validate_file(result, SCHEMA_PATH) == 1
-    assert len(capsys.readouterr().out.encode()) <= 4096
+def test_lookup_by_kind_names_the_kit_part():
+    completed = show("metric", "material_link")
+    out = completed.stdout.decode()
+    assert completed.returncode == 1 and "--part 04" in out and "--part 05" in out
+    assert "未知类型" in show("unknown").stdout.decode()
+    listed = show("--variant", "nope").stdout.decode()
+    assert all(name in listed for name in json.loads((KIT / "variants.json").read_bytes()))
 
 
-def test_local_checks_never_count_repair_rounds(tmp_path, monkeypatch, capsys):
-    # SC-06: the platform counts rounds on rejected submissions; local checks are free.
+@pytest.mark.parametrize("item", [
+    {"operation": "create", "target_kind": "metric", "after": {"kind": "ratio"}},
+    {"operation": "create", "target_kind": "material_link", "after": {}},
+    {"operation": "update", "target_kind": "property", "after": {}},
+    {"operation": "delete", "target_kind": "rule"},
+])
+def test_platform_errors_point_at_a_kit_entry_that_runs(item):
+    message = diagnostic("/items/0", "示例错误", "期望形状", "实际值", item)
+    entry = shlex.split(message.split("scripts/show_example.py", 1)[1])
+    completed = show(*entry)
+    assert completed.returncode == 0 and len(completed.stdout) <= 8192, (entry, completed.stdout.decode())
+
+
+def test_examples_never_show_material_hashes():
+    for args in (["--part", "01"], ["--part", "05"], ["--variant", "reuse-fact"]):
+        completed = show(*args)
+        assert b"material_sha256" not in completed.stdout and b'"material_id"' in completed.stdout
+
+
+def test_only_the_protocol_formats_remain_under_examples():
+    directory = SKILL / "references/examples"
+    assert {p.relative_to(directory).as_posix() for p in directory.rglob("*.json")} == {
+        "protocol/entities.json", "protocol/issues.json"}
+
+
+def test_prepare_reports_the_fragment_and_preserves_output(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    ctx = pinned(SKILL / "references/examples/facts.json")
-    ctx["execution"] = {"repair_limit": 2, "repair_used": 0}
-    context = tmp_path / "context.json"
-    context.write_text(json.dumps(ctx))
-    batch = prepare.assemble(
-        ctx, [json.loads((SKILL / "references/examples/facts.json").read_bytes())]
-    )
-    result = tmp_path / "candidate.json"
-    for used in range(4):
-        batch["items"][0]["after"]["description"] = str(used)
-        result.write_text(json.dumps(batch))
-        assert checker.validate_file(result, SCHEMA_PATH, context) == 0
-    assert not list(tmp_path.glob("**/*budget*"))
-    assert "REPAIR_BUDGET_EXHAUSTED" not in capsys.readouterr().out
-
-
-def test_prepare_does_not_replace_final_on_bad_fragment(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    final = tmp_path / "final.json"
-    final.write_text("previous")
-    fragment = tmp_path / "items.json"
-    fragment.write_text('[{"operation":"update"}]')
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prepare_result.py",
-            "--schema",
-            str(SCHEMA_PATH),
-            "--context",
-            str(BASE / "tests/fixtures/context.json"),
-            "--output",
-            str(final),
-            str(fragment),
-        ],
-    )
+    (tmp_path / "plan.md").write_text("")
+    item = {"target_kind": "object_type", "after": {"name": "x"}}
+    with pytest.raises(prepare.PrepareInputError) as caught:
+        prepare.assemble([[item]])
+    assert "/items/0/operation" in str(caught.value) and "期望" in str(caught.value)
+    parts = tmp_path / "modeling/parts"
+    parts.mkdir(parents=True)
+    (parts / "01-types.json").write_text(json.dumps([item]))
+    (tmp_path / "final.json").write_text("previous")
+    (tmp_path / "pack.json").write_text(json.dumps({"result_file": "final.json"}))
+    monkeypatch.setattr(prepare, "plan_not_approved", lambda: None)
+    monkeypatch.setattr(sys, "argv", ["prepare_result.py", "--work-pack", "pack.json"])
     assert prepare.main() == 1
-    assert final.read_text() == "previous"
+    out = capsys.readouterr().out
+    assert "modeling/parts/01-types.json#/0" in out and len(out.encode()) <= 4096
+    assert (tmp_path / "final.json").read_text() == "previous"
     with pytest.raises(ValueError):
         prepare.workspace_path(tmp_path.parent / "outside.json")
 
 
-def test_local_source_scope_and_reference_literals():
-    path = SKILL / "references/examples/mapping.json"
-    ctx = pinned(path)
-    batch = prepare.assemble(ctx, [json.loads(path.read_bytes())])
-    other = deepcopy(batch["items"][-1])
-    other["client_ref"] = "second_mapping"
-    batch["items"].append(other)
-    assert not checker.check_result(batch, SCHEMA, ctx)  # same local main is legal
-    other["after"]["fields"]["loan_no"]["source_id"] = "aux"
-    errors = checker.check_result(batch, SCHEMA, ctx)
-    assert any("source_id" in e and "LOCAL_SOURCE_UNKNOWN" in e for e in errors)
+def test_calculation_variants_say_what_they_compute():
+    found = json.loads((KIT / "variants.json").read_bytes())
+    binding = found["expression-binding"][-1]["after"]["fields"]["line_amount"]["expression"]
+    assert binding == "main.copy_count * main.deposit_each"
+    link = next(i for i in found["link-joins"] if i["client_ref"] == "reports")
+    assert link["after"]["data_join"]["source_property_ids"] == [{"client_ref": "manager_no"}]
 
 
 def test_budget_targets_and_historical_conservation():
@@ -288,200 +193,6 @@ def test_skill_reference_paths_exist():
                 )
 
 
-def test_catalog_discovers_all_examples_and_core_topics():
-    directory = SKILL / "references/examples"
-    actual = {str(p.relative_to(directory)) for p in directory.rglob("*.json")}
-    registered = (
-        [e["file"] for e in CATALOG["examples"]]
-        + CATALOG["protocols"]
-        + ["catalog.json"]
-    )
-    assert len(registered) == len(set(registered))
-    assert actual == set(registered)
-    assert not (directory / "negative").exists()
-    for topic in [
-        "facts",
-        "inheritance",
-        "identifiers",
-        "mapping",
-        "metrics",
-        "rules",
-        "operations",
-        "reuse-fact",
-    ]:
-        assert any(topic in entry["topics"] for entry in CATALOG["examples"])
-
-
-@pytest.mark.parametrize("kind", sorted(checker.TARGET_KINDS))
-@pytest.mark.parametrize("operation", ["create", "update", "delete"])
-def test_lookup_output_is_bounded_and_passes_both_validators(kind, operation):
-    command = [
-        sys.executable,
-        str(SKILL / "scripts/show_example.py"),
-        kind,
-        "--with-deps",
-        "--operation",
-        operation,
-    ]
-    completed = subprocess.run(command, capture_output=True, check=False)
-    assert completed.returncode == 0, completed.stdout.decode()
-    assert len(completed.stdout) <= 8192
-    items = json.loads(completed.stdout)
-    assert any(i["target_kind"] == kind and i["operation"] == operation for i in items)
-    path = SKILL / "references/examples" / CATALOG["lookup"][kind][operation]
-    ctx = pinned(path)
-    batch = prepare.assemble(ctx, [items])
-    assert not checker.check_result(batch, SCHEMA, ctx)
-    assert server_parse(batch, ctx)
-
-
-def test_unknown_lookup_lists_choices():
-    completed = subprocess.run(
-        [sys.executable, str(SKILL / "scripts/show_example.py"), "unknown"],
-        capture_output=True,
-        check=False,
-    )
-    assert completed.returncode == 1 and len(completed.stdout) <= 8192
-    assert all(k in completed.stdout.decode() for k in checker.TARGET_KINDS)
-
-
-@pytest.mark.parametrize(
-    "mutation",
-    [
-        "unknown_field",
-        "missing",
-        "wrong_type",
-        "placeholder",
-        "branch",
-        "source",
-        "reference",
-        "token",
-        "before",
-        "hash",
-        "duplicate",
-    ],
-)
-def test_errors_have_location_expectation_actual_and_executable_lookup(mutation):
-    import shlex
-
-    name = "mapping" if mutation == "source" else "facts"
-    if mutation in {"before", "hash", "duplicate"}:
-        name = "operations"
-    path = SKILL / f"references/examples/{name}.json"
-    ctx = pinned(path)
-    batch = prepare.assemble(ctx, [json.loads(path.read_bytes())])
-    assert not checker.check_result(batch, SCHEMA, ctx)
-    assert server_parse(batch, ctx)
-    item = batch["items"][0]
-    if mutation == "unknown_field":
-        item["after"]["technical_name"] = "forbidden"
-    elif mutation == "missing":
-        del item["after"]["name"]
-    elif mutation == "wrong_type":
-        item["after"]["name"] = 5
-    elif mutation == "placeholder":
-        batch["items"][2]["after"]["verbalizes"] = ["{source}至{other}"]
-    elif mutation == "branch":
-        metric_path = SKILL / "references/examples/metrics.json"
-        ctx = pinned(metric_path)
-        batch = prepare.assemble(ctx, [json.loads(metric_path.read_bytes())])
-        batch["items"][3]["after"]["time_field"] = {
-            "dataset_id": {"client_ref": "daily"},
-            "column": "sales",
-        }
-    elif mutation == "source":
-        batch["items"][-1]["after"]["fields"]["loan_no"]["source_id"] = "aux"
-    elif mutation == "reference":
-        item["after"]["extends"] = {"client_ref": "absent"}
-    elif mutation == "token":
-        batch["run_token"] = "stale"
-    elif mutation == "before":
-        item["before"] = {"description": "stale"}  # the platform's to supply (SC-08)
-    elif mutation == "hash":
-        item["expected_target_hash"] = "0" * 64
-    else:
-        batch["items"].append(deepcopy(item))
-    errors = checker.check_result(batch, SCHEMA, ctx)
-    assert errors
-    for error in errors:
-        assert re.match(r"错误 \[[A-Z_]+\]：(/|文档根)", error)
-        assert "期望" in error and "实际" in error and "下一步：" in error
-        step = error.split("下一步：", 1)[1]
-        if "show_example.py" not in step:
-            continue
-        # Writing errors point at an example; the printed command runs as is.
-        command = shlex.split(step.split("：", 1)[1])
-        assert command[0] == "$DATAAGENT_PYTHON_BIN" and Path(command[1]).is_file()
-        completed = subprocess.run(
-            [sys.executable, *command[1:]], capture_output=True, check=False
-        )
-        assert completed.returncode == 0 and len(completed.stdout) <= 8192
-    with pytest.raises(ProposalContractError) as caught:
-        server_parse(batch, ctx)
-    assert "期望" in str(caught.value) and "实际" in str(caught.value)
-    message = str(caught.value)
-    # Item errors point at an example; whole-graph errors name each broken element.
-    assert "/" in message and ("show_example.py" in message or "逐个修正" in message)
-
-
-
-def test_prepare_reports_exact_fragment_location_and_preserves_output(
-    tmp_path, monkeypatch, capsys
-):
-    monkeypatch.chdir(tmp_path)
-    context = pinned(SKILL / "references/examples/operations.json")
-    item = json.loads((SKILL / "references/examples/operations.json").read_bytes())[0]
-    del item["operation"]
-    with pytest.raises(prepare.PrepareInputError) as caught:
-        prepare.assemble(context, [[item]])
-    message = str(caught.value)
-    assert "/items/0/operation" in message and "期望" in message and "实际" in message
-    (tmp_path / "items.json").write_text(json.dumps([item]))
-    (tmp_path / "final.json").write_text("previous")
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prepare_result.py",
-            "--context",
-            str(BASE / "tests/fixtures/context.json"),
-            "--schema",
-            str(SCHEMA_PATH),
-            "--output",
-            "final.json",
-            "items.json",
-        ],
-    )
-    assert prepare.main() == 1
-    assert (tmp_path / "final.json").read_text() == "previous"
-    assert len(capsys.readouterr().out.encode()) <= 4096
-    assert json.loads((tmp_path / "final.json.errors.json").read_bytes())["total"] == 1
-
-
-def test_manual_evidence_preservation_and_meaningful_calculation_examples():
-    path = SKILL / "references/examples/reuse-fact.json"
-    ctx = pinned(path)
-    batch = prepare.assemble(ctx, [json.loads(path.read_bytes())])
-    assert server_parse(batch, ctx)
-    batch["items"][0]["after"]["evidence"] = []
-    with pytest.raises(ProposalContractError) as caught:
-        server_parse(batch, ctx)
-    assert caught.value.code == "MANUAL_EVIDENCE_FORBIDDEN"
-    example = json.loads(
-        (SKILL / "references/examples/expression-binding.json").read_bytes()
-    )
-    assert (
-        example[-1]["after"]["fields"]["line_amount"]["expression"]
-        == "main.copy_count * main.deposit_each"
-    )
-    assert 2 * 30 == 60
-    joins = json.loads((SKILL / "references/examples/link-joins.json").read_bytes())
-    link = next(i for i in joins if i["client_ref"] == "reports")
-    assert link["after"]["data_join"]["source_property_ids"] == [
-        {"client_ref": "manager_no"}
-    ]
-
-
 def test_method_section_ranges_and_budgeted_decision_reads():
     import re
 
@@ -492,41 +203,3 @@ def test_method_section_ranges_and_budgeted_decision_reads():
             assert lines[start - 1] == "## " + heading
             assert 0 < start <= end <= len(lines)
             assert not any(line.startswith("## ") for line in lines[start:end])
-
-
-@pytest.mark.parametrize(
-    "kind,variant,filename",
-    [
-        ("metric", "ratio", "metrics.json"),
-        ("metric", "expression", "metrics.json"),
-        ("mapping", "expression", "expression-binding.json"),
-        ("mapping", "shared_parent", "inheritance.json"),
-        ("link_type", "direct", "link-joins.json"),
-        ("link_type", "mapping_table", "link-joins.json"),
-        ("rule", "derivation", "derivation.json"),
-    ],
-)
-def test_branch_lookup_output_is_a_positive_example(kind, variant, filename):
-    command = [
-        sys.executable,
-        str(SKILL / "scripts/show_example.py"),
-        kind,
-        "--with-deps",
-        "--variant",
-        variant,
-    ]
-    completed = subprocess.run(command, capture_output=True, check=False)
-    assert completed.returncode == 0 and len(completed.stdout) <= 8192
-    ctx = pinned(SKILL / "references/examples" / filename)
-    batch = prepare.assemble(ctx, [json.loads(completed.stdout)])
-    assert not checker.check_result(batch, SCHEMA, ctx)
-    assert server_parse(batch, ctx)
-
-
-def test_examples_never_show_material_hashes():
-    # The agent writes material id, locator and quote; the merge fills the hash.
-    for args in (["--part", "01"], ["material_object", "--operation", "create"], ["material_link", "--operation", "update"]):
-        completed = subprocess.run([sys.executable, str(SKILL / "scripts/show_example.py"), *args], capture_output=True, check=True)
-        assert b"material_sha256" not in completed.stdout and b'"material_id"' in completed.stdout
-
-

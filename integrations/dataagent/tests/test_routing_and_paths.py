@@ -7,14 +7,18 @@ import shlex
 import subprocess
 import sys
 
-from test_stepwise_workflow import invoke, mapping_example, write_json
-from test_workflow import BASE, SCHEMA_PATH, SKILL, prepare
+from test_stepwise_workflow import BASE, KIT, SKILL, invoke, prepare, write_json
 
 init_workflow = importlib.import_module("init_workflow")
 read_input = importlib.import_module("read_input")
 show_example = importlib.import_module("show_example")
 SKILLS = BASE / "skills"
 LINK = re.compile(r"\]\(([^)]+\.md)\)")
+
+
+def kit_parts():
+    """Types, links and datasets/mappings from the fixed kit, as three fragments."""
+    return [json.loads((KIT / f"{n}.json").read_bytes()) for n in ("01", "02", "03")]
 
 
 def test_entries_only_route_and_every_linked_step_exists():
@@ -73,7 +77,6 @@ def test_init_prints_this_runs_paths_and_commands(tmp_path, monkeypatch, capsys)
     assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
     out = capsys.readouterr().out
     for text in ("uploads/fictional.md", "output/result.json", "uploads/tables.json",
-                 "check_part.py --work-pack uploads/pack.json 01",
                  "prepare_result.py --work-pack uploads/pack.json modeling/parts/", "modeling/tmp/", "/tmp",
                  "references/examples/protocol/entities.json",
                  "references/examples/protocol/issues.json"):
@@ -104,24 +107,22 @@ def test_init_works_from_another_folder_and_lists_inputs(tmp_path, monkeypatch, 
 
 def test_prepare_takes_the_work_pack_short_names_and_default_parts(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    ctx, items = mapping_example()
-    write_json(tmp_path / "context.json", ctx)
-    pack = write_json(tmp_path / "pack.json", {
-        "context_file": "context.json", "schema_file": str(SCHEMA_PATH), "result_file": "output/result.json",
-    })
+    types, links, datasets = kit_parts()
+    items = types + links + datasets
+    pack = write_json(tmp_path / "pack.json", {"result_file": "output/result.json"})
     parts = tmp_path / "modeling/parts"
     parts.mkdir(parents=True)
-    write_json(parts / "01-types.json", items[:4])
-    write_json(parts / "02-datasets.json", items[4:5])
-    write_json(parts / "03-mappings.json", items[5:])
+    write_json(parts / "01-types.json", types)
+    write_json(parts / "02-links.json", links)
+    write_json(parts / "03-mappings.json", datasets)
     assert invoke(monkeypatch, prepare, "--work-pack", pack) == 0
     default = (tmp_path / "output/result.json").read_bytes()
     # A stored batch moves its fragments away so no later merge resubmits them.
     assert not list(parts.glob("*.json"))
     assert len(list((tmp_path / "modeling/submitted/unknown/parts").glob("*.json"))) == 3
-    write_json(parts / "01-types.json", items[:4])
-    write_json(parts / "02-datasets.json", items[4:5])
-    write_json(parts / "03-mappings.json", items[5:])
+    write_json(parts / "01-types.json", types)
+    write_json(parts / "02-links.json", links)
+    write_json(parts / "03-mappings.json", datasets)
     assert invoke(monkeypatch, prepare, "--work-pack", pack, "01", "02", "03-mappings") == 0
     assert (tmp_path / "output/result.json").read_bytes() == default
     assert json.loads(default)["items"] == items
@@ -131,7 +132,7 @@ def test_wrong_arguments_and_stdin_print_the_correct_commands(tmp_path, monkeypa
     monkeypatch.chdir(tmp_path)
     assert invoke(monkeypatch, prepare, "--work-pack", "pack.json", "-") == 2
     assert "先写到 modeling/parts/" in capsys.readouterr().out
-    script = SKILL / "scripts/check_part.py"
+    script = SKILL / "scripts/prepare_result.py"
     result = subprocess.run([sys.executable, script, "--work-pack", "uploads/pack.json", "--bogus", "01"],
                             cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 2
@@ -208,19 +209,18 @@ def test_table_keys_accept_commas_or_spaces(tmp_path, monkeypatch, capsys):
     assert all(f"[ref: t{n}]" in out for n in (1, 2, 3))
 
 
-def test_check_part_reports_refs_another_fragment_already_defines(tmp_path, monkeypatch, capsys):
-    check_part = importlib.import_module("check_part")
+def test_prepare_reports_refs_another_fragment_already_defines(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    ctx, items = mapping_example()
-    write_json(tmp_path / "context.json", ctx)
-    pack = write_json(tmp_path / "pack.json", {"context_file": "context.json", "schema_file": str(SCHEMA_PATH)})
+    types, _, datasets = kit_parts()
+    pack = write_json(tmp_path / "pack.json", {"result_file": "output/result.json"})
     parts = tmp_path / "modeling/parts"
     parts.mkdir(parents=True)
-    write_json(parts / "01-types.json", items[:4])
-    clash = {**items[4], "client_ref": items[0]["client_ref"]}
-    write_json(parts / "03-datasets.json", [clash])
-    assert invoke(monkeypatch, check_part, "--work-pack", pack, "03") == 1
-    assert f"client_ref {items[0]['client_ref']} 与 01-types.json 重复" in capsys.readouterr().out
+    write_json(parts / "01-types.json", types)
+    write_json(parts / "03-datasets.json", [{**datasets[0], "client_ref": types[0]["client_ref"]}])
+    assert invoke(monkeypatch, prepare, "--work-pack", pack) == 1
+    out = capsys.readouterr().out
+    assert "不重复的 client_ref" in out and "modeling/parts/03-datasets.json#/0" in out
+    assert not (tmp_path / "output/result.json").exists()
 
 
 def test_a_table_too_wide_for_one_read_has_exact_continuation(tmp_path, monkeypatch, capsys):
@@ -237,31 +237,10 @@ def test_a_table_too_wide_for_one_read_has_exact_continuation(tmp_path, monkeypa
     assert seen == [f"col_{n}" for n in range(200)]
 
 
-def test_check_part_counts_generated_refs_and_ignores_replacements_elsewhere(tmp_path, monkeypatch, capsys):
-    check_part = importlib.import_module("check_part")
-    monkeypatch.chdir(tmp_path)
-    ctx, items = mapping_example()
-    write_json(tmp_path / "context.json", ctx)
-    pack = write_json(tmp_path / "pack.json", {"context_file": "context.json", "schema_file": str(SCHEMA_PATH)})
-    parts = tmp_path / "modeling/parts"
-    parts.mkdir(parents=True)
-    first = {k: v for k, v in items[0].items() if k != "client_ref"}
-    write_json(parts / "01-types.json", [first])
-    write_json(parts / "02-other.json", [{**items[4], "client_ref": f"{first['target_kind']}-1"}])
-    assert invoke(monkeypatch, check_part, "--work-pack", pack, "02") == 1
-    assert f"client_ref {first['target_kind']}-1 与 01-types.json 重复" in capsys.readouterr().out
-    # A corrected copy outside modeling/parts/ is merged by explicit choice, not compared.
-    (tmp_path / "modeling/tmp").mkdir()
-    write_json(tmp_path / "modeling/tmp/02-fixed.json", [{**items[4], "client_ref": f"{first['target_kind']}-1"}])
-    invoke(monkeypatch, check_part, "--work-pack", pack, "modeling/tmp/02-fixed.json")
-    assert "重复" not in capsys.readouterr().out
-
-
-def test_show_example_points_field_names_at_their_kind(capsys, monkeypatch):
+def test_show_example_names_the_kit_part_for_a_kind(capsys, monkeypatch):
     show_example = importlib.import_module("show_example")
-    assert invoke(monkeypatch, show_example, "data_join") == 1
-    out = capsys.readouterr().out
-    assert "属于 link_type" in out and "--variant mapping_table" in out
+    assert invoke(monkeypatch, show_example, "link_type") == 1
+    assert "--part 02" in capsys.readouterr().out
 
 
 def test_errors_say_why_and_name_valid_pointer_paths(tmp_path, monkeypatch, capsys):
@@ -281,11 +260,11 @@ def test_commands_name_scripts_without_climbing_out_of_the_workspace(tmp_path, m
     runpaths = importlib.import_module("runpaths")
     monkeypatch.chdir(tmp_path)
     # The skill lives outside this workspace: its own path, never "../".
-    printed = runpaths.command("check_part.py", "--work-pack", "uploads/pack.json", "01")
+    printed = runpaths.command("prepare_result.py", "--work-pack", "uploads/pack.json", "01")
     assert ".." not in printed and str(runpaths.SKILL_DIR.resolve()) in printed
     # A placeholder left in is quoted, so Bash never reads it as a redirect.
     assert runpaths.command("read_input.py", "<材料路径>").endswith(" '<材料路径>'")
-    monkeypatch.setattr(sys, "argv", ["check_result.py", "--work-pack", "uploads/pack.json"])
+    monkeypatch.setattr(sys, "argv", ["prepare_result.py", "--work-pack", "uploads/pack.json"])
     assert runpaths.command("show_element.py", "--work-pack", "<工作包>", "x").endswith(" --work-pack uploads/pack.json x")
 
 

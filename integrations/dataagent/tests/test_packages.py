@@ -16,8 +16,10 @@ BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 from build_packages import MODELING, SKILLS, build
 from generate_output_schemas import SOURCE, TARGETS, generate
-from test_workflow import MATERIAL_HASHES, SCHEMA, pinned
+from platform_check import empty_pinned
 from test_platform_submit import platform as platform
+
+KIT = BASE / "shared/references/extract-kit"
 
 
 @pytest.fixture(scope="module")
@@ -67,11 +69,9 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
         output = run(scripts / "show_example.py", tmp_path, "--part", part)
         assert len(output) <= 8192 and isinstance(json.loads(output), list)
         (parts / f"{part}.json").write_bytes(output)
-    # A real complete fixture, not --help or empty fragments; the platform schema
-    # is supplied as run input and never fetched from the repository by the CLI.
-    context = pinned(BASE / "shared/references/examples/create-object_type.json")
+    # A real complete fixture, not --help or empty fragments.
+    context = empty_pinned()
     (tmp_path / "context.json").write_text(json.dumps(context))
-    (tmp_path / "schema.json").write_text(json.dumps(SCHEMA))
     run(scripts / "init_workflow.py", tmp_path, "--work-pack", _pack(tmp_path))
     run(scripts / "read_input.py", tmp_path, "context.json", "--start", "1", "--end", "1")
     (tmp_path / "material.csv").write_text('code,note\na,"第一行\n第二行"\n')
@@ -82,30 +82,31 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
     table_out = run(scripts / "read_input.py", tmp_path, "tables.json", "--search-tables").decode()
     assert "[ref: t1]" in table_out
     assert "[ref: t1." in run(scripts / "read_input.py", tmp_path, "tables.json", "--describe-tables", "t1").decode()
-    run(scripts / "check_part.py", tmp_path, "--work-pack", "work-pack.json", *sorted(parts.glob("*.json")))
     run(scripts / "prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "parts")
     batch = json.loads((tmp_path / "result.json").read_bytes())
     assert len(batch["items"]) > 10
     assert set(batch) == {"items"}  # SC-08: the run is the platform's
-    run(scripts / "check_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "result.json")
 
     # Exercise baseline reads and mixed instance/definition edits in every ZIP.
-    context = pinned(BASE / "shared/references/examples/instance-baseline.json")
+    context = json.loads((BASE / "tests/fixtures/pinned-material_link.json").read_bytes())
     (tmp_path / "context.json").write_text(json.dumps(context))
-    output = run(scripts / "show_example.py", tmp_path, "material_object", "--operation", "update", "--with-deps")
-    assert json.loads(output)[0]["target_kind"] == "material_object"
+    assert json.loads(run(scripts / "show_example.py", tmp_path, "--part", "update"))
     entries = context["instance_baseline"]["items"]
     selected = json.loads(run(scripts / "show_element.py", tmp_path, "--work-pack", "work-pack.json", *[f'{e["target_kind"]}:{e["target_id"]}' for e in entries]))
     assert [e["definition"]["id"] for e in selected["elements"]] == [e["target_id"] for e in entries]
-    edits = json.loads((skill / "references/examples/instance-baseline.json").read_bytes())
-    # Omitted guards must also be filled by the isolated script.
-    for item in edits:
-        item.pop("before", None)
-        item.pop("expected_target_hash", None)
+    prop = context["draft"]["properties"][0]
+    obj = next(e for e in entries if e["target_kind"] == "material_object")
+    link = next(e for e in entries if e["target_kind"] == "material_link")
+    edits = [
+        {"operation": "update", "target_kind": "property", "target_id": prop["id"],
+         "after": {**{k: v for k, v in prop.items() if k != "id"}, "description": "更新说明"}},
+        {"operation": "update", "target_kind": "material_object", "target_id": obj["target_id"],
+         "after": {k: v for k, v in obj["element"].items() if k != "id"}},
+        {"operation": "delete", "target_kind": "material_link", "target_id": link["target_id"]},
+    ]
     (tmp_path / "edits.json").write_text(json.dumps(edits))
-    run(scripts / "check_part.py", tmp_path, "--work-pack", "work-pack.json", "edits.json")
-    run(scripts / "prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "--context", "context.json", "--schema", "schema.json", "--output", "mixed.json", "edits.json")
-    run(scripts / "check_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "mixed.json")
+    _pack(tmp_path, "mixed.json", "mixed-pack.json")
+    run(scripts / "prepare_result.py", tmp_path, "--work-pack", "mixed-pack.json", "edits.json")
     mixed = json.loads((tmp_path / "mixed.json").read_bytes())
     assert {i["target_kind"] for i in mixed["items"]} == {"property", "material_object", "material_link"}
     # SC-08: edits name their target only; the platform supplies before and hash.
@@ -116,18 +117,17 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
             assert item["target_id"] in targets
 
 
-def _pack(tmp_path):
-    path = tmp_path / "work-pack.json"
+def _pack(tmp_path, result="result.json", name="work-pack.json"):
+    path = tmp_path / name
     path.write_text(json.dumps({
-        "context_file": "context.json", "schema_file": "schema.json", "result_file": "result.json",
+        "context_file": "context.json", "result_file": result,
         "platform_check_file": "platform-check.json",
-        "materials": [{"id": mid, "sha256": sha} for mid, sha in MATERIAL_HASHES.items()],
     }))
     return path
 
 
 def test_extraction_schemas_are_generated_and_preserve_platform_contract(tmp_path):
-    generate(SOURCE, tmp_path, functions_file=tmp_path / "platform_functions.json")
+    generate(SOURCE, tmp_path)
     source = json.loads(SOURCE.read_bytes())
     for name, targets in TARGETS.items():
         generated = tmp_path / name / "output-schema.json"
@@ -142,10 +142,10 @@ def test_extraction_schemas_are_generated_and_preserve_platform_contract(tmp_pat
             if definition != "item":
                 assert value == source["$defs"][definition]
         # Every platform-valid example remains valid exactly for its target subset.
-        for example in (BASE / "shared/references/examples").glob("*.json"):
-            items = json.loads(example.read_bytes())
-            if not isinstance(items, list):
-                continue
+        kit = [*(json.loads(p.read_bytes()) for p in sorted(KIT.glob("0*.json"))),
+               *json.loads((KIT / "variants.json").read_bytes()).values()]
+        assert sum(map(len, kit)) > 50
+        for example, items in enumerate(kit):
             for raw in items:
                 if not Draft202012Validator({"$ref": "#/$defs/item", "$defs": source["$defs"]}).is_valid(raw):
                     continue
@@ -155,7 +155,7 @@ def test_extraction_schemas_are_generated_and_preserve_platform_contract(tmp_pat
     source["properties"]["items"]["maxItems"] = 97
     modified = tmp_path / "modified.json"
     modified.write_text(json.dumps(source))
-    generate(modified, tmp_path / "changed", functions_file=tmp_path / "changed.json")
+    generate(modified, tmp_path / "changed")
     for name in TARGETS:
         schema = json.loads((tmp_path / "changed" / name / "output-schema.json").read_bytes())
         assert schema["properties"]["items"]["maxItems"] == 97
@@ -210,9 +210,9 @@ def test_plugin_install_only_copies_skills_and_reports_admin_work(packages, tmp_
     assert {p.name for p in target.iterdir()} == set(SKILLS)
     assert "管理员后续步骤" in installed.stdout.decode()
     for name in MODELING:
-        assert (target / name / "scripts/check_result.py").is_file()
+        assert (target / name / "scripts/prepare_result.py").is_file()
     # Validate the entire source before copying anything into a fresh destination.
-    (root / "skills/entity-extraction/scripts/check_result.py").unlink()
+    (root / "skills/entity-extraction/scripts/prepare_result.py").unlink()
     env["SKILLS_ROOT_DIR"] = str(tmp_path / "invalid-install")
     failed = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True)
     assert failed.returncode != 0 and not Path(env["SKILLS_ROOT_DIR"]).exists()
@@ -226,10 +226,8 @@ def test_two_extraction_skills_merge_into_one_result(packages, tmp_path, platfor
             archive.extractall(tmp_path)
     discovery = tmp_path / "ontology-discovery"
     extraction = tmp_path / "entity-extraction"
-    items = json.loads((discovery / "references/examples/facts.json").read_bytes())
-    context = pinned(BASE / "shared/references/examples/facts.json")
-    (tmp_path / "context.json").write_text(json.dumps(context))
-    (tmp_path / "schema.json").write_text(json.dumps(SCHEMA))
+    items = [i for n in ("01", "02", "05") for i in json.loads((discovery / f"references/extract-kit/{n}.json").read_bytes())]
+    (tmp_path / "context.json").write_text(json.dumps(empty_pinned()))
     parts = tmp_path / "parts"
     parts.mkdir()
     for name, skill in (("01-definitions", discovery), ("05-facts", extraction)):
@@ -238,17 +236,15 @@ def test_two_extraction_skills_merge_into_one_result(packages, tmp_path, platfor
         fragment = [item for item in items if item["target_kind"] in kinds]
         assert fragment
         (parts / f"{name}.json").write_text(json.dumps(fragment))
-        run(skill / "scripts/check_part.py", tmp_path, "--schema", skill / "output-schema.json", "--context", "context.json", parts / f"{name}.json")
-    run(discovery / "scripts/prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "--schema", "schema.json", "--context", "context.json", "--output", "result.json", "parts")
+    run(discovery / "scripts/prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "parts")
     result = json.loads((tmp_path / "result.json").read_bytes())
     assert len(result["items"]) == len(items)
-    assert {i["target_kind"] for i in result["items"]} == {"object_type", "property", "link_type", "material_object", "material_link"}
+    assert {"material_object", "material_link", "object_type", "link_type"} <= {i["target_kind"] for i in result["items"]}
 
 
 def _configure_check(tmp_path, origin):
     wid = "11111111-1111-4111-8111-111111111111"
-    context = pinned(BASE / "shared/references/examples/create-object_type.json")
-    wid = context["run"]["workspace_id"]
+    wid = empty_pinned()["run"]["workspace_id"]
     (tmp_path / "platform-check.json").write_text(json.dumps({
         "url": f"{origin}/api/v1/workspaces/{wid}/mcp",
         "submit_url": f"{origin}/api/v1/workspaces/{wid}/sessions/fictional-session/proposals",

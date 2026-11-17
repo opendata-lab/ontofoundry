@@ -13,7 +13,7 @@ validate_skill() {
     for file in requirements.txt references/core-model.md references/principles.md \
         references/examples/protocol/entities.json references/extract-kit/01.json \
         scripts/init_workflow.py scripts/read_input.py scripts/show_element.py \
-        scripts/show_example.py scripts/check_part.py scripts/check_result.py scripts/prepare_result.py \
+        scripts/show_example.py scripts/prepare_result.py \
         scripts/runpaths.py references/steps/finish.md; do
         [ -f "$skill_dir/$file" ] || { echo "缺少文件：$skill_dir/$file" >&2; exit 1; }
     done

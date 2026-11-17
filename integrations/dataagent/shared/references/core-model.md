@@ -32,4 +32,4 @@ Rule 归具体对象、属性、关系或值类型；值类型只拥有 constrai
 
 ## 正例索引
 
-写法统一用 `scripts/show_example.py <target_kind>`。完整正例与覆盖索引见 [catalog](examples/catalog.json)：关系／实例 facts、继承 inheritance／virtual-parent、标识 identifiers、来源 mapping／membership、指标 metrics、规则 rules、更新 operations／reuse-fact。当前设计来源：仓库 docs/concepts/README.md（安装包外的概念说明）。值类型与表达式数据集已支持，分别遵循现行值类型、数据集来源设计的已确认决定。抽取轮按 SKILL 的固定包路线，不将本文件作为回读入口。
+写法统一用 `scripts/show_example.py`：固定包 `--part 01`–`05`（类型属性、关系、数据集映射、指标规则、实例），修改 `--part update`／`edit`，少见写法 `--variant <名称>`（继承 inheritance／virtual-parent、成员 membership、重化 reified-event、关系连接 link-joins、表达式绑定 expression-binding、派生 derivation、比率／表达式指标 metric-ratio／metric-expression、查询数据集 query-dataset、实例复用 reuse-fact）。当前设计来源：仓库 docs/concepts/README.md（安装包外的概念说明）。值类型与表达式数据集已支持，分别遵循现行值类型、数据集来源设计的已确认决定。抽取轮按 SKILL 的固定包路线，不将本文件作为回读入口。

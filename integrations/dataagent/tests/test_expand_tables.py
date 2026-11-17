@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from test_workflow import SCHEMA_PATH
 
 expand_tables = importlib.import_module("expand_tables")
 init_workflow = importlib.import_module("init_workflow")
@@ -63,7 +62,7 @@ def shape(items, kind):
 
 
 def test_expansion_matches_the_hand_written_retail_fixture():
-    types, datasets, notes, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
+    types, datasets, notes, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"))
     expected_types = fixture("01-types.json")
     # refund has no synced table: its properties come from the material and are written by hand (01b).
     hand = {k: v for k, v in shape(expected_types, "property").items() if k[0] != "refund"}
@@ -79,18 +78,17 @@ def test_expansion_matches_the_hand_written_retail_fixture():
 
 
 def test_comment_tail_becomes_the_description_not_the_display_name():
-    types, _, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
+    types, _, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"))
     member_id = next(i["after"] for i in types if i["client_ref"] == "order_member_id")
     assert (member_id["display_name"], member_id["description"]) == ("下单会员", "散客为空")
     level = next(i["after"] for i in types if i["client_ref"] == "member_member_level")
     assert "description" not in level  # the listed values live on the value type
 
 
-def test_material_basis_is_quoted_from_the_material_line():
-    texts = {MATERIAL_ID: (RETAIL / "material.md").read_text().splitlines()}
-    types, _, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), texts)
+def test_material_basis_cites_lines_and_leaves_the_quote_to_the_platform():
+    types, _, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"))
     evidence = next(i for i in types if i["client_ref"] == "member")["after"]["evidence"][0]
-    assert evidence["locator"] == {"line_start": 6, "line_end": 6} and evidence["quote"] == texts[MATERIAL_ID][5].strip()
+    assert evidence["locator"] == {"line_start": 6, "line_end": 6} and "quote" not in evidence
     store = next(i for i in types if i["client_ref"] == "store")["after"]["evidence"][0]
     assert store["kind"] == "table" and store["ref"] == "t5"
 
@@ -106,7 +104,7 @@ def test_spec_mistakes_are_reported_before_anything_is_written(change, message):
     spec = json.loads(json.dumps(RETAIL_SPEC))
     change(spec)
     with pytest.raises(expand_tables.SpecError, match=message):
-        expand_tables.expand(spec, tables(RETAIL / "tables.json"), {})
+        expand_tables.expand(spec, tables(RETAIL / "tables.json"))
 
 
 def test_booleans_exclusions_and_renames_follow_the_spec_only():
@@ -114,7 +112,7 @@ def test_booleans_exclusions_and_renames_follow_the_spec_only():
     spec = {"items": [{"name": "product", "display_name": "商品", "table": "t10", "boolean_columns": ["is_fresh"],
                        "exclude_columns": ["barcode"], "properties": {"spec": {"name": "pack_spec", "display_name": "包装规格"}}},
                       {"name": "brand", "display_name": "品牌", "table": "t8"}]}
-    types, datasets, notes, _ = expand_tables.expand(spec, qinghe, {})
+    types, datasets, notes, _ = expand_tables.expand(spec, qinghe)
     props = {i["after"]["name"]: i["after"] for i in types if i["target_kind"] == "property"
              and i["after"]["owner_type_id"]["client_ref"] == "product"}
     assert props["is_fresh"]["value_kind"] == "boolean" and "barcode" not in props
@@ -126,14 +124,13 @@ def test_booleans_exclusions_and_renames_follow_the_spec_only():
     assert any("t33 ods_sync_log" in n for n in notes)
 
 
-def test_expander_writes_parts_and_runs_the_fragment_check(tmp_path, monkeypatch, capsys):
+def test_expander_writes_parts(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "modeling").mkdir()
     (tmp_path / "modeling/entities.json").write_text(json.dumps(RETAIL_SPEC, ensure_ascii=False))
     (tmp_path / "plan.md").write_text("")
     pack = tmp_path / "pack.json"
-    pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json"), "context_file": str(RETAIL / "context.json"),
-                                "schema_file": str(SCHEMA_PATH)}))
+    pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json")}))
     monkeypatch.setattr(sys, "argv", ["expand_tables.py", "--work-pack", str(pack)])
     code = expand_tables.main()
     out = capsys.readouterr().out
@@ -159,13 +156,12 @@ def test_init_table_list_is_cut_at_whole_lines(tmp_path):
     assert len("\n".join(lines[:-1]).encode()) <= 800
 
 
-check_part = importlib.import_module("check_part")
 
 
 # Review findings (Gemini Argon, 2026-11-15) — each pinned by one case.
 
 def qinghe_expand(items, value_types=()):
-    return expand_tables.expand({"items": items, "value_types": list(value_types)}, tables(FIXTURES / "qinghe-tables.json"), {})
+    return expand_tables.expand({"items": items, "value_types": list(value_types)}, tables(FIXTURES / "qinghe-tables.json"))
 
 
 def prop(types, ref):
@@ -214,16 +210,15 @@ def test_numeric_values_are_not_quoted():
 
 
 def test_table_basis_by_name_and_line_ranges():
-    texts = {MATERIAL_ID: ["第一行", "第二行", "第三行"]}
     spec = {"items": [{"name": "order", "display_name": "订单", "table": "orders",
                        "basis": [{"table": "orders"}, {"material_id": MATERIAL_ID, "line": "2-3"}]}]}
-    types, _, _, _ = expand_tables.expand(spec, tables(RETAIL / "tables.json"), texts)
+    types, _, _, _ = expand_tables.expand(spec, tables(RETAIL / "tables.json"))
     table_ev, material_ev = prop(types, "order")["evidence"]
     assert table_ev["ref"] == "t3" and material_ev["locator"] == {"line_start": 2, "line_end": 3}
-    assert material_ev["quote"] == "第二行 第三行"
-    spec["items"][0]["basis"] = [{"material_id": MATERIAL_ID, "line": 9}]
-    with pytest.raises(expand_tables.SpecError, match="超出材料"):
-        expand_tables.expand(spec, tables(RETAIL / "tables.json"), texts)
+    assert "quote" not in material_ev  # the platform quotes the lines and checks they exist
+    spec["items"][0]["basis"] = [{"material_id": MATERIAL_ID, "line": "两行"}]
+    with pytest.raises(expand_tables.SpecError, match="12-15"):
+        expand_tables.expand(spec, tables(RETAIL / "tables.json"))
 
 
 def test_same_table_name_in_two_schemas_gets_two_datasets():
@@ -233,7 +228,7 @@ def test_same_table_name_in_two_schemas_gets_two_datasets():
     pool = {t["key"]: t for t in [*copy, other]}
     _, datasets, _, _ = expand_tables.expand({"items": [
         {"name": "order", "display_name": "订单", "table": "t3"},
-        {"name": "old_order", "display_name": "归档订单", "table": "t9"}]}, pool, {})
+        {"name": "old_order", "display_name": "归档订单", "table": "t9"}]}, pool)
     names = [d["after"]["name"] for d in datasets if d["target_kind"] == "dataset"]
     assert len(set(names)) == 2 and "archive_orders" in names
 
@@ -244,76 +239,6 @@ def test_expander_waits_for_plan_approval(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["expand_tables.py", "--work-pack", "pack.json"])
     assert expand_tables.main() == 2
     assert "PLAN_NOT_APPROVED" in capsys.readouterr().out and not (tmp_path / "modeling").exists()
-
-
-def test_check_part_takes_suffixed_short_names_and_defaults_to_all_parts(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "modeling/parts").mkdir(parents=True)
-    for name in ("01-types", "01b-types", "02-links"):
-        (tmp_path / f"modeling/parts/{name}.json").write_text("[]")
-    pack = tmp_path / "pack.json"
-    pack.write_text(json.dumps({"context_file": str(RETAIL / "context.json"), "schema_file": str(SCHEMA_PATH)}))
-    for args, expected in ((["01b"], {"01b-types"}), ([], {"01-types", "01b-types", "02-links"}),
-                           (["modeling/parts"], {"01-types", "01b-types", "02-links"})):
-        monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", str(pack), *args])
-        assert check_part.main() == 0
-        out = capsys.readouterr().out
-        assert {n for n in ("01-types", "01b-types", "02-links") if f"{n}.json：通过" in out} == expected, (args, out)
-
-
-column_refs = importlib.import_module("column_refs")
-prepare_result = importlib.import_module("prepare_result")
-
-
-def column_workspace(tmp_path, monkeypatch, metric_column, query_schema=None, query_sql="SELECT 1 AS n"):
-    """Retail tables, the expander's 01/03, and a hand-written 04 metric."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "modeling/parts").mkdir(parents=True)
-    types, datasets, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
-    (tmp_path / "modeling/parts/01-types.json").write_text(json.dumps(types, ensure_ascii=False))
-    (tmp_path / "modeling/parts/03-datasets.json").write_text(json.dumps(datasets, ensure_ascii=False))
-    ref = {"client_ref": "ds_orders"}
-    metric = {"operation": "create", "target_kind": "metric", "client_ref": "sales", "after": {
-        "name": "sales", "display_name": "销售额", "kind": "simple", "dataset_id": ref, "aggregation": "sum",
-        "measure": {"dataset_id": ref, "column": metric_column}, "time_field": {"dataset_id": ref, "column": "order_date"}}}
-    extra = []
-    if query_schema or query_sql != "SELECT 1 AS n":
-        extra.append({"operation": "create", "target_kind": "dataset", "client_ref": "ds_events", "after": {
-            "name": "events", "display_name": "事件", "source_kind": "query", "connection_id": "c",
-            **({"schema_name": query_schema} if query_schema else {}),
-            "query_sql": query_sql, "columns": [{"name": "n"}]}})
-    (tmp_path / "modeling/parts/04-metrics-rules.json").write_text(json.dumps([*extra, metric], ensure_ascii=False))
-    pack = tmp_path / "pack.json"
-    pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json"), "context_file": str(RETAIL / "context.json"),
-                                "schema_file": str(SCHEMA_PATH), "result_file": "output/r.json"}))
-    return pack
-
-
-@pytest.mark.parametrize("column, query_schema, query_sql, code", [
-    ("amount", None, "SELECT 1 AS n", "COLUMN_UNKNOWN"),          # the real slip: refund_amount written as amount
-    ("pay_amount", "retail", "SELECT 1 AS n", "QUERY_DATASET_LOCATION"),
-    ("pay_amount", None, "SELECT GREATEST(1, 2) AS n", "FUNCTION_UNSUPPORTED"),  # cost a repair round on 2026-11-15
-])
-def test_wrong_columns_and_query_locations_fail_locally(tmp_path, monkeypatch, capsys, column, query_schema, query_sql, code):
-    pack = column_workspace(tmp_path, monkeypatch, column, query_schema, query_sql)
-    monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", str(pack), "04"])
-    assert check_part.main() == 1
-    out = capsys.readouterr().out
-    assert code in out and ("pay_amount" in out if code == "COLUMN_UNKNOWN" else True)
-    submitted = []
-    monkeypatch.setattr(prepare_result, "platform_submit", lambda *a: submitted.append(a) or True)
-    monkeypatch.setattr(sys, "argv", ["prepare_result.py", "--work-pack", str(pack)])
-    assert prepare_result.main() == 1 and not submitted
-    assert "不计修正轮次" in capsys.readouterr().out
-
-
-def test_correct_columns_pass_and_unknown_datasets_are_not_guessed(tmp_path, monkeypatch, capsys):
-    pack = column_workspace(tmp_path, monkeypatch, "pay_amount")
-    monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", str(pack), "04"])
-    assert check_part.main() == 0, capsys.readouterr().out
-    existing = [{"target_kind": "metric", "client_ref": "m", "after": {
-        "measure": {"dataset_id": "6f0e2d4a-0000-4000-8000-000000000001", "column": "whatever"}}}]
-    assert column_refs.column_errors(existing, {}) == []  # an existing dataset by id: the platform decides
 
 
 RETAIL_LINKS = [
@@ -328,7 +253,7 @@ RETAIL_LINKS = [
 
 def test_compact_links_match_the_hand_written_fixture():
     spec = {**RETAIL_SPEC, "links": RETAIL_LINKS}
-    _, _, _, links = expand_tables.expand(spec, tables(RETAIL / "tables.json"), {})
+    _, _, _, links = expand_tables.expand(spec, tables(RETAIL / "tables.json"))
     expected = {x["after"]["name"]: x["after"] for x in fixture("02-links.json")}
     assert len(links) == 5
     for item in links:
@@ -345,7 +270,7 @@ def test_link_through_a_junction_table_gets_its_dataset():
                       {"name": "product", "display_name": "商品", "table": "t10"}],
             "links": [{"name": "promoted_product", "display_name": "参与商品", "from": "promotion", "to": "product",
                        "multiplicity": "many_to_many", "via": "t26", "via_from": "promotion_id", "via_to": "sku"}]}
-    _, datasets, notes, links = expand_tables.expand(spec, tables(FIXTURES / "qinghe-tables.json"), {})
+    _, datasets, notes, links = expand_tables.expand(spec, tables(FIXTURES / "qinghe-tables.json"))
     join = links[0]["after"]["data_join"]
     assert join["kind"] == "mapping_table" and join["dataset_id"] == {"client_ref": "ds_promotion_products"}
     assert join["source_key"]["property_ids"] == [{"client_ref": "promotion_promotion_id"}]
@@ -365,7 +290,7 @@ def test_link_spec_mistakes_are_reported(change, message):
     links = json.loads(json.dumps(RETAIL_LINKS))
     change(links[1])
     with pytest.raises(expand_tables.SpecError, match=message):
-        expand_tables.expand({**RETAIL_SPEC, "links": links}, tables(RETAIL / "tables.json"), {})
+        expand_tables.expand({**RETAIL_SPEC, "links": links}, tables(RETAIL / "tables.json"))
 
 
 def test_links_file_is_written_only_when_the_spec_has_links(tmp_path, monkeypatch, capsys):
@@ -373,8 +298,7 @@ def test_links_file_is_written_only_when_the_spec_has_links(tmp_path, monkeypatc
     (tmp_path / "modeling/parts").mkdir(parents=True)
     (tmp_path / "modeling/parts/02-links.json").write_text("[]  ")
     pack = tmp_path / "pack.json"
-    pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json"), "context_file": str(RETAIL / "context.json"),
-                                "schema_file": str(SCHEMA_PATH)}))
+    pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json")}))
     monkeypatch.setattr(sys, "argv", ["expand_tables.py", "--work-pack", str(pack)])
     (tmp_path / "modeling/entities.json").write_text(json.dumps(RETAIL_SPEC, ensure_ascii=False))
     expand_tables.main()

@@ -20,36 +20,35 @@ def diagnostic(pointer, message, expected, actual, item=None, *, graph=False):
             "下一步：按“实际”中列出的对象、关系逐个修正对应片段，全部改完后整批重提"
         )
     item = item if isinstance(item, dict) else {}
-    kind = item.get("target_kind", "object_type")
-    if kind not in {
-        "object_type",
-        "property",
-        "link_type",
-        "dataset",
-        "mapping",
-        "metric",
-        "rule",
-        "material_object",
-        "material_link",
-    }:
-        kind = "object_type"
-    operation = item.get("operation", "create")
-    if operation not in {"create", "update", "delete"}:
-        operation = "create"
-    after = item.get("after")
-    variant = after.get("kind") if isinstance(after, dict) else None
-    suffix = (
-        f" --variant {variant}"
-        if operation == "create" and kind == "metric" and variant in {"ratio", "expression"}
-        else ""
-    )
     return (
         f"{pointer} [{short(item.get('client_ref', item.get('target_id', '-')))}] {message}；"
         f"期望 {short(expected)}；实际 {short(actual)}；"
-        # The platform cannot know where the skill is installed; the skill's
-        # own check_part/prepare_result print the full command.
-        f"下一步：用建模技能的 scripts/show_example.py 查正确写法：{kind} --operation {operation}{suffix}"
+        # The platform cannot know where the skill is installed; it names the
+        # skill's kit entry, and the error itself carries the expected shape.
+        f"下一步：按“期望”改；完整写法见建模技能的 scripts/show_example.py {kit_entry(item)}"
     )
+
+
+# Where the skill's fixed kit shows each kind (create).
+KIT_PARTS = {
+    "object_type": "01", "property": "01", "value_type": "01", "link_type": "02",
+    "dataset": "03", "mapping": "03", "metric": "04", "rule": "04",
+    "material_object": "05", "material_link": "05",
+}
+KIT_VARIANTS = {("metric", "ratio"): "metric-ratio", ("metric", "expression"): "metric-expression",
+                ("dataset", "query"): "query-dataset", ("rule", "derivation"): "derivation"}
+
+
+def kit_entry(item):
+    operation = item.get("operation", "create")
+    if operation == "delete":
+        return "--part edit"
+    if operation == "update":
+        return "--part update"
+    after = item.get("after") if isinstance(item.get("after"), dict) else {}
+    kind = item.get("target_kind")
+    variant = KIT_VARIANTS.get((kind, after.get("kind") or after.get("source_kind") or after.get("rule_kind")))
+    return f"--variant {variant}" if variant else f"--part {KIT_PARTS.get(kind, '01')}"
 
 
 def schema_diagnostic(error, schema, data):
