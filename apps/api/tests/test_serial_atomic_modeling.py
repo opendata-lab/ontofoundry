@@ -9,6 +9,7 @@ from sqlalchemy import select
 from test_instance_store import create_instance
 from test_modeling import ROOT, create_session, save
 from test_proposal_submit import running_submit
+from test_stepwise_modeling import fake_agent  # noqa: F401  (fixture)
 from test_t3_proposal_results import proposals_run, result, some_items, stored
 from test_t4_proposal_decisions import chain, current, decide, seed_batch
 
@@ -35,13 +36,20 @@ def test_revising_a_proposal_to_an_existing_name_is_atomic(client):
         assert db.get(ProposalItemRecord, item["id"]).after_json == item["after"]
 
 
-def test_pending_proposals_block_new_runs(client):
+def test_pending_proposals_do_not_block_new_runs(client, fake_agent):  # noqa: F811 (fixture)
+    """AI-08: the run starts and is pinned to the draft with the pending proposals applied."""
+    from test_stepwise_modeling import send
+
     session = create_session(client)
-    seed_batch(client, session, chain(session))
-    response = client.post(ROOT + f"/sessions/{session['id']}/agent-conversation/messages", json={"content": "继续补充虚构订单"})
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "PENDING_PROPOSALS"
-    assert row(client, session["id"]).revision == session["revision"]
+    batch = seed_batch(client, session, chain(session))
+    uploads, _ = fake_agent
+    manifest = send(client, session["id"])
+    pending_ids = {item["target_id"] for item in batch["items"]}
+    pinned = {e["id"] for collection in ("object_types", "properties", "link_types") for e in manifest["pinned_draft"][collection]}
+    assert pending_ids <= pinned
+    assert {p["target_id"] for p in manifest["pending_proposals"]} == pending_ids
+    context = next(json.loads(body) for path, body in uploads.items() if "ontofoundry-context-" in path)
+    assert {p["target_id"] for p in context["pending_proposals"]} == pending_ids
 
 
 @pytest.mark.parametrize("state,claimed", [(None, False), ("processing", True), ("failed_retriable", True)])

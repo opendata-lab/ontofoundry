@@ -13,6 +13,7 @@ const REVIEW_STATE: Record<ProposalStatus, StatusState> = {
   pending: "pending",
   accepted: "mapped",
   rejected: "unmapped",
+  superseded: "unmapped",
 };
 
 export function ProposalStatusMark({ status }: { status: ProposalStatus }) {

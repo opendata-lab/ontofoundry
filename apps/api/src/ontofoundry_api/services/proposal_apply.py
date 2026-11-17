@@ -254,7 +254,8 @@ def parse_agent(db, settings, session, raw, context):
         problems = getattr(exc, "problems", None) or [(exc.code, str(exc))]
         raise ServiceError(str(exc), code=exc.code, status_code=422,
                            details={"problems": problems}) from exc
-    trial = check_proposal(db, context.workspace_id, session, parsed.items, settings)
+    # Against the draft the run was pinned to, which includes pending proposals.
+    trial = check_proposal(db, context.workspace_id, session, parsed.items, settings, draft=context.draft)
     return ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
 
 

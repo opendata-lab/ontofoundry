@@ -63,7 +63,9 @@ def _counts(items, statuses) -> dict[str, int]:
         ("pending", "accepted", "rejected"), 0
     )
     for item in items:
-        counts[statuses[item.id][0]] += 1
+        status = statuses[item.id][0]
+        if status in counts:  # superseded items are history, not counted for review
+            counts[status] += 1
     return counts
 
 

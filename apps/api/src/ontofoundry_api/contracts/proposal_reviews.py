@@ -3,7 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-ProposalStatus = Literal["pending", "accepted", "rejected"]
+# superseded: replaced by a merged batch (AI-08); kept for history, never decided again.
+ProposalStatus = Literal["pending", "accepted", "rejected", "superseded"]
 
 
 class ProposalBatchSummary(BaseModel):

@@ -299,9 +299,11 @@ async def send_message(
     user: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
     require_edit(db, str(workspace_id), user)
-    from ontofoundry_api.services.session_gate import lock_session, require_draft_edit
+    from ontofoundry_api.services.session_gate import lock_session, require_idle
     item = lock_session(db, workspace_id, session_id)
-    require_draft_edit(db, item)
+    # Pending proposals no longer block a run: the agent sees them and its
+    # result is merged with them on submit (AI-08).
+    require_idle(item)
     _require_configured(request)
 
     # The session's mode is fixed; a message cannot switch it.
@@ -371,8 +373,15 @@ async def send_message(
     }
     proposals = manifest["result_contract"] == "proposals"
     if proposals:
-        # Results are parsed against exactly the draft this run was given.
-        manifest["pinned_draft"] = draft
+        from ontofoundry_api.services.proposals import run_review_context
+
+        # Results are parsed against exactly the draft this run was given: the
+        # session draft with the pending proposals applied, so the agent can
+        # revise them; what is pending and unpublished is listed for review.
+        review = run_review_context(db, item)
+        manifest.update(review)
+        manifest["pinned_draft"] = review.pop("candidate_draft", None) or draft
+        manifest.pop("candidate_draft", None)
         from ontofoundry_api.services.instance_store import baseline
         manifest["instance_baseline"] = baseline(db, workspace_id, session_id)
 
@@ -519,7 +528,7 @@ async def send_message(
 
         proposal_prompt = None
         if proposals:
-            fixed_context = proposal_context(manifest, draft)
+            fixed_context = proposal_context(manifest, manifest["pinned_draft"])
             context_body = encode(fixed_context)
             context = await dataagent.upload(
                 topic_id,
