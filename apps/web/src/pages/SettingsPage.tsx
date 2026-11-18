@@ -57,7 +57,14 @@ export function SettingsPage() {
   const [form] = Form.useForm<InfoValues>();
 
   // Space info form state.
-  const [infoDirty, setInfoDirty] = useState(false);
+  const [infoDirty, setInfoDirtyState] = useState(false);
+  // Read by the workspace sync below without re-running it when dirty flips,
+  // so clearing dirty after a save does not copy back the not-yet-refreshed values.
+  const infoDirtyRef = useRef(false);
+  const setInfoDirty = useCallback((dirty: boolean) => {
+    infoDirtyRef.current = dirty;
+    setInfoDirtyState(dirty);
+  }, []);
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoSaved, setInfoSaved] = useState(false);
 
@@ -77,6 +84,9 @@ export function SettingsPage() {
   const [searchText, setSearchText] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<WorkspaceUserSearchItem[]>([]);
+  const [searchError, setSearchError] = useState("");
+  // Enter belongs to the dropdown while it shows options (it picks the highlighted one).
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [addRole, setAddRole] = useState<WorkspaceRole>("member");
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState("");
@@ -93,10 +103,10 @@ export function SettingsPage() {
 
   // Follow workspace refreshes unless the user has unsaved edits.
   useEffect(() => {
-    if (!infoDirty) {
+    if (!infoDirtyRef.current) {
       form.setFieldsValue({ name: workspace.name, description: workspace.description });
     }
-  }, [form, infoDirty, workspace.name, workspace.description]);
+  }, [form, workspace.name, workspace.description]);
 
   const loadMembers = useCallback(
     () => api.members(workspace.id).then((r) => setMembers(r.items)),
@@ -120,9 +130,15 @@ export function SettingsPage() {
       const seq = ++searchSeq.current;
       try {
         const res = await api.searchWorkspaceUsers(workspace.id, q.trim() || undefined);
-        if (seq === searchSeq.current) setSearchResults(res.items);
-      } catch {
-        if (seq === searchSeq.current) setSearchResults([]);
+        if (seq === searchSeq.current) {
+          setSearchResults(res.items);
+          setSearchError("");
+        }
+      } catch (e) {
+        if (seq === searchSeq.current) {
+          setSearchResults([]);
+          setSearchError(settingsErrorText(e, "搜索用户失败"));
+        }
       }
     },
     [workspace.id],
@@ -168,10 +184,10 @@ export function SettingsPage() {
     setActionError("");
     setSavingInfo(true);
     try {
-      await api.updateWorkspace(workspace.id, {
-        name: values.name.trim(),
-        description: values.description ?? "",
-      });
+      const saved = { name: values.name.trim(), description: values.description ?? "" };
+      await api.updateWorkspace(workspace.id, saved);
+      // Show what was stored until the workspace refresh catches up.
+      form.setFieldsValue(saved);
       setInfoDirty(false);
       setInfoSaved(true);
       refresh();
@@ -201,8 +217,10 @@ export function SettingsPage() {
       void message.success(
         isPublic ? `「${workspace.name}」已设为公开空间` : "已设为私有空间，非成员将无法访问",
       );
+      return true;
     } catch (e) {
       setActionError(settingsErrorText(e, "更新空间公开状态失败"));
+      return false;
     } finally {
       setPublicBusy(false);
     }
@@ -247,6 +265,8 @@ export function SettingsPage() {
     setSearchText("");
     setSelectedUserId(null);
     setSearchResults([]);
+    setSearchError("");
+    setSuggestionsOpen(false);
     setAddRole("member");
     setAddError("");
   };
@@ -461,7 +481,7 @@ export function SettingsPage() {
               <Button
                 type="primary"
                 icon={<Plus size={14} />}
-                disabled={addOpen}
+                disabled={addOpen || loadingMembers || Boolean(membersLoadError)}
                 onClick={() => setAddOpen(true)}
               >
                 添加成员
@@ -470,7 +490,7 @@ export function SettingsPage() {
           >
             <SectionTitle
               title="空间成员"
-              note={loadingMembers ? undefined : `${members.length} 人`}
+              note={loadingMembers || membersLoadError ? undefined : `${members.length} 人`}
             />
           </PanelToolbar>
           {addOpen && (
@@ -483,10 +503,13 @@ export function SettingsPage() {
                   allowClear
                   autoFocus
                   notFoundContent={
-                    searchText.trim() ? (
+                    searchError ? (
+                      <div className="px-2 py-1.5 text-xs text-danger">{searchError}</div>
+                    ) : searchText.trim() ? (
                       <div className="px-2 py-1.5 text-xs text-muted">{USER_NOT_FOUND_TEXT}</div>
                     ) : null
                   }
+                  onOpenChange={setSuggestionsOpen}
                   onFocus={() => void runUserSearch(searchText)}
                   onSearch={(val) => {
                     setSearchText(val);
@@ -509,10 +532,9 @@ export function SettingsPage() {
                     placeholder="按用户名搜索已有用户"
                     prefix={<Search size={14} className="text-muted" />}
                     onPressEnter={(e) => {
-                      if (!selectedUserId) {
-                        e.preventDefault();
-                        void handleAddMember();
-                      }
+                      if (suggestionsOpen && autoOptions.some((o) => !o.disabled)) return;
+                      e.preventDefault();
+                      void handleAddMember();
                     }}
                   />
                 </AutoComplete>
@@ -547,7 +569,9 @@ export function SettingsPage() {
           if (!publicBusy) setPublicConfirmOpen(false);
         }}
         onOk={() => {
-          void updatePublic(true).then(() => setPublicConfirmOpen(false));
+          void updatePublic(true).then((ok) => {
+            if (ok) setPublicConfirmOpen(false);
+          });
         }}
       >
         <p className="m-0 text-sm leading-base text-ink-2">

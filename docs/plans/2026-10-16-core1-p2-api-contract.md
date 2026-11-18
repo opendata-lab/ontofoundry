@@ -327,7 +327,7 @@ type ConversationSnapshot = { messages: Record<string, Json>[]; run: RunRef | nu
 | GET `W/service-tokens` | — | `Items<ServiceToken>` | 管理员；G、Auth |
 | POST `W/service-tokens` | `{name:string;scopes?:Scope[]}` | `{id:UUID;name:string;token:string;scopes:Scope[]}` | 管理员；G、Auth；明文仅此次返回 |
 | DELETE `W/service-tokens/{token_id}` | — | `{ok:true}` | 管理员；G、Auth |
-| GET `/api/v1/system/dataagent-health` | — | `Health` | 2026-11-17 自 `W/settings/dataagent-health` 迁出；需登录会话，失败检查可能以 200 的 ok=false 返回 |
+| GET `/api/v1/system/dataagent-health` | — | `Health` | 2026-11-17 自 `W/settings/dataagent-health` 迁出；仅平台管理员（未登录 401，非管理员 403），失败检查可能以 200 的 ok=false 返回 |
 | GET `W/connections` | — | `Items<Connection>` | G、Auth；连接管理内部字段保留 |
 | POST `W/connections` | `ConnectionCreate` | `Connection`，201 | 管理员；409 同名，422/502 连接失败；不返回密码 |
 | POST `C/test` | — | `{ok:true}` | G、Auth；连接测试 HTTP 错误 |

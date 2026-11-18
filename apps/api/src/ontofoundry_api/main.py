@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -27,7 +27,6 @@ from ontofoundry_api.api import (
     sessions,
     workspaces,
 )
-from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
 from ontofoundry_api.db_models import (
@@ -38,7 +37,6 @@ from ontofoundry_api.db_models import (
 from ontofoundry_api.domain.models import WorkspaceCreate
 from ontofoundry_api.services.auth_config import load_auth_config
 from ontofoundry_api.services.dataagent import DataAgentError
-from ontofoundry_api.services.dataagent_health import dataagent_health
 from ontofoundry_api.services.demo import (
     DEMO_CONNECTION_ID,
     DEMO_TABLE,
@@ -212,18 +210,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"status": "ok", "service": "ontofoundry-api"}
 
-    @app.get("/api/v1/system/dataagent-health", tags=["system"])
-    async def system_dataagent_health(
-        request: Request, user: Principal = Depends(current_principal)
-    ) -> dict:
-        # Deployment diagnostics: any signed-in user may run them; anonymous
-        # callers must not probe internal service addresses or agent ids.
-        return await dataagent_health(request.app.state.settings)
-
-    from ontofoundry_api.api import users
+    from ontofoundry_api.api import system, users
 
     app.include_router(users.router)
     app.include_router(users.me_router)
+    app.include_router(system.router)
     app.include_router(auth.router)
     app.include_router(workspaces.router)
     app.include_router(workspaces.feedback_router)

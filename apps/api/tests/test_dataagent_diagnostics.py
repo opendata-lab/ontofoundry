@@ -232,11 +232,12 @@ def test_workspace_scoped_health_route_is_gone(client):
     assert response.status_code == 404
 
 
-def test_health_requires_login_session_in_login_mode(tmp_path):
+def test_health_requires_a_platform_admin_in_login_mode(tmp_path):
     config = tmp_path / "auth.py"
     config.write_text(
         'ADMIN_USERS = ["fiction-admin"]\n'
-        'LOCAL_USERS = [{"username": "fiction-admin", "password": "fiction-pass"}]\n'
+        'LOCAL_USERS = [{"username": "fiction-admin", "password": "fiction-pass"},'
+        ' {"username": "fiction-viewer", "password": "viewer-pass"}]\n'
     )
     settings = Settings(
         environment="test",
@@ -248,8 +249,19 @@ def test_health_requires_login_session_in_login_mode(tmp_path):
         seed_demo=False,
         session_secret="test-login-secret-with-more-than-32-chars",
     )
+    with TestClient(create_app(settings)) as viewer_client:
+        assert viewer_client.get(HEALTH_PATH).status_code == 401
+        login = viewer_client.post(
+            "/api/v1/auth/login/local",
+            json={"username": "fiction-viewer", "password": "viewer-pass"},
+        )
+        assert login.status_code == 204
+        # A signed-in user who is not a platform admin must not see internal
+        # addresses or agent ids.
+        denied = viewer_client.get(HEALTH_PATH)
+        assert denied.status_code == 403
+        assert "agent_id" not in denied.text
     with TestClient(create_app(settings)) as login_client:
-        assert login_client.get(HEALTH_PATH).status_code == 401
 
         login = login_client.post(
             "/api/v1/auth/login/local",

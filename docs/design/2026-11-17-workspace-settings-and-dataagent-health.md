@@ -14,7 +14,7 @@
 
 | 编号 | 决定 | 说明与来源 | 状态 |
 |---|---|---|---|
-| WS-01 | **DataAgent 连通性移出空间设置** | 删除 `GET /api/v1/workspaces/{workspace_id}/settings/dataagent-health` 与设置页「DataAgent 连通性」区块；改为平台级只读运维接口 `GET /api/v1/system/dataagent-health`（不绑定 `workspace_id`，需登录会话）。属于部署运维诊断，不进入本体模型。 | 2026-11-17 用户确认 |
+| WS-01 | **DataAgent 连通性移出空间设置** | 删除 `GET /api/v1/workspaces/{workspace_id}/settings/dataagent-health` 与设置页「DataAgent 连通性」区块；改为平台级只读运维接口 `GET /api/v1/system/dataagent-health`（不绑定 `workspace_id`，仅平台管理员；2026-11-18 评审由“需登录会话”收紧，见 §3）。属于部署运维诊断，不进入本体模型。 | 2026-11-17 用户确认 |
 | WS-02 | **构建页提示修正** | `BuilderPage.tsx` 在 `!capabilities.agent_configured` 时提示改为“DataAgent 建模服务未配置，请联系部署管理员”，不再引导去空间设置。已配置但连通或 Agent 异常时，发消息仍由对话 BFF 按 [DataAgent 集成设计](2026-09-21-dataagent-conversation-sdk-integration-design.md) §6.9 返回可诊断报错。 | 2026-11-17 用户确认 |
 | WS-03 | **空间设置上下铺满两段式布局** | 取消设置页 `Panel` 的 `max-w-settings` 限制，铺满 `PageBody` 宽度（保留 `--settings-max-width` 供详情弹窗继续引用）。整合为两个全宽 `Panel`：上块「空间信息」（内含 `@container` + `FormRow` 并排「空间名称」与只读「空间标识」、全宽「说明」、表单内「保存空间信息」与「重置」，以及底部分割区「空间公开」开关与确认弹窗）；下块「空间成员」。属于控制台页面排版，不新增本体概念。 | 2026-11-17 用户确认 |
 | WS-04 | **极简成员管理（用户名单列 + 内联渐进添加 + 防护）** | 成员列表精简为 `用户名`、`角色`、`操作` 三列（直接展示唯一 `username`）；点击工具栏「+ 添加成员」在表格上方内联展开极简添加栏（`AutoComplete` 按用户名搜索 + 干净的 `可查看 / 可编辑 / 管理员` 角色下拉，不包含额外描述文字与多余小字提示）；保留行内角色切换（`PATCH /members/{id}`）与 `LAST_ADMIN` 保护；移除接入 `Popconfirm` 二次确认，可见性说明放进 `Panel footer`。 | 2026-11-17 用户确认 |
@@ -23,8 +23,8 @@
 
 ## 3. DataAgent 连通性平台级接口（WS-01）
 
-- **路由**：新增 `GET /api/v1/system/dataagent-health`（`tags=["system"]`），替代并删除 `api/workspaces.py` 的 `GET /api/v1/workspaces/{workspace_id}/settings/dataagent-health`。
-- **鉴权**：要求 `Depends(current_principal)`（`dev` 模式自动生效、`login` 模式需登录会话，未登录返回 401，避免匿名请求探测内部服务地址、`website_id` 与 `agent_id`）。
+- **路由**：新增 `GET /api/v1/system/dataagent-health`（`api/system.py`，`tags=["system"]`），替代并删除 `api/workspaces.py` 的 `GET /api/v1/workspaces/{workspace_id}/settings/dataagent-health`。
+- **鉴权**：仅平台管理员（复用 `api/users.py` 的 `platform_admin`）。未登录返回 401，已登录但非平台管理员返回 403 `PLATFORM_ADMIN_REQUIRED`。理由：检查结果含内部服务地址、`website_id` 与 `agent_id`，且每次调用都会以部署的访问密钥请求 DataAgent；§1 要解决的正是把这些暴露给空间级用户，只要求登录会扩大到所有用户。前端没有调用该接口，收紧不影响界面。`dev` 模式下默认用户 `dev` 是平台管理员。
 - **服务签名**：`services/dataagent_health.py` 的 `dataagent_health(settings: Settings)` 移除 `workspace_id` 参数，固定使用 `session_ref="ontofoundry:system:diagnostics"`；响应体维持 `{"ok": bool, "checks": [{"name", "ok", "message", "hint"}]}`。
 
 ## 4. 空间设置页面设计（WS-03、WS-04）

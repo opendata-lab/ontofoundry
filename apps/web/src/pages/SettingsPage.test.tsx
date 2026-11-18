@@ -169,6 +169,8 @@ describe("空间设置", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("已保存");
     expect(context.refresh).toHaveBeenCalledTimes(1);
     expect(save).toBeDisabled();
+    // The workspace has not been refreshed yet; the saved value must stay.
+    expect(name).toHaveValue("星河零售");
 
     fireEvent.change(screen.getByRole("textbox", { name: "说明" }), { target: { value: "新说明" } });
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -183,6 +185,17 @@ describe("空间设置", () => {
     expect(await screen.findByText("名称已被占用")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存空间信息" })).toBeEnabled();
     expect(screen.getByRole("textbox", { name: "空间名称" })).toHaveValue("重名空间");
+  });
+
+  it("设为公开失败时确认框保持打开", async () => {
+    vi.mocked(api.updateWorkspace).mockRejectedValueOnce(new ApiError("无权修改", 403, "FORBIDDEN"));
+    show();
+    fireEvent.click(await screen.findByRole("switch", { name: "对平台全部登录用户公开" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认公开" }));
+    expect(await screen.findByText("无权修改")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(context.refresh).not.toHaveBeenCalled();
   });
 
   it("复制空间标识", async () => {
@@ -295,6 +308,44 @@ describe("空间设置", () => {
     expect(screen.getByRole("combobox", { name: "搜索已有用户" })).toHaveValue("");
   });
 
+  it("搜索失败时提示失败原因，不说用户不存在", async () => {
+    vi.mocked(api.searchWorkspaceUsers).mockRejectedValue(new ApiError("服务暂不可用", 503, "UNAVAILABLE"));
+    show();
+    await screen.findByText("linxiao");
+    fireEvent.click(screen.getByRole("button", { name: /添加成员/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "搜索已有用户" }), { target: { value: "lisi" } });
+    expect(await screen.findByText("服务暂不可用")).toBeInTheDocument();
+    expect(screen.queryByText("用户不存在，请联系平台管理员在用户管理中创建")).not.toBeInTheDocument();
+  });
+
+  it("下拉显示候选时回车不按半截输入添加，选中后回车添加所选用户", async () => {
+    vi.mocked(api.searchWorkspaceUsers).mockResolvedValue({
+      items: [
+        { id: "u4", username: "chen", display_name: "陈", last_login_at: null },
+        { id: "u5", username: "chenxi", display_name: "陈曦", last_login_at: null },
+      ],
+    });
+    vi.mocked(api.addMember).mockResolvedValue({
+      id: 5, user_id: "u5", username: "chenxi", display_name: "陈曦", role: "member", last_login_at: null,
+    });
+    show();
+    await screen.findByText("linxiao");
+    fireEvent.click(screen.getByRole("button", { name: /添加成员/ }));
+    const search = screen.getByRole("combobox", { name: "搜索已有用户" });
+    fireEvent.change(search, { target: { value: "chen" } });
+    const option = await screen.findByText("chenxi", { selector: ".ant-select-item-option-content span" });
+    // Enter while suggestions are shown belongs to the dropdown: it must not add "chen" from the typed text.
+    fireEvent.keyDown(search, { key: "Enter", code: "Enter", keyCode: 13, which: 13 });
+    fireEvent.keyUp(search, { key: "Enter", code: "Enter", keyCode: 13, which: 13 });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(api.addMember).not.toHaveBeenCalled();
+    fireEvent.click(option);
+    await waitFor(() => expect(search).toHaveValue("chenxi"));
+    fireEvent.keyDown(search, { key: "Enter", code: "Enter", keyCode: 13, which: 13 });
+    fireEvent.keyUp(search, { key: "Enter", code: "Enter", keyCode: 13, which: 13 });
+    await waitFor(() => expect(api.addMember).toHaveBeenCalledWith("w1", { user_id: "u5", role: "member" }));
+  });
+
   it("行内修改角色，LAST_ADMIN 错误浮动提示", async () => {
     vi.mocked(api.updateMemberRole).mockRejectedValueOnce(
       new ApiError("该空间至少需要一名管理员", 409, "LAST_ADMIN"),
@@ -342,6 +393,9 @@ describe("空间设置", () => {
 
     fail(new Error("网络异常"));
     expect(await screen.findByText("网络异常")).toBeInTheDocument();
+    // No member count and no adding against a list that failed to load.
+    expect(screen.queryByText(/ 人$/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /添加成员/ })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     expect(await screen.findByText("linxiao")).toBeInTheDocument();
     expect(api.members).toHaveBeenCalledTimes(2);
