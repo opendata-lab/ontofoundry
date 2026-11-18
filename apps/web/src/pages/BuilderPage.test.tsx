@@ -59,6 +59,7 @@ function session(): ModelingSession {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   context.workspace = workspace({ name: "Test", slug: "test" });
   context.model = {
     session: session(),
@@ -271,7 +272,65 @@ it("opens an expanded plan in the results column and closes back", async () => {
   expect(await screen.findByRole("heading", { name: "星河采购建模计划" })).toBeInTheDocument();
   expect(screen.getByText("供应商")).toBeInTheDocument();
   expect(screen.getAllByText("星河采购建模计划")).toHaveLength(1);
+
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "复制计划" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("# 星河采购建模计划\n\n## 步骤\n1. 新建对象 **供应商**"));
+  } finally {
+    if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+    else delete (navigator as unknown as { clipboard?: unknown }).clipboard;
+  }
+
+  // Opening another plan replaces the panel and resets per-plan copy feedback.
+  const second = new CustomEvent("dataagent-plan-open", {
+    cancelable: true,
+    detail: {
+      title: "星河库存补充计划",
+      body: "## 步骤\n1. 新建对象 **仓库**",
+      markdown: "# 星河库存补充计划\n\n## 步骤\n1. 新建对象 **仓库**",
+      requestId: "plan-2",
+    },
+  });
+  act(() => { el.dispatchEvent(second); });
+  expect(await screen.findByRole("heading", { name: "星河库存补充计划" })).toBeInTheDocument();
+  expect(screen.getByText("仓库")).toBeInTheDocument();
+
+  // Plain-HTTP LAN fallback uses focus({ preventScroll: true }) + execCommand.
+  const originalExecCommand = document.execCommand;
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+  document.execCommand = vi.fn().mockReturnValue(true);
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "复制计划" }));
+    await waitFor(() => expect(document.execCommand).toHaveBeenCalledWith("copy"));
+  } finally {
+    document.execCommand = originalExecCommand;
+    if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+    else delete (navigator as unknown as { clipboard?: unknown }).clipboard;
+  }
+
   fireEvent.click(screen.getByRole("button", { name: "关闭计划" }));
+  expect(screen.queryByRole("heading", { name: "星河库存补充计划" })).toBeNull();
+});
+
+it("does not claim dataagent-plan-open in daily mode where PlanPanel is hidden", async () => {
+  context.model.session = { ...session(), mode: "chat" };
+  const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  const event = new CustomEvent("dataagent-plan-open", {
+    cancelable: true,
+    detail: {
+      title: "星河采购建模计划",
+      body: "## 步骤\n1. 新建对象 **供应商**",
+      markdown: "# 星河采购建模计划\n\n## 步骤\n1. 新建对象 **供应商**",
+      requestId: "plan-1",
+    },
+  });
+  act(() => { el.dispatchEvent(event); });
+  expect(event.defaultPrevented).toBe(false);
   expect(screen.queryByRole("heading", { name: "星河采购建模计划" })).toBeNull();
 });
 
@@ -437,4 +496,38 @@ it.each([
   expect(conversation).toHaveAttribute("disabled");
   expect(conversation).toHaveAttribute("placeholder", "只读模式下不可发送消息");
   expect(conversation.beforeSend?.({ text: "hello" } as never)).toBe(false);
+});
+
+it("renders a splitter separator only in modeling mode and restores valid stored widths", async () => {
+  localStorage.setItem("ontofoundry.builder.results.width", "440");
+  const { container } = renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  await ready();
+  expect(screen.getByRole("separator")).toBeInTheDocument();
+  const panels = container.querySelectorAll<HTMLElement>(".builder-splitter > .ant-splitter-panel");
+  expect(panels).toHaveLength(2);
+  expect(panels[1].style.flexBasis).toBe("440px");
+
+  cleanup();
+  localStorage.setItem("ontofoundry.builder.results.width", "120");
+  const fallback = renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  await ready();
+  expect(fallback.container.querySelectorAll<HTMLElement>(".builder-splitter > .ant-splitter-panel")[1].style.flexBasis).toBe("360px");
+
+  cleanup();
+  context.model.session = { ...session(), mode: "chat" };
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  await ready();
+  expect(screen.queryByRole("separator")).toBeNull();
 });

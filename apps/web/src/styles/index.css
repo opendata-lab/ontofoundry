@@ -26,6 +26,64 @@
   & .ant-form-item-label > label { height: auto; line-height: var(--leading-base); }
 }
 
+/* Builder split between conversation and right results/plan column keeps the canvas gap as drag area. */
+@utility builder-splitter {
+  flex: 1 1 0%;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+
+  & > .ant-splitter-panel {
+    padding: 0;
+    overflow: visible;
+    min-width: 0;
+  }
+
+  & > .ant-splitter-panel:last-of-type:not(:first-child) {
+    flex-shrink: 0;
+    max-width: var(--builder-results-max-width);
+  }
+
+  & > .ant-splitter-bar {
+    width: var(--space-md);
+    background: transparent;
+  }
+
+  & > .ant-splitter-bar .ant-splitter-bar-dragger {
+    width: var(--space-md);
+    height: 100%;
+  }
+
+  & > .ant-splitter-bar .ant-splitter-bar-dragger::before {
+    width: var(--builder-splitter-track-width);
+    height: 100%;
+    background: transparent;
+    border-radius: var(--radius-xs);
+    transition: background var(--dur-micro) var(--ease-out);
+  }
+
+  & > .ant-splitter-bar .ant-splitter-bar-dragger::after {
+    width: var(--builder-splitter-handle-width);
+    height: var(--builder-splitter-handle-height);
+    background: var(--color-rule-strong);
+    border-radius: var(--radius-xs);
+    transition: background var(--dur-micro) var(--ease-out);
+  }
+
+  & > .ant-splitter-bar .ant-splitter-bar-dragger:hover:not(.ant-splitter-bar-dragger-active)::before {
+    background: var(--color-rule);
+  }
+
+  & > .ant-splitter-bar .ant-splitter-bar-dragger:hover:not(.ant-splitter-bar-dragger-active)::after,
+  & > .ant-splitter-bar .ant-splitter-bar-dragger-active::after {
+    background: var(--color-accent);
+  }
+
+  & > .ant-splitter-bar .ant-splitter-bar-dragger-active::before {
+    background: var(--color-accent-soft);
+  }
+}
+
 @layer base {
   html,
   body,

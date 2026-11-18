@@ -113,8 +113,14 @@
   /* U3 existing review overlay and preview bounds. */
   --model-category-min-width: 100px;
   --model-category-max-columns: 4;
-  /* The results column stays narrower than the conversation. */
-  --builder-results-width: clamp(340px, 30%, 480px);
+  /* Builder middle conversation and right results/plan column are split-resized. */
+  --builder-conversation-min-width: 360px;
+  --builder-results-min-width: 340px;
+  --builder-results-default-width: 360px;
+  --builder-results-max-width: 65%;
+  --builder-splitter-track-width: 2px;
+  --builder-splitter-handle-width: 4px;
+  --builder-splitter-handle-height: 28px;
   /* Side padding of the builder conversation; messages keep the SDK's own
      alignment and widths (user right, assistant left). */
   --builder-conversation-padding: 32px;
@@ -162,7 +168,6 @@
   --spacing-review-detail: var(--review-detail-height);
   --spacing-review-evidence: var(--review-evidence-width);
   --spacing-review-filter: var(--review-filter-width);
-  --spacing-builder-results: var(--builder-results-width);
   --spacing-review-graph: var(--review-graph-height);
   --spacing-property-name: 8rem;
   --spacing-property-kind: 7rem;
