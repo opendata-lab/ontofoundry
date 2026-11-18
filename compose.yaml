@@ -30,6 +30,9 @@ services:
       ONTOFOUNDRY_AUTH_CONFIG: /opt/ontofoundry-api/docker/ontofoundry/ontofoundry_config.py
       ONTOFOUNDRY_SESSION_SECRET: ${ONTOFOUNDRY_SESSION_SECRET:-development-only-session-secret-change-me}
       ONTOFOUNDRY_COOKIE_SECURE: ${ONTOFOUNDRY_COOKIE_SECURE:-false}
+      ONTOFOUNDRY_CORS_ORIGINS: ${ONTOFOUNDRY_CORS_ORIGINS:-}
+      ONTOFOUNDRY_PUBLIC_BASE_URL: ${ONTOFOUNDRY_PUBLIC_BASE_URL:-}
+      ONTOFOUNDRY_MCP_TOKEN: ${ONTOFOUNDRY_MCP_TOKEN-ontofoundry-mcp-default-token}
       ONTOFOUNDRY_DATABASE_URL: postgresql+psycopg://ontofoundry:ontofoundry@postgres:5432/ontofoundry
       # Uploaded material and import artifacts are local files; keep them on a
       # named volume so recreating the container does not orphan material rows.

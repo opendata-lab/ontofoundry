@@ -11,7 +11,7 @@
 
 <p>
   <a href="https://github.com/opendata-lab/ontofoundry/actions/workflows/ci.yml"><img src="https://github.com/opendata-lab/ontofoundry/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/opendata-lab/ontofoundry/releases"><img src="https://img.shields.io/github/v/release/opendata-lab/ontofoundry?style=flat-square&color=0061ef" alt="Release" /></a>
+  <a href="https://github.com/opendata-lab/ontofoundry/releases"><img src="https://img.shields.io/github/v/release/opendata-lab/ontofoundry?sort=semver&filter=v*&style=flat-square&color=0061ef" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-156d3b?style=flat-square" alt="License Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/MCP-2026--07--28-716096?style=flat-square" alt="MCP 2026-07-28" />
   <img src="https://img.shields.io/badge/Apache%20Ossie-0.2.0.dev0-94600b?style=flat-square" alt="Apache Ossie" />
@@ -144,7 +144,7 @@ make test   # API pytest + Frontend vitest
 make build  # TypeScript type-check + Vite production build
 ```
 
-Default API tests use an isolated SQLite. For PostgreSQL transaction, migration and concurrency tests, provide an account that can create databases (CREATEDB):
+Default API tests use an isolated SQLite database. For PostgreSQL transaction, migration and concurrency tests, provide an account that can create databases (CREATEDB):
 
 ```sh
 cd apps/api

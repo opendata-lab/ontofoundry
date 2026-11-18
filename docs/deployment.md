@@ -4,12 +4,12 @@
 
 ## 生产配置要求
 
-仓库提供的 Compose 是本地部署参考，已映射认证模式、会话密钥、安全 Cookie、运行环境和示例开关；正式部署需在 `apps/api/.env` 中显式配置这些值，并提供 HTTPS 入口。外置认证路径由 Compose 固定为挂载目录内的基础配置。完整变量见 [`.env.example`](../.env.example) 与 [`config.py`](../apps/api/src/ontofoundry_api/config.py)。
+仓库提供的 Compose 是本地部署参考，已映射认证模式、会话密钥、安全 Cookie、运行环境、示例开关、CORS 源、外部可达基址和单空间 MCP 令牌；正式部署需在 `apps/api/.env`（或离线包 `.env`）中显式配置这些值，并提供 HTTPS 入口。外置认证路径由 Compose 固定为挂载目录内的基础配置。完整变量见 [`.env.example`](../.env.example) 与 [`config.py`](../apps/api/src/ontofoundry_api/config.py)。
 
 - `ONTOFOUNDRY_ENVIRONMENT=production`，`ONTOFOUNDRY_AUTH_MODE=login`，按下节配置本地账号和可选 SSO。
 - 使用至少 32 字符的随机会话密钥（`ONTOFOUNDRY_SESSION_SECRET`），设置 `ONTOFOUNDRY_COOKIE_SECURE=true`、`ONTOFOUNDRY_SEED_DEMO=false`，由 HTTPS 入口提供访问。
 - **修改 `ONTOFOUNDRY_MCP_TOKEN`**：默认值 `ontofoundry-mcp-default-token` 是公开的，启动检查不会拒绝它。正式环境改为至少 24 字符的随机值；不需要单空间 MCP 时显式设为空，外部即无法访问该接口。持有该令牌可按空间管理员身份读取定义、数据绑定和实例。
-- 升级前备份 PostgreSQL、上传材料和连接加密密钥，按 Alembic 迁移链升级数据库。
+- 升级前备份 PostgreSQL 和上传材料，按 Alembic 迁移链升级数据库。
 
 ### 数据连接
 
