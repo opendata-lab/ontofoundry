@@ -5,7 +5,6 @@ import { objectMapping } from "../../src/lib/objectMapping";
 import { documentDisplayText } from "../../src/lib/instanceDisplay";
 import type { CoreDraft } from "../../src/api/core.generated";
 import type {
-  DataAgentHealth,
   DataConnection,
   Comparison,
   Draft,
@@ -224,20 +223,6 @@ const FIXTURE_MEMBERS: Member[] = [
   { id: 2, user_id: "user-visual-member", username: "chenning", display_name: "陈宁", role: "member", last_login_at: "2026-11-12T08:00:00Z" },
 ];
 
-const FIXTURE_HEALTH: DataAgentHealth = {
-  ok: false,
-  checks: [
-    { name: "配置完整性", ok: true, message: "配置完整", hint: "" },
-    { name: "连通性", ok: true, message: "连接成功", hint: "" },
-    {
-      name: "Agent 存在性",
-      ok: false,
-      message: "未找到示例 Agent",
-      hint: "请在 DataAgent 管理端检查示例 Agent 的配置",
-    },
-  ],
-};
-
 const FIXTURE_VERSIONS: VersionSummary[] = [3, 2, 1].map((version) => ({
   workspace_id: WORKSPACE_ID,
   version_id: `ver-visual-demo-${version}`,
@@ -275,7 +260,6 @@ export async function mockMappingsApi(page: Page) {
     [`${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`]: { version: FIXTURE_VERSIONS[0], model: FIXTURE_DRAFT },
     [`${base}/connections`]: { items: FIXTURE_CONNECTIONS },
     [`${base}/members`]: { items: FIXTURE_MEMBERS },
-    [`${base}/settings/dataagent-health`]: FIXTURE_HEALTH,
     [`${base}/versions`]: { items: FIXTURE_VERSIONS },
     [`${base}/connections/conn-visual-retail/schemas`]: { items: ["public", "fiction_archive"] },
     [`${base}/connections/conn-visual-retail/tables`]: { items: [{ name: "parties" }, { name: "daily_sales" }, { name: "fiction_stores" }] },

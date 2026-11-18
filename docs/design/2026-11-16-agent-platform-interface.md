@@ -46,7 +46,7 @@
 | 实例 | `GET /objects…`、`/instances…`、`/sessions/{s}/instances`、`/sessions/{s}/instance-baseline`、`POST /instance-neighborhood` | `api/instances.py` |
 | 数据 | `/connections…`、`/registered-tables`、`POST /datasets/validate`、`/datasets/preview`、`/mapping-preview`、`/metrics/preview` | `api/connections.py`、`assets.py`、`datasets.py`、`metrics.py` |
 | 材料与导入 | `/materials…`、`/imports/{adapter}…` | `api/materials.py`、`imports.py` |
-| 工作空间 | `GET/PATCH ""`、`/overview`、`/capabilities`、`/members…`、`/users/search`、`/feedback`、`/settings/dataagent-health` | `api/workspaces.py`（并入 `settings.py`） |
+| 工作空间 | `GET/PATCH ""`、`/overview`、`/capabilities`、`/members…`、`/users/search`、`/feedback`（原 `/settings/dataagent-health` 已于 2026-11-17 迁出至 `/api/v1/system/dataagent-health`） | `api/workspaces.py`（并入 `settings.py`） |
 
 鉴权：人工端点只接受登录；`POST /sessions/{s}/proposals` 只接受运行凭据，校验凭据中的工作空间、会话与用户编辑权限，保留“当前运行 → 同内容回执 → 活动状态 → 轮次与待审规则”的顺序，运行结束后仍可重取回执（迁自现有提交端点）。
 

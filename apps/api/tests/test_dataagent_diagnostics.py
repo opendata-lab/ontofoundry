@@ -2,9 +2,14 @@ from functools import partial
 
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
+from ontofoundry_api.config import Settings
+from ontofoundry_api.main import create_app
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
+
+HEALTH_PATH = "/api/v1/system/dataagent-health"
 
 
 def _dataagent_client(
@@ -141,15 +146,15 @@ def test_health_checks_agent_profile_public_route_and_reports_all_checks(
     settings.dataagent_base_url = "https://dataagent.example"
     settings.dataagent_access_key = "server-secret"
     requested_paths: list[str] = []
+    seen_session_refs: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requested_paths.append(request.url.path)
+        seen_session_refs.append(request.headers["X-DataAgent-User-Id"])
         return httpx.Response(200, json={"agent_id": settings.dataagent_agent_id})
 
     _dataagent_client(monkeypatch, handler)
-    response = client.get(
-        f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/settings/dataagent-health"
-    )
+    response = client.get(HEALTH_PATH)
 
     assert response.status_code == 200
     assert response.json()["ok"] is True
@@ -161,6 +166,7 @@ def test_health_checks_agent_profile_public_route_and_reports_all_checks(
     ]
     assert all(check["ok"] for check in response.json()["checks"])
     assert requested_paths == [f"/api/v1/dataagent/agents/{settings.dataagent_agent_id}"]
+    assert seen_session_refs == ["ontofoundry:system:diagnostics"]
 
 
 def test_health_reports_missing_agent_without_using_topic_filter(client, monkeypatch):
@@ -175,9 +181,7 @@ def test_health_reports_missing_agent_without_using_topic_filter(client, monkeyp
         return httpx.Response(404, json={"detail": "agent not found"})
 
     _dataagent_client(monkeypatch, handler)
-    response = client.get(
-        f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/settings/dataagent-health"
-    )
+    response = client.get(HEALTH_PATH)
 
     assert response.status_code == 200
     payload = response.json()
@@ -206,3 +210,65 @@ def test_empty_dataagent_base_url_does_not_block_app_or_ontology(client):
     assert response.status_code == 200
     assert response.json()["workspace_id"] == str(DEMO_WORKSPACE_ID)
     assert response.json()["version_id"]
+
+
+def test_health_reports_skipped_checks_when_base_url_missing(client):
+    assert client.app.state.settings.dataagent_base_url == ""
+
+    response = client.get(HEALTH_PATH)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert [check["ok"] for check in payload["checks"]] == [False] * 4
+    assert payload["checks"][0]["message"] == "DataAgent 未配置"
+
+
+def test_workspace_scoped_health_route_is_gone(client):
+    response = client.get(
+        f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/settings/dataagent-health"
+    )
+
+    assert response.status_code == 404
+
+
+def test_health_requires_a_platform_admin_in_login_mode(tmp_path):
+    config = tmp_path / "auth.py"
+    config.write_text(
+        'ADMIN_USERS = ["fiction-admin"]\n'
+        'LOCAL_USERS = [{"username": "fiction-admin", "password": "fiction-pass"},'
+        ' {"username": "fiction-viewer", "password": "viewer-pass"}]\n'
+    )
+    settings = Settings(
+        environment="test",
+        auth_mode="login",
+        auth_config=config,
+        database_url=f"sqlite+pysqlite:///{tmp_path / 'login.db'}",
+        data_dir=tmp_path / "files",
+        auto_create_schema=True,
+        seed_demo=False,
+        session_secret="test-login-secret-with-more-than-32-chars",
+    )
+    with TestClient(create_app(settings)) as viewer_client:
+        assert viewer_client.get(HEALTH_PATH).status_code == 401
+        login = viewer_client.post(
+            "/api/v1/auth/login/local",
+            json={"username": "fiction-viewer", "password": "viewer-pass"},
+        )
+        assert login.status_code == 204
+        # A signed-in user who is not a platform admin must not see internal
+        # addresses or agent ids.
+        denied = viewer_client.get(HEALTH_PATH)
+        assert denied.status_code == 403
+        assert "agent_id" not in denied.text
+    with TestClient(create_app(settings)) as login_client:
+
+        login = login_client.post(
+            "/api/v1/auth/login/local",
+            json={"username": "fiction-admin", "password": "fiction-pass"},
+        )
+        assert login.status_code == 204
+        response = login_client.get(HEALTH_PATH)
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is False

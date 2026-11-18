@@ -210,10 +210,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"status": "ok", "service": "ontofoundry-api"}
 
-    from ontofoundry_api.api import users
+    from ontofoundry_api.api import system, users
 
     app.include_router(users.router)
     app.include_router(users.me_router)
+    app.include_router(system.router)
     app.include_router(auth.router)
     app.include_router(workspaces.router)
     app.include_router(workspaces.feedback_router)
