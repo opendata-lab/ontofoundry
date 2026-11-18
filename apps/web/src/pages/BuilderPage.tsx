@@ -1,6 +1,6 @@
 import { Ban, ChevronDown, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Alert, Button, Checkbox, Dropdown, Popconfirm, Segmented, Splitter, Tooltip, Typography, Upload } from "antd";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { datasetApi, modelingApi } from "../api/client";
 import type { Capabilities, Material, RegisteredTable, SessionMode } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -56,35 +56,120 @@ const MODE_ITEMS = (Object.keys(MODES) as SessionMode[]).map((key) => ({
 
 const RESULTS_WIDTH_KEY = "ontofoundry.builder.results.width";
 
-function readCssToken(name: string, fallback: string): string {
-  if (typeof document === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
+// Split limits come only from tokens.css. Without the stylesheet (unit tests)
+// there is no layout to fit, so nothing is clamped.
+type SplitLayout = {
+  conversationMin: number;
+  resultsMin: number;
+  resultsDefault: number;
+  resultsMaxRatio: number;
+  bar: number;
+};
+
+function readSplitLayout(): SplitLayout | null {
+  if (typeof document === "undefined") return null;
+  const style = getComputedStyle(document.documentElement);
+  const px = (name: string) => {
+    const value = Number.parseFloat(style.getPropertyValue(name));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  };
+  const max = style.getPropertyValue("--builder-results-max-width").trim();
+  const ratio = max.endsWith("%") ? Number.parseFloat(max) / 100 : NaN;
+  const layout = {
+    conversationMin: px("--builder-conversation-min-width"),
+    resultsMin: px("--builder-results-min-width"),
+    resultsDefault: px("--builder-results-default-width"),
+    resultsMaxRatio: Number.isFinite(ratio) && ratio > 0 && ratio <= 1 ? ratio : null,
+    // The splitter bar keeps the canvas gap (styles/index.css).
+    bar: px("--space-md"),
+  };
+  return Object.values(layout).every((value) => value !== null) ? (layout as SplitLayout) : null;
 }
 
-function readPxToken(name: string, fallback: number): number {
-  const raw = Number.parseFloat(readCssToken(name, ""));
-  return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+/** The largest results width the measured area allows, keeping the conversation at its minimum. */
+function resultsMax(layout: SplitLayout, area: number): number {
+  const panels = area - layout.bar;
+  return Math.max(
+    layout.resultsMin,
+    Math.floor(Math.min(area * layout.resultsMaxRatio, panels - layout.conversationMin)),
+  );
 }
 
-function readRatioToken(name: string, fallback: number): number {
-  const value = readCssToken(name, "");
-  if (value.endsWith("%")) {
-    const pct = Number.parseFloat(value);
-    if (Number.isFinite(pct) && pct > 0 && pct <= 100) return pct / 100;
-  }
-  return fallback;
-}
-
-function storedResultsWidth(minWidth: number, defaultWidth: number): number {
+function storedResultsWidth(): number | null {
   try {
-    const stored = localStorage.getItem(RESULTS_WIDTH_KEY);
-    if (stored === null) return defaultWidth;
-    const parsed = Number.parseFloat(stored);
-    return Number.isFinite(parsed) && parsed >= minWidth ? Math.round(parsed) : defaultWidth;
+    const parsed = Number.parseFloat(localStorage.getItem(RESULTS_WIDTH_KEY) ?? "");
+    return Number.isFinite(parsed) ? Math.round(parsed) : null;
   } catch {
-    return defaultWidth;
+    return null;
   }
+}
+
+/**
+ * Conversation beside the results column. The width lives here, so dragging
+ * re-renders only this component: the two columns arrive as elements made by
+ * the page and React skips them while only the width changes.
+ */
+function BuilderSplit({ conversation, results }: { conversation: ReactNode; results: ReactNode }) {
+  const splitLayout = useMemo(readSplitLayout, []);
+  // The user's preferred width; what is shown is clamped to the measured area.
+  const [resultsWidth, setResultsWidth] = useState(storedResultsWidth);
+  const splitAreaRef = useRef<HTMLDivElement>(null);
+  const [splitAreaWidth, setSplitAreaWidth] = useState(0);
+  useEffect(() => {
+    const el = splitAreaRef.current;
+    if (!el) return;
+    const measure = (width: number) => width > 0 && setSplitAreaWidth(width);
+    measure(el.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => measure(entries[0]?.contentRect.width ?? 0));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const resultsLimit = splitLayout && splitAreaWidth > 0 ? resultsMax(splitLayout, splitAreaWidth) : undefined;
+  // Until the area is measured a stored width cannot be trusted (it may come
+  // from a wider screen), so the default is used.
+  const effectiveResultsWidth = !splitLayout
+    ? (resultsWidth ?? undefined)
+    : resultsLimit === undefined
+      ? splitLayout.resultsDefault
+      : Math.min(
+          // A stored width below the minimum is not a valid choice: use the default.
+          resultsWidth !== null && resultsWidth >= splitLayout.resultsMin ? resultsWidth : splitLayout.resultsDefault,
+          resultsLimit,
+        );
+
+  return (
+    <div ref={splitAreaRef} className="flex min-h-0 min-w-0 flex-1">
+      <Splitter
+        className="builder-splitter"
+        onResize={([, next]) => {
+          if (typeof next === "number" && Number.isFinite(next)) setResultsWidth(Math.round(next));
+        }}
+        onResizeEnd={([, next]) => {
+          if (typeof next !== "number" || !Number.isFinite(next)) return;
+          try {
+            localStorage.setItem(RESULTS_WIDTH_KEY, String(Math.round(next)));
+          } catch {
+            // Ignore storage write failures in private mode or constrained quotas.
+          }
+        }}
+      >
+        <Splitter.Panel min={splitLayout?.conversationMin} className="flex min-h-0 min-w-0 flex-col">
+          {conversation}
+        </Splitter.Panel>
+        {results && (
+          <Splitter.Panel
+            size={effectiveResultsWidth}
+            min={splitLayout?.resultsMin}
+            max={resultsLimit}
+            className="flex min-h-0 min-w-0 flex-col"
+          >
+            {results}
+          </Splitter.Panel>
+        )}
+      </Splitter>
+    </div>
+  );
 }
 
 export function BuilderPage() {
@@ -111,34 +196,6 @@ export function BuilderPage() {
   // until it is closed.
   const [openPlan, setOpenPlan] = useState<OpenPlan | null>(null);
   useEffect(() => setOpenPlan(null), [sessionId, mode]);
-  const conversationMinWidth = useMemo(() => readPxToken("--builder-conversation-min-width", 360), []);
-  const resultsMinWidth = useMemo(() => readPxToken("--builder-results-min-width", 340), []);
-  const resultsMaxWidth = useMemo(() => readCssToken("--builder-results-max-width", "65%"), []);
-  const resultsMaxRatio = useMemo(() => readRatioToken("--builder-results-max-width", 0.65), []);
-  const [resultsWidth, setResultsWidth] = useState(() =>
-    storedResultsWidth(resultsMinWidth, readPxToken("--builder-results-default-width", 360)),
-  );
-  const latestResultsWidth = useRef(resultsWidth);
-  const splitAreaRef = useRef<HTMLDivElement>(null);
-  const [splitAreaWidth, setSplitAreaWidth] = useState(0);
-  useEffect(() => {
-    const el = splitAreaRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
-      if (width > 0) setSplitAreaWidth(width);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  const effectiveResultsWidth = useMemo(() => {
-    if (splitAreaWidth <= 0) return resultsWidth;
-    const maxAllowed = Math.max(
-      resultsMinWidth,
-      Math.min(Math.floor(splitAreaWidth * resultsMaxRatio), Math.floor(splitAreaWidth - conversationMinWidth)),
-    );
-    return Math.min(resultsWidth, maxAllowed);
-  }, [conversationMinWidth, resultsMaxRatio, resultsMinWidth, resultsWidth, splitAreaWidth]);
   const conversation = useRef<AgentConversationElement>(null);
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
@@ -564,29 +621,8 @@ export function BuilderPage() {
               </div>
             )}
           </Panel>}
-          <div ref={splitAreaRef} className="flex min-h-0 min-w-0 flex-1">
-            <Splitter
-              className="builder-splitter"
-              onResize={([, next]) => {
-                if (typeof next === "number" && Number.isFinite(next)) {
-                  latestResultsWidth.current = next;
-                  setResultsWidth(next);
-                }
-              }}
-              onResizeEnd={(sizes) => {
-                const next = sizes[1] ?? latestResultsWidth.current;
-                if (typeof next !== "number" || !Number.isFinite(next)) return;
-                const rounded = Math.max(resultsMinWidth, Math.round(next));
-                latestResultsWidth.current = rounded;
-                setResultsWidth(rounded);
-                try {
-                  localStorage.setItem(RESULTS_WIDTH_KEY, String(rounded));
-                } catch {
-                  // Ignore storage write failures in private mode or constrained quotas.
-                }
-              }}
-            >
-              <Splitter.Panel min={conversationMinWidth} className="flex min-h-0 min-w-0 flex-col">
+          <BuilderSplit
+            conversation={
                 <Panel fill className="min-w-0">
                   <PanelToolbar extra={<>
                     <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} presentation="dialog" disabled={busy || uploading} />
@@ -646,21 +682,13 @@ export function BuilderPage() {
                     )}
                   </dataagent-conversation>
                 </Panel>
-              </Splitter.Panel>
-              {mode === "model" && (
-                <Splitter.Panel
-                  size={effectiveResultsWidth}
-                  min={resultsMinWidth}
-                  max={resultsMaxWidth}
-                  className="flex min-h-0 min-w-0 flex-col"
-                >
-                  {openPlan
-                    ? <PlanPanel key={openPlan.requestId ?? openPlan.markdown} plan={openPlan} onClose={() => setOpenPlan(null)} />
-                    : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} canEdit={canEdit} />}
-                </Splitter.Panel>
-              )}
-            </Splitter>
-          </div>
+            }
+            results={mode === "model"
+              ? openPlan
+                ? <PlanPanel key={openPlan.requestId ?? openPlan.markdown} plan={openPlan} onClose={() => setOpenPlan(null)} />
+                : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} canEdit={canEdit} />
+              : null}
+          />
         </div>
       </PageBody>
     </div>

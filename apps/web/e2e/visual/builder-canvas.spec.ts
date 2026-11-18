@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { ELEMENTS, INSTANCE_FACT, INSTANCE_LABEL, INSTANCE_TYPE, mockCanvasApi, REVIEW_SESSION_ID, WORKSPACE_ID } from "./fixtures";
 
+/** Panel sizes come from ratios and sub-pixel layout; a couple of pixels is the same position. */
+function expectNear(actual: number, expected: number) {
+  expect(Math.abs(actual - expected)).toBeLessThanOrEqual(2);
+}
+
+
 const base = `/workspaces/${WORKSPACE_ID}`;
 
 test.beforeEach(async ({ page }) => {
@@ -183,7 +189,7 @@ test("builder opens plan panel when clicking the plan card", async ({ page }) =>
   const separator = page.getByRole("separator");
   await expect(separator).toBeVisible();
   const initialRightBox = (await rightPanel.boundingBox())!;
-  expect(initialRightBox.width).toBeCloseTo(360, 0);
+  expectNear(initialRightBox.width, 360);
 
   const sepBox = (await separator.boundingBox())!;
   const startX = sepBox.x + sepBox.width / 2;
@@ -200,11 +206,11 @@ test("builder opens plan panel when clicking the plan card", async ({ page }) =>
   // Closing back to ModelResults keeps the resized column width, and reloading restores it.
   await page.getByRole("button", { name: "关闭计划", exact: true }).click();
   await expect(page.getByLabel("提案审核面板", { exact: true })).toBeVisible();
-  expect((await rightPanel.boundingBox())!.width).toBeCloseTo(widenedRightBox.width, 0);
+  expectNear((await rightPanel.boundingBox())!.width, widenedRightBox.width);
 
   await page.reload();
   await expect(page.getByLabel("提案审核面板", { exact: true })).toBeVisible();
-  expect((await rightPanel.boundingBox())!.width).toBeCloseTo(widenedRightBox.width, 0);
+  expectNear((await rightPanel.boundingBox())!.width, widenedRightBox.width);
 
   // Dragging beyond bounds clamps without collapsing either panel.
   const afterReloadSep = (await separator.boundingBox())!;
@@ -285,8 +291,8 @@ test("semantic overview aligns resource explorer and fixed canvas", async ({ pag
   await dialog.getByRole("tab", { name: /^字段/ }).click();
   await expect(search).toHaveValue("编号");
   const after = await table.boundingBox();
-  expect(after!.width).toBeCloseTo(before!.width, 0);
-  expect(after!.x).toBeCloseTo(before!.x, 0);
+  expectNear(after!.width, before!.width);
+  expectNear(after!.x, before!.x);
   await dialog.getByRole("button", { name: "展开弹窗", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "还原弹窗", exact: true })).toBeVisible();
   await expect(table).toBeVisible();

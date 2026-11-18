@@ -41,7 +41,6 @@
 
   & > .ant-splitter-panel:last-of-type:not(:first-child) {
     flex-shrink: 0;
-    max-width: var(--builder-results-max-width);
   }
 
   & > .ant-splitter-bar {

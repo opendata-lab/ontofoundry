@@ -499,6 +499,16 @@ it.each([
 });
 
 it("renders a splitter separator only in modeling mode and restores valid stored widths", async () => {
+  // The limits come from tokens.css, which jsdom does not load; set the same tokens here.
+  const tokens = {
+    "--builder-conversation-min-width": "360px",
+    "--builder-results-min-width": "340px",
+    "--builder-results-default-width": "360px",
+    "--builder-results-max-width": "65%",
+    "--space-md": "16px",
+  };
+  for (const [name, value] of Object.entries(tokens)) document.documentElement.style.setProperty(name, value);
+  const measured = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 1200 } as DOMRect);
   localStorage.setItem("ontofoundry.builder.results.width", "440");
   const { container } = renderWithProviders(
     <MemoryRouter>
@@ -530,4 +540,29 @@ it("renders a splitter separator only in modeling mode and restores valid stored
   );
   await ready();
   expect(screen.queryByRole("separator")).toBeNull();
+  measured.mockRestore();
+  for (const name of Object.keys(tokens)) document.documentElement.style.removeProperty(name);
+});
+
+it("clamps a width saved on a wider screen to the measured area", async () => {
+  const tokens = {
+    "--builder-conversation-min-width": "360px",
+    "--builder-results-min-width": "340px",
+    "--builder-results-default-width": "360px",
+    "--builder-results-max-width": "65%",
+    "--space-md": "16px",
+  };
+  for (const [name, value] of Object.entries(tokens)) document.documentElement.style.setProperty(name, value);
+  // 1000px area: 65% is 650, but the conversation keeps 360 and the bar 16, so 624 is the limit.
+  const measured = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 1000 } as DOMRect);
+  localStorage.setItem("ontofoundry.builder.results.width", "1600");
+  const { container } = renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  await ready();
+  expect(container.querySelectorAll<HTMLElement>(".builder-splitter > .ant-splitter-panel")[1].style.flexBasis).toBe("624px");
+  measured.mockRestore();
+  for (const name of Object.keys(tokens)) document.documentElement.style.removeProperty(name);
 });

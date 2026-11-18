@@ -11,17 +11,24 @@ export type OpenPlan = { title: string; body: string; markdown: string; requestI
 export function PlanPanel({ plan, onClose }: { plan: OpenPlan; onClose: () => void }) {
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
   const resetTimer = useRef<number | null>(null);
-  useEffect(() => () => {
-    if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+  // A copy can settle after the panel closed or was replaced by another plan.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+    };
   }, []);
+  const settle = (outcome: "done" | "failed") => {
+    if (!mounted.current) return;
+    setCopied(outcome);
+    if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+    resetTimer.current = window.setTimeout(() => setCopied("idle"), 1500);
+  };
   const copy = () => {
     if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
-    copyText(plan.markdown)
-      .then(() => {
-        setCopied("done");
-        resetTimer.current = window.setTimeout(() => setCopied("idle"), 1500);
-      })
-      .catch(() => setCopied("failed"));
+    copyText(plan.markdown).then(() => settle("done"), () => settle("failed"));
   };
   const fileName = `${plan.title.replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-+|-+$/g, "") || "plan"}.md`;
   return (
