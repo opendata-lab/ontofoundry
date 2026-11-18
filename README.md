@@ -11,7 +11,7 @@
 
 <p>
   <a href="https://github.com/opendata-lab/ontofoundry/actions/workflows/ci.yml"><img src="https://github.com/opendata-lab/ontofoundry/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/opendata-lab/ontofoundry/releases"><img src="https://img.shields.io/badge/release-v0.4.1-0061ef?style=flat-square" alt="Release v0.4.1" /></a>
+  <a href="https://github.com/opendata-lab/ontofoundry/releases"><img src="https://img.shields.io/github/v/release/opendata-lab/ontofoundry?style=flat-square&color=0061ef" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-156d3b?style=flat-square" alt="License Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/MCP-2026--07--28-716096?style=flat-square" alt="MCP 2026-07-28" />
   <img src="https://img.shields.io/badge/Apache%20Ossie-0.2.0.dev0-94600b?style=flat-square" alt="Apache Ossie" />
@@ -114,16 +114,17 @@ make install
 docker compose up -d postgres
 (cd apps/api && uv run --python 3.13 alembic -c src/ontofoundry_api/alembic.ini upgrade head)
 make api-dev     # 后端 :8000
-make web-dev     # 另开终端，前端 :5174（单进程托管可用 make build && make serve）
+make web-dev     # 另开终端，前端 :5174
+# 单进程托管：先停止 make api-dev，再执行 make build && make serve（:8000）
 ```
 
 #### 离线安装包（无外网环境）
 
-从 [GitHub Releases](https://github.com/opendata-lab/ontofoundry/releases) 下载 `ontofoundry-offline.tar.gz`（[`latest`](https://github.com/opendata-lab/ontofoundry/releases/tag/latest) 为 `ontofoundry-offline-latest.tar.gz`）及 `.sha256`，或本地执行 `./scripts/create-offline-package.sh` 打包后安装：
+从 [GitHub Releases](https://github.com/opendata-lab/ontofoundry/releases) 下载安装包及对应的 `.sha256`，或本地执行 `./scripts/create-offline-package.sh` 打包后安装。以下以 [`latest`](https://github.com/opendata-lab/ontofoundry/releases/tag/latest)（main 最新构建）的 `ontofoundry-offline-latest.tar.gz` 为例，固定版本的包名为 `ontofoundry-offline.tar.gz`：
 
 ```sh
-shasum -a 256 -c ontofoundry-offline.tar.gz.sha256
-tar -xzf ontofoundry-offline.tar.gz && cd offline
+shasum -a 256 -c ontofoundry-offline-latest.tar.gz.sha256
+tar -xzf ontofoundry-offline-latest.tar.gz && cd offline
 cp .env.example .env && ./install.sh
 ```
 
@@ -131,7 +132,9 @@ cp .env.example .env && ./install.sh
 
 - 完整环境变量见 [`.env.example`](.env.example) 与 [`config.py`](apps/api/src/ontofoundry_api/config.py)。
 - `ONTOFOUNDRY_ENVIRONMENT=production` 强制要求：`ONTOFOUNDRY_AUTH_MODE=login`、`ONTOFOUNDRY_SEED_DEMO=false`、`ONTOFOUNDRY_COOKIE_SECURE=true`（经 HTTPS 入口访问）、`ONTOFOUNDRY_SESSION_SECRET` ≥ 32 位随机字符。
-- 本地账号覆盖与企业 SSO 钩子模板见 [`deploy/docker/ontofoundry/`](deploy/docker/ontofoundry/)。
+- **必须修改 `ONTOFOUNDRY_MCP_TOKEN`**：默认值 `ontofoundry-mcp-default-token` 是公开的，启动检查不会拒绝它；改为随机值，或显式设为空以关闭单空间 MCP。
+- 业务数据库请使用只读账号：平台的 SQL 白名单是应用层防护，连接密码按原样保存在平台数据库中。
+- 本地账号、SSO 钩子契约、平台管理员与用户名冲突风险，以及版本升级与旧 OAuth 迁移，见 [部署、登录与升级](docs/deployment.md)；配置模板在 [`deploy/docker/ontofoundry/`](deploy/docker/ontofoundry/)。
 
 #### 测试与校验
 
@@ -141,7 +144,13 @@ make test   # API pytest + 前端 vitest
 make build  # TypeScript 检查 + 前端构建
 ```
 
-PostgreSQL 并发与迁移集成测试可指定 `ONTOFOUNDRY_TEST_POSTGRES_URL` 在 `apps/api/` 下运行 `pytest`。
+默认 API 测试使用隔离 SQLite。验证 PostgreSQL 事务、迁移和并发行为时，提供可创建临时数据库（CREATEDB）的 PostgreSQL 账号：
+
+```sh
+cd apps/api
+ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://user:password@127.0.0.1:5432/test_db' \
+  uv run --python 3.13 pytest -q
+```
 
 </details>
 
@@ -182,7 +191,9 @@ PostgreSQL 并发与迁移集成测试可指定 `ONTOFOUNDRY_TEST_POSTGRES_URL` 
 | [`docs/concepts/`](docs/concepts/README.md) | Core-1 概念手册（对象、继承、值类型、关系、指标、规则、时间与快照、查询语义） |
 | [`docs/design/`](docs/design/2026-10-14-core-model-and-format-adapters.md) | 架构与核心设计基线（[Core-1](docs/design/2026-10-14-core-model-and-format-adapters.md) · [Proposal 生命周期](docs/design/2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) · [外部智能体语义层](docs/design/2026-11-11-runtime-agnostic-semantic-layer-for-agents.md)） |
 | [`docs/demo/coffee-channel-sales/`](docs/demo/coffee-channel-sales/README.md) | 精品咖啡渠道销售端到端演示案例（自上而下/自下而上建模 + 问数校验） |
-| [`docs/releases/v0.4.1.md`](docs/releases/v0.4.1.md) | 版本发布日志与升级指南（另有 [`已知问题`](docs/known-issues.md) 与 [`演进规划`](docs/TODO.md)） |
+| [`docs/design/2026-09-01-…-design.md`](docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md) · [`Ossie 覆盖矩阵`](docs/design/2026-10-08-ossie-coverage-matrix.md) | 产品与架构总体设计；Ossie 字段逐项往返覆盖情况 |
+| [`docs/deployment.md`](docs/deployment.md) | 生产配置、平台登录与 SSO、升级与迁移说明 |
+| [`docs/releases/`](docs/releases/) | 版本发布日志（另有 [`已知问题`](docs/known-issues.md) 与 [`演进规划`](docs/TODO.md)） |
 
 ---
 

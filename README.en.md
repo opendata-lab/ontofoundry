@@ -11,7 +11,7 @@
 
 <p>
   <a href="https://github.com/opendata-lab/ontofoundry/actions/workflows/ci.yml"><img src="https://github.com/opendata-lab/ontofoundry/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/opendata-lab/ontofoundry/releases"><img src="https://img.shields.io/badge/release-v0.4.1-0061ef?style=flat-square" alt="Release v0.4.1" /></a>
+  <a href="https://github.com/opendata-lab/ontofoundry/releases"><img src="https://img.shields.io/github/v/release/opendata-lab/ontofoundry?style=flat-square&color=0061ef" alt="Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-156d3b?style=flat-square" alt="License Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/MCP-2026--07--28-716096?style=flat-square" alt="MCP 2026-07-28" />
   <img src="https://img.shields.io/badge/Apache%20Ossie-0.2.0.dev0-94600b?style=flat-square" alt="Apache Ossie" />
@@ -114,16 +114,17 @@ make install
 docker compose up -d postgres
 (cd apps/api && uv run --python 3.13 alembic -c src/ontofoundry_api/alembic.ini upgrade head)
 make api-dev     # Backend :8000
-make web-dev     # Second terminal, Frontend :5174 (or `make build && make serve` on :8000)
+make web-dev     # Second terminal, Frontend :5174
+# Single process: stop make api-dev first, then make build && make serve (:8000)
 ```
 
 #### Offline / Air-Gapped Package
 
-Download `ontofoundry-offline.tar.gz` (or `ontofoundry-offline-latest.tar.gz` for [`latest`](https://github.com/opendata-lab/ontofoundry/releases/tag/latest)) and `.sha256` from [GitHub Releases](https://github.com/opendata-lab/ontofoundry/releases), or build locally with `./scripts/create-offline-package.sh`:
+Download a package and its `.sha256` from [GitHub Releases](https://github.com/opendata-lab/ontofoundry/releases), or build locally with `./scripts/create-offline-package.sh`. The commands below use `ontofoundry-offline-latest.tar.gz` from [`latest`](https://github.com/opendata-lab/ontofoundry/releases/tag/latest) (newest main build); versioned releases name it `ontofoundry-offline.tar.gz`:
 
 ```sh
-shasum -a 256 -c ontofoundry-offline.tar.gz.sha256
-tar -xzf ontofoundry-offline.tar.gz && cd offline
+shasum -a 256 -c ontofoundry-offline-latest.tar.gz.sha256
+tar -xzf ontofoundry-offline-latest.tar.gz && cd offline
 cp .env.example .env && ./install.sh
 ```
 
@@ -131,7 +132,9 @@ cp .env.example .env && ./install.sh
 
 - Full configuration reference: [`.env.example`](.env.example) and [`config.py`](apps/api/src/ontofoundry_api/config.py).
 - `ONTOFOUNDRY_ENVIRONMENT=production` requires `ONTOFOUNDRY_AUTH_MODE=login`, `ONTOFOUNDRY_SEED_DEMO=false`, `ONTOFOUNDRY_COOKIE_SECURE=true` behind HTTPS, and a 32+ character `ONTOFOUNDRY_SESSION_SECRET`.
-- Local user overrides and OAuth/OIDC SSO hook templates live in [`deploy/docker/ontofoundry/`](deploy/docker/ontofoundry/).
+- **Change `ONTOFOUNDRY_MCP_TOKEN`**: the default `ontofoundry-mcp-default-token` is public and startup checks do not reject it. Set a random value, or set it empty to disable the per-workspace MCP endpoint.
+- Use read-only accounts for business databases: the SQL whitelist is an application-level guard, and connection passwords are stored as-is in the platform database.
+- Local users, the SSO hook contract, platform admins and the username-collision risk, plus upgrade and legacy OAuth migration notes: see [docs/deployment.md](docs/deployment.md) (Chinese). Templates live in [`deploy/docker/ontofoundry/`](deploy/docker/ontofoundry/).
 
 #### Tests & Verification
 
@@ -141,7 +144,13 @@ make test   # API pytest + Frontend vitest
 make build  # TypeScript type-check + Vite production build
 ```
 
-Run PostgreSQL transaction and migration tests in `apps/api/` by setting `ONTOFOUNDRY_TEST_POSTGRES_URL`.
+Default API tests use an isolated SQLite. For PostgreSQL transaction, migration and concurrency tests, provide an account that can create databases (CREATEDB):
+
+```sh
+cd apps/api
+ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://user:password@127.0.0.1:5432/test_db' \
+  uv run --python 3.13 pytest -q
+```
 
 </details>
 
@@ -182,7 +191,9 @@ Configure `ONTOFOUNDRY_DATAAGENT_BASE_URL` and `ONTOFOUNDRY_DATAAGENT_AGENT_ID` 
 | [`docs/concepts/`](docs/concepts/README.md) | Core-1 conceptual reference (objects, inheritance, value types, links, metrics, rules, snapshots — Chinese) |
 | [`docs/design/`](docs/design/2026-10-14-core-model-and-format-adapters.md) | Design baselines ([Core-1](docs/design/2026-10-14-core-model-and-format-adapters.md) · [Proposal Lifecycle](docs/design/2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) · [Agent Semantic Layer](docs/design/2026-11-11-runtime-agnostic-semantic-layer-for-agents.md) — Chinese) |
 | [`docs/demo/coffee-channel-sales/`](docs/demo/coffee-channel-sales/README.md) | End-to-end walkthrough: top-down & bottom-up modeling + MCP analytics (Chinese) |
-| [`docs/releases/v0.4.1.md`](docs/releases/v0.4.1.md) | Release notes & upgrade checklists (see also [`Known Issues`](docs/known-issues.md) · [`TODO`](docs/TODO.md)) |
+| [Platform design](docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md) · [Ossie coverage matrix](docs/design/2026-10-08-ossie-coverage-matrix.md) | Overall product & architecture design; field-by-field Ossie round-trip coverage |
+| [`docs/deployment.md`](docs/deployment.md) | Production config, login & SSO, upgrade and migration notes (Chinese) |
+| [`docs/releases/`](docs/releases/) | Release notes (see also [`Known Issues`](docs/known-issues.md) · [`TODO`](docs/TODO.md)) |
 
 ---
 
