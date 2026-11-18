@@ -18,7 +18,9 @@ def _skipped(name: str, reason: str, hint: str) -> dict[str, Any]:
     return _check(name, False, f"未执行：{reason}", hint)
 
 
-async def dataagent_health(settings: Settings, workspace_id: str) -> dict[str, Any]:
+async def dataagent_health(settings: Settings) -> dict[str, Any]:
+    # Deployment-level check: the result depends only on server settings, so no
+    # workspace is involved and the session reference is a fixed system value.
     try:
         require_dataagent_configuration(settings.dataagent_base_url)
     except DataAgentError as exc:
@@ -36,7 +38,7 @@ async def dataagent_health(settings: Settings, workspace_id: str) -> dict[str, A
         prefix=settings.dataagent_api_prefix,
         website_id=settings.dataagent_website_id,
         access_key=settings.dataagent_access_key,
-        session_ref=f"ontofoundry:{workspace_id}:diagnostics",
+        session_ref="ontofoundry:system:diagnostics",
         timeout_seconds=settings.dataagent_request_timeout_seconds,
     )
     try:

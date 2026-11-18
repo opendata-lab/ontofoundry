@@ -271,7 +271,7 @@ export function BuilderPage() {
   // the composer shows its stop button.
   const blockedReason = !canEdit ? ""
     : running ? ""
-    : capabilities && !capabilities.agent_configured ? "请先在空间设置中配置 DataAgent"
+    : capabilities && !capabilities.agent_configured ? "DataAgent 建模服务未配置，请联系部署管理员"
     : resultPending ? "上一轮结果还在处理，请稍候"
     : uploading ? "正在上传材料"
     : busy ? "操作处理中" : "";

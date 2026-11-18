@@ -44,17 +44,16 @@ test("connections show compact rows and preserve the add action", async ({ page 
   await expect(page.getByRole("spinbutton", { name: "端口" })).toHaveValue("5432");
 });
 
-test("settings align forms, member rows and health states", async ({ page }) => {
+test("settings fill the body with info and member panels", async ({ page }) => {
   await page.goto(`/workspaces/${WORKSPACE_ID}/settings`);
   await expect(page.getByRole("heading", { name: "空间设置", exact: true })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "陈宁", exact: true })).toBeVisible();
-  await expect(page.getByText("未找到示例 Agent", { exact: true })).toBeAttached();
+  await expect(page.getByRole("cell", { name: "linxiao （当前用户）", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "chenning", exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader")).toHaveText(["用户名", "角色", "操作"]);
+  await expect(page.getByRole("button", { name: "保存空间信息" })).toBeDisabled();
+  await expect(page.getByText("DataAgent 连通性", { exact: true })).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("settings.png", { fullPage: true });
-
-  await page.getByText("未找到示例 Agent", { exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByText("需处理", { exact: true })).toBeVisible();
-  await expect(page).toHaveScreenshot("settings-health.png", { fullPage: true });
 });
 
 test("directory shows published, unpublished and reader workspaces", async ({ page }) => {

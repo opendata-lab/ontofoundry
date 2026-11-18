@@ -269,7 +269,7 @@ X-DataAgent-Access-Key: {ONTOFOUNDRY_DATAAGENT_ACCESS_KEY}
 | Agent 不存在或不可见 | 502 | DataAgent 上找不到该 Agent | 创建 `agent_id={agent_id}`、安装 `md2ossie` Skill，并确认其可见性允许 Widget 访问 |
 | 访问密钥缺失（本地未配） | 503 | 未配置服务端接入密钥 | 设置 `ONTOFOUNDRY_DATAAGENT_ACCESS_KEY` |
 
-同一组诊断在空间设置页以只读连通性检查呈现（`GET /api/v1/workspaces/{id}/settings/dataagent-health`），Agent 一项用 §6.2 的 `/api/v1/dataagent/agents/{agent_id}` 探测。**设置页不提供密钥写入**——凭据由部署环境注入，不进数据库、不经浏览器。
+同一组诊断最初在空间设置页以只读连通性检查呈现（`GET /api/v1/workspaces/{id}/settings/dataagent-health`），Agent 一项用 §6.2 的 `/api/v1/dataagent/agents/{agent_id}` 探测。**不提供任何密钥写入**——凭据由部署环境注入，不进数据库、不经浏览器。2026-11-17 已确认从空间设置移出，改为平台级只读运维接口 `GET /api/v1/system/dataagent-health`（见[空间设置重整与 DataAgent 连通性归位设计](2026-11-17-workspace-settings-and-dataagent-health.md) WS-01）。
 
 ## 7. 自动建模结果回写（过渡实现，待 Proposal-first 替换）
 

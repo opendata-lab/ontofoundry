@@ -155,6 +155,22 @@ it("lets the agent run while proposals are pending (it revises them)", async () 
   expect(screen.queryByText("请先处理完待审提案，或在提案上修订")).toBeNull();
 });
 
+it("points an unconfigured DataAgent at the deployment admin, not workspace settings", async () => {
+  vi.mocked(modelingApi.capabilities).mockResolvedValueOnce({
+    agent_configured: false,
+    model: "DataAgent",
+    max_file_mb: 256,
+    connections_configured: false,
+    skills: [],
+  });
+  const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  expect(await screen.findByText("DataAgent 建模服务未配置，请联系部署管理员")).toBeInTheDocument();
+  expect(screen.queryByText(/空间设置/)).toBeNull();
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  expect(el.beforeSend!({ content: "建模", settings: {}, attachments: [] })).toBe(false);
+});
+
 it("uploads business knowledge files through Upload.Dragger and switches to the material library", async () => {
   const uploaded: Material = {
     id: "m-new",

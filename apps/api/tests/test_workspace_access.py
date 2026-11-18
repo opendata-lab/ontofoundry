@@ -73,7 +73,7 @@ READS = [
     ("POST", S + "/publish-preview"),
 ]
 MANAGE = [("GET", W + "/feedback"), ("GET", W + "/members"), ("GET", W + "/users/search"),
-          ("GET", W + "/settings/dataagent-health"), ("PATCH", W),
+          ("PATCH", W),
           ("POST", W + "/members"), ("PATCH", W + "/members/{member_id}"),
           ("DELETE", W + "/members/{member_id}")]
 # Writes that stay admin-only as before this change: connection maintenance
@@ -331,13 +331,8 @@ def test_visibility_directory_cache_revocation_and_platform_superuser(matrix):
     assert any(s["id"] == wid for s in client.get("/api/v1/mcp/workspaces").json()["items"])
 
 
-def test_manage_routes_deny_editors_viewers_and_public_readers(matrix, monkeypatch):
+def test_manage_routes_deny_editors_viewers_and_public_readers(matrix):
     data, client = matrix, matrix["client"]
-
-    async def health(*args):
-        return {"status": "ok"}
-
-    monkeypatch.setattr("ontofoundry_api.api.workspaces.dataagent_health", health)
     for role, admin in [(None, False), ("viewer", False), ("member", False), ("admin", False), (None, True)]:
         actor(data, role, admin=admin)
         for method, template in MANAGE:

@@ -18,7 +18,6 @@ from ontofoundry_api.database import get_db
 from ontofoundry_api.domain.models import WorkspaceCreate
 from ontofoundry_api.services import gateway_records, users
 from ontofoundry_api.services.access import require_manage, require_read
-from ontofoundry_api.services.dataagent_health import dataagent_health
 from ontofoundry_api.services.ontology_query import current_version, workspace_overview
 from ontofoundry_api.services.workspaces import (
     create_workspace,
@@ -103,12 +102,6 @@ def overview(
         include_mappings=can_read_mappings(session, workspace_id, principal),
         include_instances=can_read_instances(session, workspace_id, principal),
     )
-
-
-@router.get("/{workspace_id}/settings/dataagent-health")
-async def get_dataagent_health(workspace_id: str, request: Request, db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
-    require_manage(db, workspace_id, user)
-    return await dataagent_health(request.app.state.settings, workspace_id)
 
 
 @router.patch("/{workspace_id}", response_model=WorkspaceItem)
