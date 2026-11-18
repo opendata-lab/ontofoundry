@@ -256,9 +256,19 @@ jobs:
               throw new Error('Missing uploaded artifact ID; refusing cleanup');
             }
             const repo = context.repo;
-            const { data: current } = await github.rest.actions.getArtifact({
-              ...repo, artifact_id: keepId,
-            });
+            // The artifact just uploaded can answer 404 for a few seconds
+            // (seen on main 2026-11-17/18): wait for it before trusting the API.
+            let current;
+            for (let attempt = 1; ; attempt++) {
+              try {
+                ({ data: current } = await github.rest.actions.getArtifact({ ...repo, artifact_id: keepId }));
+                break;
+              } catch (error) {
+                if (error.status !== 404 || attempt >= 6) throw error;
+                core.info(`Uploaded package not visible yet (attempt ${attempt}); retrying`);
+                await new Promise((resolve) => setTimeout(resolve, 5000 * attempt));
+              }
+            }
             if (current.name !== 'ontofoundry-offline' || current.expired) {
               throw new Error('Uploaded package unavailable; refusing cleanup');
             }
