@@ -13,7 +13,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from runpaths import HintParser, command, error, notice, relative, usage
+from runpaths import WORK_FILES, HintParser, command, error, notice, relative, usage
 from table_summary import load_tables, summary_lines
 
 ROOT = Path("modeling")
@@ -49,7 +49,6 @@ PREVIOUS = ROOT / "previous"
 LATEST_CHECK = ROOT / "checks" / "latest-content-check.json"
 # Everything one run's modeling depends on; kept or archived together so a
 # plan or scope file never outlives the fragments it describes.
-WORK_FILES = ("parts", "checks", "plan.md", "notes.md", "entities.json", "issues.json")
 
 
 def run_token(pack):
@@ -128,6 +127,23 @@ def point_plan_at(work_pack):
         plan.write_text(re.sub(r"(?m)^工作包：.*$", lambda _: f"工作包：{work_pack}", text, count=1))
 
 
+def scratch_line():
+    scratch = sorted(p for p in (ROOT / "tmp").iterdir() if p.is_file()) if (ROOT / "tmp").is_dir() else []
+    if not scratch:
+        return ""
+    names = "、".join(p.name for p in scratch[:15]) + (f" 等 {len(scratch)} 个" if len(scratch) > 15 else "")
+    return f"- modeling/tmp/（上一轮从材料整理出的中间结果，先看能否直接用）：{names}"
+
+
+def pending_notes():
+    """Lines of notes.md that say what is still to be written."""
+    try:
+        text = (ROOT / "notes.md").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return [" ".join(line.split())[:200] for line in text.splitlines() if "待补" in line][:3]
+
+
 def resume_summary():
     """What the earlier run left, so the agent can decide without opening files."""
     lines = ["上一轮未入库，基线未变，已保留其成果："]
@@ -144,6 +160,8 @@ def resume_summary():
             lines.append(f"- {relative(part)}：无法读取（按缺失处理）")
     if not parts:
         lines.append("- 片段：无")
+    if line := scratch_line():
+        lines.append(line)
     for name in ("entities.json", "issues.json", "plan.md", "notes.md"):
         if (ROOT / name).is_file():
             extra = ""
@@ -153,6 +171,7 @@ def resume_summary():
                 except (OSError, ValueError, AttributeError):
                     extra = "（无法读取）"
             lines.append(f"- modeling/{name}：有{extra}")
+    lines += ["  · notes 待补：" + line for line in pending_notes()]
     if LATEST_CHECK.is_file():
         try:
             report = json.loads(LATEST_CHECK.read_bytes())
@@ -230,6 +249,11 @@ def main():
                      f"先读 {steps}/resume.md，按用户这条消息决定：修正后提交、补写缺少的部分、按新要求改受影响的部分，或运行 init_workflow.py --restart 从头开始"))
     elif state == "plan_kept":
         steps = relative(Path(__file__).resolve().parents[1] / "references" / "steps")
+        # Not the resume summary: its heading routes to resume.md, and an approved
+        # plan continues to extraction. Only what can save rereading is listed.
+        kept = [line for line in (scratch_line(), "- modeling/entities.json：有" if (ROOT / "entities.json").is_file() else "") if line]
+        if kept:
+            print("\n".join(["上一轮整理的中间结果：", *kept]))
         print(notice("PLAN_KEPT", "上一轮的计划已保留，尚未写片段",
                      f"计划已获批准就读 {steps}/extract.md 接着抽取；用户要调整则改 modeling/plan.md 后重新提交计划"))
     elif archived:

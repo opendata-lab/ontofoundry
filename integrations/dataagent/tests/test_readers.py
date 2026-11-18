@@ -128,17 +128,19 @@ def test_json_outline_real_lines_escaped_pointers_ranges_and_queries(tmp_path):
     assert "数组 40 项" in output and "code:string" in output
     source_lines = text.splitlines()
     first = source_lines.index("    {") + 1
-    assert f"[ref: m1#/items/0 · L{first}–{first + 3}]" in output
+    # Every element is one readable line with its original lines (design T3, T4).
+    assert f"  L{first}–{first + 3} /items/0 code=same" in output
+    assert "/items/39 code=same" in output and "示例" not in output
     output = read(path, "--pointer", "/items/2-4", "--ref", "m1")
     assert (
         "m1#/items/2" in output
         and "m1#/items/4" in output
         and "m1#/items/5" not in output
     )
-    assert "number · 7" not in read(
-        path, "--pointer", "/a~1b/~0"
-    )  # Raw, numbered source value.
-    assert "→7" in read(path, "--pointer", "/a~1b/~0")
+    scalar = read(path, "--pointer", "/a~1b/~0", "--ref", "m1")
+    assert re.search(r"\[ref: m1#/a~1b/~0 · L\d+–\d+\] 7", scalar)  # a scalar in full
+    fields = read(path, "--pointer", "/items/0", "/a~1b", "--ref", "m1")
+    assert "code: same" in fields and "note: 重复" in fields and "~: 7" in fields
     args, seen = [str(path), "--query", "code=same", "--ref", "m1"], []
     while args:
         output = read(Path(args[0]), *args[1:])
@@ -200,7 +202,10 @@ def test_nested_json_outline_zero_values_and_duplicate_key_source_positions(tmp_
     output = read(path, "--outline", "--ref", "m1")
     assert "m1#/data/rows" in output and "数组 1 项" in output
     assert "m1#/same · L3–3" in output
-    assert "number · 0" in output and "boolean · False" in output
+    # Falsy values are shown, not dropped: in the element line and when read by path.
+    assert "/data/rows/0 flag=false" in output
+    unit = read(path, "--pointer", "/data/rows/0", "--ref", "m1")
+    assert "flag: false" in unit and "count: 0" in unit
     assert "m1#/data/rows/0 · L4–4" in read(
         path, "--query", "flag=false", "--ref", "m1"
     )
@@ -216,3 +221,57 @@ def test_wide_csv_outline_has_bounded_continuation(tmp_path):
         seen += re.findall(r"^列 (column_\d+) ·", output, re.M)
         args = next_args(output)
     assert seen == columns
+
+
+def test_nested_lists_are_reachable_and_long_values_point_at_their_full_text(tmp_path):
+    """LM-01: a wrapper array is opened; each element is one line; long values say how to read them."""
+    path = tmp_path / "model.json"
+    long_sql = "SELECT " + ", ".join(f"col_{i}" for i in range(400)) + " FROM fiction_orders"
+    text = json.dumps({"mappings": [{"model": {"datasets": [{"name": f"d{i}", "sql": long_sql} for i in range(3)]}}]},
+                      ensure_ascii=False, indent=2)
+    path.write_text(text)
+    outline = read(path, "--outline", "--ref", "m1")
+    assert all(f"/mappings/0/model/datasets/{i} name=d{i}" in outline for i in range(3))
+    unit = read(path, "--pointer", "/mappings/0/model/datasets/0", "/mappings/0/model/datasets/2", "--ref", "m1")
+    assert "name: d0" in unit and "name: d2" in unit and "全文：" in unit
+    full = re.search(r"全文：(.+?)）", unit).group(1)
+    parts = shlex.split(full)  # python, script, file, args...
+    whole = read(Path(parts[2]), *parts[3:])
+    # A long value comes in numbered pieces, nothing clipped.
+    pieces = re.findall(r"（第 \d+/\d+ 段）(.*)", whole)
+    assert len(pieces) >= 3 and "".join(pieces) == long_sql
+
+
+def test_every_field_survives_paging_and_many_paths_still_fit(tmp_path):
+    """Argon review 2026-11-18: an object's fields are paged, not clipped; ten paths still fit a page."""
+    path = tmp_path / "wide.json"
+    datasets = [{"name": f"dataset_{i}", "note": "虚构说明 " * 60,
+                 "fields": [{"name": f"col_{j}", "expr": "a_long_column_expression_" + str(j)} for j in range(15)]}
+                for i in range(10)]
+    path.write_text(json.dumps({"model": {"datasets": datasets}, "obj": {f"key_{k}": "值" * 120 for k in range(40)}},
+                               ensure_ascii=False, indent=2))
+    args, seen = [str(path), "--pointer", "/obj", "--ref", "m1"], set()
+    while args:
+        output = read(Path(args[0]), *args[1:])
+        seen |= set(re.findall(r"(key_\d+):", output))
+        args = next_args(output)
+    assert seen == {f"key_{k}" for k in range(40)}
+    pointers = [f"/model/datasets/{i}/fields" for i in range(10)]
+    args, pages = [str(path), "--pointer", *pointers, "--ref", "m1"], 0
+    while args:
+        read(Path(args[0]), *args[1:])  # read() asserts each page is within 8000 bytes
+        pages += 1
+        args = next_args(read(Path(args[0]), *args[1:]))
+    assert pages >= 2
+
+
+def test_short_wrapper_lists_are_opened_and_each_element_is_named(tmp_path):
+    path = tmp_path / "scopes.json"
+    path.write_text(json.dumps({
+        "ontology": [{"concept": "order", "relationships": [{"name": "order_id"}]}],
+        "mappings": [{"name": "core", "model": {"datasets": [{"name": "d1", "source": "public.orders"}]}},
+                     {"name": "ext", "model": {"datasets": [{"name": "d3", "source": "public.refunds"}]}}],
+    }, indent=2))
+    outline = read(path, "--outline", "--ref", "m1")
+    assert "/ontology/0 concept=order" in outline
+    assert "/mappings/1/model/datasets/0 name=d3 source=public.refunds" in outline

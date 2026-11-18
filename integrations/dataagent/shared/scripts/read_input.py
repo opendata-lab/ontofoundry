@@ -188,11 +188,13 @@ def paged(units, page, per_page, limit, next_command):
     if page < 1:
         raise ValueError("页码必须从 1 开始")
     pages, current = [], []
+    # Room for the footer and its next-page command, which repeats every argument.
+    reserve = max(600, len(next_command(10**6).encode()) + 120)
     for unit in units:
         unit = clip(unit, min(limit // 2, 2000))
         if current and (
             len(current) >= per_page
-            or len("\n".join([*current, unit]).encode()) > limit - 600
+            or len("\n".join([*current, unit]).encode()) > limit - reserve
         ):
             pages.append(current)
             current = []
@@ -377,16 +379,135 @@ def summary(value):
                     k + ":" + "/".join(sorted({value_type(v[k]) for v in value}))
                     for k in value[0]
                 )
-        if value:
-            sample = value[0]
-            if isinstance(sample, dict):
-                result += "；示例：" + "；".join(
-                    k + "=" + clean(v) for k, v in sample.items()
-                )
-            else:
-                result += "；示例：" + clean(sample)
+        if value and not isinstance(value[0], (dict, list)):
+            result += "；示例：" + clean(value[0])
         return result
     return value_type(value) + " · " + clean(value)
+
+
+# Fields that usually name an element, in the order they are tried.
+NAME_KEYS = ("name", "concept", "id", "key", "title", "label", "type")
+UNIT_LIMIT = 600
+WRAPPER_ITEMS = 3
+
+
+SECOND_KEYS = ("source", "table", "type", "concept", "kind")
+
+
+def _scalar(value):
+    return isinstance(value, (str, int, float)) and not isinstance(value, bool) and str(value).strip()
+
+
+def element_name(value):
+    if isinstance(value, dict):
+        for key in NAME_KEYS:
+            if _scalar(value.get(key)):
+                extra = next((k for k in SECOND_KEYS if k != key and _scalar(value.get(k))), None)
+                text = f"{key}={clip(clean(value[key]), 200)}"
+                return text + (f" {extra}={clip(clean(value[extra]), 200)}" if extra else "")
+        first = next(((k, v) for k, v in value.items() if not isinstance(v, (dict, list))), None)
+        return f"{first[0]}={clip(compact(first[1]), 200)}" if first else "对象；键：" + "、".join(list(value)[:8])
+    return clip(clean(value), 200)
+
+
+def compact(value):
+    """One readable line for a value: nested values flattened, no JSON quoting."""
+    if isinstance(value, dict):
+        return "{" + "；".join(f"{k}={compact(v)}" for k, v in value.items()) + "}"
+    if isinstance(value, list):
+        return "[" + ", ".join(compact(v) for v in value) + "]"
+    return clean(json.dumps(value) if value is None or isinstance(value, bool) else value)
+
+
+class JsonUnits:
+    """Readable units for a JSON source: one line per element or field, each with
+    its original line range, so the agent never reads raw JSON (design T3, T4)."""
+
+    def __init__(self, source, ref, path):
+        self.source, self.ref, self.path = source, ref, path
+
+    def lines(self, pointer):
+        _, start, end = self.source.nodes[pointer]
+        a = bisect.bisect_left(self.source.newlines, start) + 1
+        b = bisect.bisect_left(self.source.newlines, max(start, end - 1)) + 1
+        return f"L{a}" if a == b else f"L{a}–{b}"
+
+    def more(self, pointer):
+        return command("read_input.py", self.path, "--pointer", pointer, "--ref", self.ref)
+
+    def bounded(self, text, pointer):
+        if len(text.encode()) <= UNIT_LIMIT:
+            return text
+        return text.encode()[:UNIT_LIMIT].decode("utf-8", "ignore") + "…（全文：" + self.more(pointer) + "）"
+
+    def child(self, pointer, key):
+        return pointer + "/" + str(key).replace("~", "~0").replace("/", "~1")
+
+    def outline(self):
+        """Every key of objects; every element of arrays as one line; a wrapper
+        array with a single element is opened so nested lists are reachable."""
+        units = []
+
+        def visit(p):
+            value = self.source.nodes[p][0]
+            units.append(self.source.tag(p, self.ref) + " " + clip(summary(value), 1300))
+            if isinstance(value, dict):
+                for key in value:
+                    visit(self.child(p, key))
+            elif isinstance(value, list) and value and isinstance(value[0], (dict, list)):
+                for i, item in enumerate(value):
+                    q = p + "/" + str(i)
+                    units.append(f"  {self.lines(q)} {q} {element_name(item)}")
+                    # A short wrapper list (e.g. mapping scopes) is opened where its
+                    # elements hold further collections; long entity lists are not.
+                    if len(value) <= WRAPPER_ITEMS and isinstance(item, dict):
+                        for key, nested in item.items():
+                            if isinstance(nested, (dict, list)) and nested:
+                                visit(self.child(q, key))
+
+        visit("")
+        return units
+
+    def node(self, p):
+        """A node read by path: fields one per line, array elements one per line,
+        a scalar in full."""
+        value = self.source.nodes[p][0]
+        head = self.source.tag(p, self.ref)
+        if isinstance(value, dict):
+            out = [head + " 对象"]
+            for key, item in value.items():
+                q = self.child(p, key)
+                inline = f"{key}: {compact(item)}"
+                if isinstance(item, (dict, list)) and len(inline.encode()) <= UNIT_LIMIT:
+                    text = inline
+                elif isinstance(item, dict):
+                    text = f"{key}: 对象；键：" + "、".join(item) + f"（路径 {q}）"
+                elif isinstance(item, list) and item and isinstance(item[0], (dict, list)):
+                    text = f"{key}: 数组 {len(item)} 项：" + "；".join(element_name(x) for x in item) + f"（路径 {q}）"
+                else:
+                    text = f"{key}: {compact(item)}"
+                out.append(f"  {self.lines(q)} " + self.bounded(text, q))
+            return out  # one unit per field, so paging never drops fields
+        if isinstance(value, list):
+            out = [head + f" 数组 {len(value)} 项"]
+            for i, item in enumerate(value):
+                q = p + "/" + str(i)
+                out.append(f"  {self.lines(q)} {q} " + self.bounded(compact(item), q))
+            return out
+        text = clean(json.dumps(value) if value is None or isinstance(value, bool) else value)
+        step = 1500
+        if len(text.encode()) <= step:
+            return [head + " " + text]
+        # A long scalar comes in numbered pieces across pages, never clipped;
+        # pieces split between characters so no character is lost.
+        pieces, current = [], ""
+        for char in text:
+            if len((current + char).encode()) > step:
+                pieces.append(current)
+                current = ""
+            current += char
+        pieces.append(current)
+        return [f"{head}（第 {n}/{len(pieces)} 段）{piece}" for n, piece in enumerate(pieces, 1)]
 
 
 def json_view(path, text, ref, outline=False, pointer=None, query=None, page=1):
@@ -413,46 +534,19 @@ def json_view(path, text, ref, outline=False, pointer=None, query=None, page=1):
                 if not isinstance(v, (dict, list))
                 and query.casefold() in (p + " " + str(v)).casefold()
             ]
-    elif pointer is not None:
-        found = source.select(pointer)
+    reader = JsonUnits(source, ref, path)
+    pointers = [pointer] if isinstance(pointer, str) else list(pointer or [])
+    if query is not None:
+        units = [source.tag(p, ref) + " " + clip(summary(source.nodes[p][0]), 1300) for p in found]
+    elif pointers:
+        units = [unit for each in pointers for p in source.select(each) for unit in reader.node(p)]
     else:
-        found = []
-
-        def visit(p):
-            found.append(p)
-            value = source.nodes[p][0]
-            if isinstance(value, dict):
-                for key in value:
-                    visit(p + "/" + key.replace("~", "~0").replace("/", "~1"))
-            elif isinstance(value, list) and value:
-                visit(p + "/0")
-
-        visit("")
-    units = []
-    for p in found:
-        value, start, end = source.nodes[p]
-        if outline or query is not None or pointer is None:
-            units.append(source.tag(p, ref) + " " + clip(summary(value), 1300))
-        else:
-            # Source text retains exact values, indentation and real physical lines.
-            fragment = text[start:end].splitlines()
-            first = bisect.bisect_left(source.newlines, start) + 1
-            chunk = [source.tag(p, ref)]
-            for i, line in enumerate(fragment):
-                numbered = f"{first + i}→{clip(line)}"
-                if (
-                    len("\n".join([*chunk, numbered]).encode()) > 1800
-                    and len(chunk) > 1
-                ):
-                    units.append("\n".join(chunk))
-                    chunk = [source.tag(p, ref)]
-                chunk.append(numbered)
-            units.append("\n".join(chunk))
+        units = reader.outline()
     args = (
         ["--query", query]
         if query is not None
-        else ["--pointer", pointer]
-        if pointer is not None
+        else ["--pointer", *pointers]
+        if pointers
         else ["--outline"]
     )
     return paged(
@@ -589,7 +683,7 @@ def main():
     modes.add_argument("--search-tables", nargs="?", const="")
     modes.add_argument("--describe-tables", "--tables", nargs="+")
     modes.add_argument("--outline", action="store_true")
-    modes.add_argument("--pointer")
+    modes.add_argument("--pointer", nargs="+", help="一个或多个 JSON 路径")
     modes.add_argument("--rows")
     modes.add_argument("--query")
     parser.add_argument("--col-query")

@@ -462,3 +462,53 @@ def test_table_search_matches_any_word_and_ranks_by_matches(tmp_path, monkeypatc
     assert invoke(monkeypatch, read_input, "tables.json", "--search-tables", "需求 阶段 部门 用户 人员") == 0
     out = capsys.readouterr().out
     assert out.index("[ref: t1]") < out.index("[ref: t2]") and "[ref: t3]" not in out
+
+
+def test_what_the_agent_derived_in_tmp_is_kept_listed_and_archived_with_the_run(tmp_path, monkeypatch, capsys):
+    """LM-02: a digest written to modeling/tmp/ survives a timeout and is offered first."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    (tmp_path / "modeling/plan.md").write_text("场景：全量\n")
+    write_json(tmp_path / "modeling/tmp/digest.json", {"concepts": 29})
+    out = _init(tmp_path, monkeypatch, capsys, "second", "first")
+    assert "PLAN_KEPT" in out and "modeling/tmp/" in out and "digest.json" in out
+    # An approved plan goes on to extraction: no resume heading that routes to resume.md.
+    assert "已保留其成果" not in out
+    assert (tmp_path / "modeling/tmp/digest.json").exists()
+    # A run that is not a continuation archives it with the rest.
+    out = _init(tmp_path, monkeypatch, capsys, "other")
+    assert "PREVIOUS_PARTS_MOVED" in out
+    assert (tmp_path / "modeling/previous/second/tmp/digest.json").exists()
+    assert not (tmp_path / "modeling/tmp/digest.json").exists()
+
+
+def test_a_stored_batch_moves_tmp_away_with_the_parts(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    for folder in ("modeling/parts", "modeling/tmp"):
+        (tmp_path / folder).mkdir(parents=True)
+    write_json(tmp_path / "modeling/parts/01-types.json", [])
+    write_json(tmp_path / "modeling/tmp/digest.json", {})
+    prepare.archive_submitted({"run": {"run_token": "done"}})
+    assert (tmp_path / "modeling/submitted/done/tmp/digest.json").exists()
+    assert not (tmp_path / "modeling/tmp/digest.json").exists()
+
+
+def test_resume_shows_what_notes_say_is_still_to_write(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    write_json(tmp_path / "modeling/parts/01-types.json", [{"operation": "create"}])
+    (tmp_path / "modeling/notes.md").write_text("已完成：01–03\n待补：03b、04 的 20 个指标\n")
+    out = _init(tmp_path, monkeypatch, capsys, "second", "first")
+    assert "PREVIOUS_WORK_KEPT" in out and "notes 待补：待补：03b、04 的 20 个指标" in out
+
+
+def test_backup_and_test_tables_are_listed_after_the_real_ones():
+    import table_summary
+
+    tables = [{"key": f"t{i}", "table_name": name, "columns": []} for i, name in enumerate(
+        ["deprecated_orders", "orders_bak", "orders_20250613", "test_orders", "orders", "stores"], 1)]
+    lines = table_summary.summary_lines(tables)
+    order = [line.split()[1] for line in lines]
+    assert order[:2] == ["orders", "stores"] and set(order[2:]) == {"deprecated_orders", "orders_bak", "orders_20250613", "test_orders"}

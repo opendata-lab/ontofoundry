@@ -17,6 +17,10 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 PARTS = Path("modeling/parts")
+# One run's work under modeling/: kept together while it can still be continued,
+# archived together otherwise (init) or once stored (merge). tmp/ holds what the
+# agent derived from the materials, so a continued run need not read them again.
+WORK_FILES = ("parts", "checks", "tmp", "plan.md", "notes.md", "entities.json", "issues.json")
 PY = '"$DATAAGENT_PYTHON_BIN"'
 COLLECTIONS = {
     "object_type": "object_types",
