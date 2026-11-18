@@ -16,7 +16,9 @@ SPLIT = re.compile(r"[/／、]")
 FLAG = re.compile(r"1\s*[:：=]?\s*是.{0,4}0\s*[:：=]?\s*否")
 # A key named "id" says nothing about which table a column points at.
 GENERIC_KEYS = {"id", "code", "no", "key", "uuid"}
-NOISE = re.compile(r"(^|_)(tmp|temp|bak|backup|ods|log|sync)(_|$|\d)", re.IGNORECASE)
+NOISE = re.compile(
+    r"(^|_)(tmp|temp|bak|backup|ods|log|sync|deprecated|test)(_|$|\d)|_\d{6,8}$", re.IGNORECASE
+)
 
 
 def load_tables(path):
@@ -96,6 +98,8 @@ def summary_lines(tables, limit=LIST_LIMIT):
     owners = single_keys(tables)
     by_name = {t.get("table_name"): t["key"] for t in tables}
     lines, size = [], 0
+    # Likely backup, test or obsolete tables go last, so a cut list keeps the real ones.
+    tables = sorted(tables, key=lambda t: bool(NOISE.search(t.get("table_name") or "")))
     for n, table in enumerate(tables):
         line = table_line(table, owners, by_name)
         size += len(line.encode()) + 1

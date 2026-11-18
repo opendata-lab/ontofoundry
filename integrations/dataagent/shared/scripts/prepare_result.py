@@ -11,6 +11,7 @@ from pathlib import Path
 
 from runpaths import (
     PARTS,
+    WORK_FILES,
     HintParser,
     atomic_write,
     command,
@@ -245,7 +246,7 @@ def archive_submitted(pack):
     try:
         # The whole run's work, so the next run starts clean and is not told
         # that "previous work was moved" after a success.
-        for name in ("parts", "checks", "plan.md", "notes.md", "entities.json", "issues.json"):
+        for name in WORK_FILES:
             source = Path("modeling") / name
             if source.is_dir() and any(source.iterdir()):
                 (target / name).mkdir(parents=True, exist_ok=True)

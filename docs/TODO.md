@@ -7,6 +7,10 @@
 - 开工时，中大型变更先按 AGENTS.md 写 `design/` 和 `plans/`，并在这里附链接。
 - 做完后移到文末“已完成”，保留结果链接。
 
+## 建模命令行（确定性生成与本地预检）
+
+现状：有表的实体、属性、映射由 `entities.json` 加 `expand_tables.py` 生成（场景 B 中占 91% 的提案）；查询数据集、指标、规则、特殊关系仍手写提案 JSON，只占 9% 的提案，却占约 30% 的输出，修错和反查 client_ref 又用了 10 个回合。要做：把这部分改为命令或紧凑写法生成，提交前用工作包里的契约、上下文、表清单和材料清单做本地预检（同源，不复制规则）；示例改为按需的 `--help`。先做小步（扩展 `expand_tables.py`、`prepare_result.py` 提交前预检），在场景 B 上对比后再决定是否统一成完整命令行。来源：用户 2026-11-18；可行性评估见 `~/.agents/handoffs/2026-11-18-gemini-modeling-cli/`（不入库），依据 `docs/design/2026-11-18-large-material-modeling.md` §5.1 的运行数据。
+
 已有的专项待办：[Ossie 上游结构跟进](plans/2026-10-20-ossie-upstream-alignment-todo.md)。
 
 ## 本体 MCP
