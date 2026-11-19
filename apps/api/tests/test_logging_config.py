@@ -55,11 +55,15 @@ def test_a_stack_trace_stays_inside_the_line():
 def test_credentials_are_redacted():
     text = redact(
         "Bearer abc.def ofpat.SECRET ofrun.SECRET password=hunter2 "
-        "postgresql+psycopg://user:pw@db:5432/x api_key: k-123"
+        "postgresql+psycopg://user:pw@db:5432/x api_key: k-123 "
+        "access_token=s1 client_secret=s2 {'password': 's3'} Authorization: Basic s4 "
+        "https://mcp.invalid/sse?access_token=s5&x=1"
     )
-    for secret in ("abc.def", "SECRET", "hunter2", ":pw@", "k-123"):
+    for secret in ("abc.def", "SECRET", "hunter2", ":pw@", "k-123", "s1", "s2", "s3", "s4", "s5"):
         assert secret not in text
     assert "user:***@db" in text
+    # Usage counts are not secrets.
+    assert redact("max_tokens=4096") == "max_tokens=4096"
 
 
 def test_long_messages_are_truncated():
@@ -127,3 +131,89 @@ def test_calls_to_dataagent_carry_the_request_id():
         assert client.headers["X-Request-ID"] == "req-42"
     finally:
         request_id_var.reset(token)
+
+
+def _middleware_app():
+    from fastapi import FastAPI
+    from fastapi.responses import StreamingResponse
+
+    from ontofoundry_api.logging_config import RequestContextMiddleware
+
+    app = FastAPI()
+    events: list[str] = []
+
+    @app.get("/boom")
+    async def boom():
+        raise RuntimeError("password=hunter2 exploded")
+
+    @app.get("/stream")
+    async def stream():
+        async def body():
+            events.append("body started")
+            yield b"a"
+            events.append("body finished")
+
+        return StreamingResponse(body())
+
+    app.add_middleware(RequestContextMiddleware, logger=logging.getLogger("ontofoundry_api.request"), skip_path_suffix="/healthz")
+    return app, events
+
+
+def test_an_unhandled_error_keeps_its_request_id():
+    from fastapi.testclient import TestClient
+
+    app, _ = _middleware_app()
+    lines: list[dict] = []
+
+    class Formatted(logging.Handler):
+        # Formatted while the request context is still active, as a real handler is.
+        def emit(self, record):
+            lines.append(json.loads(JsonFormatter().format(record)))
+
+    handler = Formatted()
+    request_logger = logging.getLogger("ontofoundry_api.request")
+    request_logger.addHandler(handler)
+    request_logger.setLevel(logging.INFO)
+    try:
+        response = TestClient(app, raise_server_exceptions=False).get("/boom", headers={"X-Request-ID": "req-500"})
+    finally:
+        request_logger.removeHandler(handler)
+        request_logger.setLevel(logging.NOTSET)
+
+    assert response.status_code == 500
+    assert response.headers["X-Request-ID"] == "req-500"
+    error, done = lines
+    assert (error["message"], error["request_id"]) == ("unhandled error", "req-500")
+    assert "RuntimeError" in error["stack_trace"] and "hunter2" not in error["stack_trace"]
+    assert (done["message"], done["request_id"], done["status_code"]) == ("request completed", "req-500", 500)
+
+
+def test_a_streaming_response_is_logged_when_it_ends(caplog):
+    from fastapi.testclient import TestClient
+
+    app, events = _middleware_app()
+    caplog.set_level(logging.INFO, logger="ontofoundry_api.request")
+
+    class Recorder(logging.Handler):
+        def emit(self, record):
+            if record.getMessage() == "request completed":
+                events.append("completed logged")
+
+    recorder = Recorder()
+    logging.getLogger("ontofoundry_api.request").addHandler(recorder)
+    try:
+        response = TestClient(app).get("/stream")
+    finally:
+        logging.getLogger("ontofoundry_api.request").removeHandler(recorder)
+    assert response.text == "a"
+    assert events == ["body started", "body finished", "completed logged"]
+
+
+def test_cors_allows_and_exposes_the_request_id(client):
+    preflight = client.options(
+        "/api/v1/workspaces",
+        headers={"Origin": "http://localhost:5174", "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "x-request-id"},
+    )
+    assert preflight.status_code == 200
+    response = client.get("/api/v1/workspaces", headers={"Origin": "http://localhost:5174"})
+    assert "x-request-id" in response.headers.get("access-control-expose-headers", "").lower()

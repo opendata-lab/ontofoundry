@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
-import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -38,11 +36,7 @@ from ontofoundry_api.db_models import (
     WorkspaceRecord,
 )
 from ontofoundry_api.domain.models import WorkspaceCreate
-from ontofoundry_api.logging_config import (
-    configure_logging,
-    request_id_var,
-    valid_request_id,
-)
+from ontofoundry_api.logging_config import RequestContextMiddleware, configure_logging
 from ontofoundry_api.services.auth_config import load_auth_config
 from ontofoundry_api.services.dataagent import DataAgentError
 from ontofoundry_api.services.demo import (
@@ -192,34 +186,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "MCP-Protocol-Version",
             "Mcp-Method",
             "Mcp-Name",
+            "X-Request-ID",
         ],
+        expose_headers=["X-Request-ID"],
     )
 
-    # Registered last so it is the outermost middleware: every request, including
-    # ones rejected by the origin check, gets an id and one completion line.
-    @app.middleware("http")
-    async def request_context(request: Request, call_next):
-        request_id = valid_request_id(request.headers.get("x-request-id")) or uuid.uuid4().hex
-        token = request_id_var.set(request_id)
-        started = time.perf_counter()
-        status_code = 500
-        try:
-            response = await call_next(request)
-            status_code = response.status_code
-            response.headers["X-Request-ID"] = request_id
-            return response
-        finally:
-            if request.url.path != "/healthz":
-                request_logger.info(
-                    "request completed",
-                    extra={
-                        "method": request.method,
-                        "path": request.url.path,
-                        "status_code": status_code,
-                        "duration_ms": round((time.perf_counter() - started) * 1000, 1),
-                    },
-                )
-            request_id_var.reset(token)
+    # Added last so it wraps every other middleware: requests rejected by the
+    # origin check are logged too, and unhandled errors keep their request id.
+    app.add_middleware(RequestContextMiddleware, logger=request_logger, skip_path_suffix="/healthz")
 
     @app.exception_handler(SessionRequestError)
     async def session_request_error_handler(_: Request, exc: SessionRequestError) -> JSONResponse:
