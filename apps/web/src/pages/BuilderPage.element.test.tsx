@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { defineAgentConversation, type AgentConversationElement, type ConversationTransport } from "@opendataagent/agent-conversation";
 
 /**
@@ -67,6 +67,10 @@ describe("the conversation element is usable", () => {
         async *streamEvents() {},
       }) satisfies ConversationTransport;
     el.endpoint = "/api/v1/workspaces/w1/sessions/s1/agent-conversation";
+    // The button only shows on a clipped plan, and jsdom has no layout: report
+    // a plan body taller than the card's 240px cap.
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(600);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(240);
     document.body.appendChild(el);
 
     const viewBtn = await new Promise<HTMLElement>((resolve, reject) => {
@@ -100,5 +104,6 @@ describe("the conversation element is usable", () => {
     ]);
 
     el.remove();
+    vi.restoreAllMocks();
   });
 });
