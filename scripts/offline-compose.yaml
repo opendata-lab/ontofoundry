@@ -1,5 +1,15 @@
+# Docker's own log is a short buffer for `docker compose logs`; the history
+# lives in ./logs/<service>/ (one-line JSON, rotated daily, kept 30 days),
+# see docs/design/2026-11-19-logging-standard.md.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
+    logging: *default-logging
     image: postgres:17-alpine
     security_opt:
       - seccomp:unconfined
@@ -18,6 +28,7 @@ services:
       - ontofoundry-postgres:/var/lib/postgresql/data
 
   of-backend:
+    logging: *default-logging
     image: ${OF_BACKEND_IMAGE:-of-backend:local}
     environment:
       ONTOFOUNDRY_ENVIRONMENT: ${ONTOFOUNDRY_ENVIRONMENT:-development}
@@ -30,6 +41,8 @@ services:
       # Uploaded material and import artifacts are local files; keep them on a
       # named volume so recreating the container does not orphan material rows.
       ONTOFOUNDRY_DATA_DIR: /var/lib/ontofoundry/files
+      ONTOFOUNDRY_LOG_DIR: /var/log/of-backend
+      ONTOFOUNDRY_LOG_LEVEL: ${ONTOFOUNDRY_LOG_LEVEL:-INFO}
       ONTOFOUNDRY_CORS_ORIGINS: ${ONTOFOUNDRY_CORS_ORIGINS:-}
       ONTOFOUNDRY_PUBLIC_BASE_URL: ${ONTOFOUNDRY_PUBLIC_BASE_URL:-}
       ONTOFOUNDRY_DATAAGENT_BASE_URL: ${ONTOFOUNDRY_DATAAGENT_BASE_URL:-}
@@ -45,6 +58,7 @@ services:
       - "127.0.0.1:8910:8900"
     volumes:
       - ontofoundry-data:/var/lib/ontofoundry/files
+      - ./logs/of-backend:/var/log/of-backend
       - ./deploy/docker/ontofoundry:/opt/ontofoundry-api/docker/ontofoundry:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/healthz').read()"]
@@ -53,6 +67,7 @@ services:
       retries: 20
 
   of-frontend:
+    logging: *default-logging
     image: ${OF_FRONTEND_IMAGE:-of-frontend:local}
     depends_on:
       of-backend:

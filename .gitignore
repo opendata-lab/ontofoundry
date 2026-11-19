@@ -24,3 +24,6 @@ apps/web/test-results/
 
 # Design prototypes stay local (AGENTS.md)
 docs/design/prototypes/
+
+# Service logs written by the containers (docs/design/2026-11-19-logging-standard.md)
+/logs/

@@ -16,6 +16,8 @@ from typing import Any
 
 import httpx
 
+from ontofoundry_api.logging_config import request_id_var
+
 ACTIVE_TASK_STATUSES = {
     "queued",
     "waiting",
@@ -72,6 +74,10 @@ class DataAgentClient:
         }
         if self.access_key:
             headers["X-DataAgent-Access-Key"] = self.access_key
+        # Carry the caller's id so both services' logs share it.
+        request_id = request_id_var.get()
+        if request_id:
+            headers["X-Request-ID"] = request_id
         return headers
 
     async def _json(

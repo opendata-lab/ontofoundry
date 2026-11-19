@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+import time
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -35,6 +38,11 @@ from ontofoundry_api.db_models import (
     WorkspaceRecord,
 )
 from ontofoundry_api.domain.models import WorkspaceCreate
+from ontofoundry_api.logging_config import (
+    configure_logging,
+    request_id_var,
+    valid_request_id,
+)
 from ontofoundry_api.services.auth_config import load_auth_config
 from ontofoundry_api.services.dataagent import DataAgentError
 from ontofoundry_api.services.demo import (
@@ -54,6 +62,8 @@ from ontofoundry_api.services.workspaces import (
     ensure_dev_user,
     publish_draft,
 )
+
+request_logger = logging.getLogger("ontofoundry_api.request")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -185,6 +195,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ],
     )
 
+    # Registered last so it is the outermost middleware: every request, including
+    # ones rejected by the origin check, gets an id and one completion line.
+    @app.middleware("http")
+    async def request_context(request: Request, call_next):
+        request_id = valid_request_id(request.headers.get("x-request-id")) or uuid.uuid4().hex
+        token = request_id_var.set(request_id)
+        started = time.perf_counter()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            if request.url.path != "/healthz":
+                request_logger.info(
+                    "request completed",
+                    extra={
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status_code": status_code,
+                        "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+                    },
+                )
+            request_id_var.reset(token)
+
     @app.exception_handler(SessionRequestError)
     async def session_request_error_handler(_: Request, exc: SessionRequestError) -> JSONResponse:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -241,4 +277,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+configure_logging(get_settings().log_level, get_settings().log_dir)
 app = create_app()
