@@ -33,13 +33,13 @@
     runtime.log                仅 DataAgent：Pi 运行时与沙箱的诊断
 ```
 
-- 服务名使用 Compose 服务名，例如 `of-backend`、`dataagent-backend`、`opendataworks-backend`。
+- 目录名与日志里的 `service` 字段相同，三个项目不重名：`of-backend`、`dataagent-backend`、`opendataworks-backend`。
 - 应用通过环境变量 `<前缀>_LOG_DIR` 得到目录；未设置时（本地源码运行）只输出到控制台，不写文件。
-- 容器以 root 运行，宿主机上的日志文件属主为 root。
+- 宿主机上的日志文件属主是容器内运行服务的用户：OntoFoundry、OpenDataWorks 为 root，DataAgent 为运行时用户（默认 uid 1000，入口脚本负责建目录并授权）。
 
 ### 轮转与保留
 
-- 应用自己写文件、自己轮转：每天 UTC 零点切分，历史文件 gzip 压缩，保留 30 天，更早的自动删除。
+- 应用自己写文件、自己轮转：每天 UTC 零点切分，历史文件 gzip 压缩，保留 30 天，更早的自动删除。Java（Logback）的滚动策略要求文件名带序号，历史文件名为 `app.log.2026-11-18.0.gz`。
 - 每个日志文件只能有一个进程写入。服务以单进程运行；改为多进程前必须先改为每进程一个文件。
 - 同一行同时写控制台（stdout），`docker logs` 仍可用于实时查看。Docker 自身的日志用 `json-file` 驱动并限额（`max-size: 10m`、`max-file: 3`），只作临时缓冲，不作历史。
 - 数据库、Redis、Nginx 等第三方服务不写 `logs/`，只用上面的 Docker 限额。Nginx 的访问记录已由后端的请求日志覆盖。
