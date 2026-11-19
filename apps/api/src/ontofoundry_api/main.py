@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -35,6 +36,7 @@ from ontofoundry_api.db_models import (
     WorkspaceRecord,
 )
 from ontofoundry_api.domain.models import WorkspaceCreate
+from ontofoundry_api.logging_config import RequestContextMiddleware, configure_logging
 from ontofoundry_api.services.auth_config import load_auth_config
 from ontofoundry_api.services.dataagent import DataAgentError
 from ontofoundry_api.services.demo import (
@@ -54,6 +56,8 @@ from ontofoundry_api.services.workspaces import (
     ensure_dev_user,
     publish_draft,
 )
+
+request_logger = logging.getLogger("ontofoundry_api.request")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -182,8 +186,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "MCP-Protocol-Version",
             "Mcp-Method",
             "Mcp-Name",
+            "X-Request-ID",
         ],
+        expose_headers=["X-Request-ID"],
     )
+
+    # Added last so it wraps every other middleware: requests rejected by the
+    # origin check are logged too, and unhandled errors keep their request id.
+    app.add_middleware(RequestContextMiddleware, logger=request_logger, skip_path_suffix="/healthz")
 
     @app.exception_handler(SessionRequestError)
     async def session_request_error_handler(_: Request, exc: SessionRequestError) -> JSONResponse:
@@ -241,4 +251,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+configure_logging(get_settings().log_level, get_settings().log_dir)
 app = create_app()

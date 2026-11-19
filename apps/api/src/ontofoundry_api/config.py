@@ -21,6 +21,9 @@ class Settings(BaseSettings):
         "postgresql+psycopg://ontofoundry:ontofoundry@127.0.0.1:5432/ontofoundry"
     )
     data_dir: Path = Path("./.data/files")
+    # Unset: console only (source runs). Set in Compose: one-line JSON, rotated daily.
+    log_dir: Path | None = None
+    log_level: str = "INFO"
     web_dist: Path | None = None
     # Test-only escape hatch. Deployed schemas are owned by the unified Alembic chain.
     auto_create_schema: bool = False

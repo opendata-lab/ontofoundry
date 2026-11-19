@@ -15,6 +15,16 @@
 
 数据连接只需填写业务数据库的地址、账号和密码，密码按原样保存在平台数据库中。**业务数据库请使用只读账号**：平台对 SQL 做 sqlglot 解析和白名单检查，但这是应用层防护，不能替代数据库权限。
 
+## 日志
+
+后端日志写在部署目录的 `logs/of-backend/` 下（[日志统一标准](design/2026-11-19-logging-standard.md)）：
+
+- `app.log` 是当前日志，每行一条 JSON，时间为 UTC；每天 UTC 零点轮转为 `app.log.YYYY-MM-DD.gz`，保留 30 天。
+- 每个请求有 `request_id`，响应头 `X-Request-ID` 返回同一个值；调用 DataAgent 时一并传递，可在两边日志中按它查找同一次操作。
+- 实时查看：`tail -f logs/of-backend/app.log` 或 `docker compose logs -f of-backend`。查找历史：`zgrep '"request_id": "<值>"' logs/of-backend/app.log*`。
+- 日志级别由 `ONTOFOUNDRY_LOG_LEVEL` 控制，默认 `INFO`。容器以 root 运行，宿主机上文件属主为 root。
+- 前端和数据库只用 Docker 日志（每个容器最多约 30 MB），不写 `logs/`。
+
 ## 平台登录
 
 Compose 默认使用 `login`（`apps/api/.env` 中显式设置的 `dev` 仍优先），只读挂载 [`deploy/docker/ontofoundry/`](../deploy/docker/ontofoundry/) 并指定基础配置入口。源码运行时，将 `ONTOFOUNDRY_AUTH_MODE` 改为 `login`，保留模板中的配置路径即可。默认本地账号为 `admin`／`admin123`，启动日志会提醒修改默认密码。
