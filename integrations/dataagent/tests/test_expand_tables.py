@@ -307,3 +307,54 @@ def test_links_file_is_written_only_when_the_spec_has_links(tmp_path, monkeypatc
     expand_tables.main()
     assert len(json.loads((tmp_path / "modeling/parts/02-links.json").read_text())) == 5
     assert "02-links.json" in capsys.readouterr().out
+
+
+def snapshot_tables():
+    """Two daily full-state tables keyed by (stat_date, code), as warehouse _df tables are."""
+    def table(key, name, columns, comment):
+        return {"key": key, "kind": "table", "comment": comment, "connection_id": "57c308bc-c544-464b-9d0e-ed56131f1b35",
+                "dialect": "mysql", "schema_name": "xinghe_dw", "table": f"xinghe_dw.{name}", "table_name": name,
+                "foreign_keys": [], "primary_key": ["stat_date", columns[0][0]],
+                "columns": [{"name": "stat_date", "type": "VARCHAR(8)", "value_kind": "string", "comment": "快照日期"},
+                            *({"name": c, "type": "VARCHAR(32)", "value_kind": "string", "comment": t} for c, t in columns)]}
+    return {"t1": table("t1", "dim_store_df", [("store_code", "门店编码"), ("store_name", "门店名称")], "门店每日快照"),
+            "t2": table("t2", "dim_shelf_df", [("shelf_code", "货架编码"), ("store_code", "所属门店")], "货架每日快照")}
+
+
+SNAPSHOT_SPEC = {"items": [
+    {"name": "store", "display_name": "门店", "table": "t1", "snapshot_date_column": "stat_date"},
+    {"name": "shelf", "display_name": "货架", "table": "t2", "snapshot_date_column": "stat_date"}],
+    "links": [{"name": "shelf_store", "from": "shelf", "to": "store", "multiplicity": "many_to_one", "on": "store_code"}]}
+
+
+def test_snapshot_date_goes_to_the_dataset_and_the_rest_of_the_key_identifies():
+    types, datasets, _, links = expand_tables.expand(json.loads(json.dumps(SNAPSHOT_SPEC)), snapshot_tables())
+    store_props = shape(types, "property")
+    assert ("store", "stat_date") not in store_props
+    assert store_props[("store", "store_code")][1:4] == (True, True, True)  # identifier, required, unique
+    dataset = next(d["after"] for d in datasets if d["client_ref"] == "ds_dim_store_df")
+    assert dataset["snapshot_date_column"] == "stat_date"
+    assert shape(datasets, "mapping")["store"][0] == ["store_code"]
+    assert links[0]["after"]["data_join"]["target_property_ids"] == [{"client_ref": "store_store_code"}]
+
+
+def test_without_a_snapshot_column_the_date_stays_in_the_key():
+    spec = json.loads(json.dumps(SNAPSHOT_SPEC))
+    for item in spec["items"]:
+        item.pop("snapshot_date_column")
+    with pytest.raises(expand_tables.SpecError, match="目标端标识有 2 个"):
+        expand_tables.expand(spec, snapshot_tables())
+    spec["items"][0]["exclude_columns"] = ["stat_date"]
+    with pytest.raises(expand_tables.SpecError, match="snapshot_date_column"):
+        expand_tables.expand(spec, snapshot_tables())
+
+
+@pytest.mark.parametrize("change, message", [
+    (lambda s: s["items"][0].update(snapshot_date_column="nope"), "没有的列"),
+    (lambda s: s["items"].append({"name": "store_copy", "display_name": "门店副本", "table": "t1"}), "不一致"),
+])
+def test_snapshot_spec_mistakes_are_reported(change, message):
+    spec = json.loads(json.dumps(SNAPSHOT_SPEC))
+    change(spec)
+    with pytest.raises(expand_tables.SpecError, match=message):
+        expand_tables.expand(spec, snapshot_tables())

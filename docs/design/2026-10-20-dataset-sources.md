@@ -80,7 +80,7 @@ Ossie 的依据是仓库 vendored `core-spec/osi-schema.json`，版本 0.2.0.dev
 | table_name | 非空，且解析为单个物理表/视图标识 | 必须为空 |
 | query_sql | 必须为空 | 非空的一条 SELECT/集合查询，建议输入上限 64 KiB UTF-8，保留原文 |
 | columns | 登记列元数据副本 | 保存/接受时由 LIMIT 0 探测生成的输出列元数据副本 |
-| snapshot_date_column | 可选，必须为输出中的日期类列 | 同左；表示完整结果集的快照，不自动继承任一叶子表快照 |
+| snapshot_date_column | 可选，必须为输出中的日期类列，或可按日期排序的文本/整数列（如 `20261118`） | 同左；表示完整结果集的快照，不自动继承任一叶子表快照 |
 
 JSON Schema 用两个互斥分支（oneOf）表达条件；Pydantic 同步验证互斥、字节长度、列名唯一和快照列引用，前端生成类型能按 source_kind 收窄。不让 table_name 留假表名，或让 query 分支的 schema_name 作为第二个位置来源。dialect 和 columns 在待审阅候选中可以缺失；**就绪的模型写入**必须补齐；“可形成提案”与“可接受进草稿”是两次不同的校验。
 
