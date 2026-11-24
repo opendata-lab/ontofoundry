@@ -827,7 +827,7 @@ OntologyMap 与 semantic_model 只是适配器作用域，不导入连接别名�
 
 #### 派生子概念与成员条件（RT-67）
 
-Ossie derived concept 的成员从父范围导出，`Employee extends Person`、`derived_by: ["EXISTS (Person.earns)"]` 表示有薪酬关系的人。导入按 §3.2 转成 ObjectType.derived_by，不依赖父属性已有物理列绑定；简单条件用 conditions，复杂条件用 expression，保留分支并集、角色与方向，不重复生成普通 Rule。多层每层只保存自己的条件，extends 保持祖先逐级限定。
+Ossie derived concept 的成员从父范围导出，`Employee extends Person`、`derived_by: ["EXISTS (Person.earns)"]` 表示有薪酬关系的人。导入按 §3.2 转成 ObjectType.derived_by，不依赖父属性已有物理列绑定；简单条件用 conditions，复杂条件用 expression，保留分支并集、角色与方向，不重复生成普通 Rule。多层每层只保存自己的条件，extends 保持祖先逐级限定。成员条件可以用任一祖先名称起头（同一实例），例如 `Manager extends Employee` 写 `Person.level = 'M'`，按直接父对象解析；`EXISTS` 的路径终点是属性时表示值存在，转成 `IS NOT NULL` 条件（not_null），终点是关系时仍是关系存在性。属性自身的 `requires` 用值角色名作变量（如 `level_code IN (...)`），与多元角色变量一样绑定到该属性，`referent_mappings.relationship` 可写成 `对象.属性`。
 
 整份成员定义能够完整解析、绑定并等价输出时按 RT-67 converted。引用被裁掉的第二父、未承载关系派生、递归或未定义变量量化等无法闭合时，整项保留原文并 error 待补全，不导入残缺分支，不覆盖已有完整定义。语义已闭合但物理绑定缺失时仅问数未就绪，不把两类缺口混为一谈。
 

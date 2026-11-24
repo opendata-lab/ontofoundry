@@ -29,6 +29,131 @@ TOKEN = re.compile(
 )
 
 
+def _member(t, owner, wanted, reverse=False):
+    obj = t.objects[owner]
+    if reverse:
+        targets = set(DraftIndex(t.model).lineage(obj.id))
+        matches = [
+            item
+            for (_source, original), item in t.members.items()
+            if original == wanted
+            and isinstance(item, LinkType)
+            and item.target_type_id in targets
+        ]
+        return matches[0] if len(matches) == 1 else None
+    for oid in DraftIndex(t.model).lineage(obj.id):
+        source = next(n for n, o in t.objects.items() if o.id == oid)
+        item = t.members.get((source, wanted))
+        if item:
+            return item
+    return None
+
+
+def _source_name(t, type_id):
+    return next(n for n, o in t.objects.items() if o.id == type_id)
+
+
+def _words(text):
+    return [m for m in TOKEN.finditer(text) if m.lastgroup != "space"]
+
+
+def _word(token):
+    return token.group() if token.lastgroup == "word" else None
+
+
+def _splice(text, edits):
+    for start, end, replacement in sorted(edits, reverse=True):
+        text = text[:start] + replacement + text[end:]
+    return text
+
+
+def bind_role_variables(text, variables):
+    """Replace bare role variables (not part of a dotted path or a call)."""
+    tokens = _words(text)
+    edits = []
+    for i, token in enumerate(tokens):
+        if _word(token) not in variables:
+            continue
+        before = tokens[i - 1].group() if i else ""
+        after = tokens[i + 1].group() if i + 1 < len(tokens) else ""
+        if before != "." and after not in {".", "("}:
+            edits.append((token.start(), token.end(), variables[token.group()]))
+    return _splice(text, edits)
+
+
+def attribute_variables(importer, element, raw):
+    # An attribute's value role is the variable its own rules constrain, as
+    # n-ary role names are; bind it to the owner's path before core parsing.
+    owner, name, _path = importer.t.property_sources[element.id]
+    return {
+        role["name"]: f"{owner}.{name}"
+        for role in raw.get("roles", [])
+        if role.get("name") and role.get("concept") != owner
+    }
+
+
+def ancestor_subject(importer, parent_id, text):
+    """A member condition may name any ancestor: it is the same instance."""
+    t = importer.t
+    parent = _source_name(t, parent_id)
+    names = {_source_name(t, oid) for oid in DraftIndex(t.model).lineage(parent_id)}
+    names.discard(parent)
+    tokens = _words(text)
+    edits = [
+        (token.start(), token.end(), parent)
+        for i, token in enumerate(tokens)
+        if _word(token) in names
+        and (i == 0 or tokens[i - 1].group() != ".")
+        and i + 1 < len(tokens)
+        and tokens[i + 1].group() == "."
+    ]
+    return _splice(text, edits)
+
+
+def exists_on_attribute(importer, text):
+    """EXISTS over an attribute path asks whether the value is present."""
+    t = importer.t
+    tokens = _words(text)
+    edits = []
+    for i, token in enumerate(tokens):
+        if (
+            _word(token) is None
+            or token.group().upper() != "EXISTS"
+            or i + 1 >= len(tokens)
+            or tokens[i + 1].group() != "("
+        ):
+            continue
+        j = i + 2
+        names = []
+        while j < len(tokens) and _word(tokens[j]):
+            names.append(tokens[j].group())
+            if j + 1 < len(tokens) and tokens[j + 1].group() == ".":
+                j += 2
+                continue
+            j += 1
+            break
+        if (
+            len(names) < 2
+            or j >= len(tokens)
+            or tokens[j].group() != ")"
+            or names[0] not in t.objects
+        ):
+            continue
+        owner, item = names[0], None
+        for k, wanted in enumerate(names[1:], start=2):
+            item = _member(t, owner, wanted)
+            if k == len(names):
+                break
+            if not isinstance(item, LinkType):
+                item = None
+                break
+            owner = _source_name(t, item.target_type_id)
+        if isinstance(item, Property):
+            path = text[tokens[i + 2].start() : tokens[j - 1].end()]
+            edits.append((token.start(), tokens[j].end(), f"({path} IS NOT NULL)"))
+    return _splice(text, edits)
+
+
 def rewrite_expression(importer, text):
     # Rewrite only identifier tokens in resolved-looking ontology paths. The core
     # parser remains authoritative for semantics and unsupported role syntax.
@@ -44,23 +169,7 @@ def rewrite_expression(importer, text):
         )
 
     def member(owner, wanted, reverse=False):
-        obj = t.objects[owner]
-        if reverse:
-            targets = set(DraftIndex(t.model).lineage(obj.id))
-            matches = [
-                item
-                for (_source, original), item in t.members.items()
-                if original == wanted
-                and isinstance(item, LinkType)
-                and item.target_type_id in targets
-            ]
-            return matches[0] if len(matches) == 1 else None
-        for oid in DraftIndex(t.model).lineage(obj.id):
-            source = next(n for n, o in t.objects.items() if o.id == oid)
-            item = t.members.get((source, wanted))
-            if item:
-                return item
-        return None
+        return _member(t, owner, wanted, reverse)
 
     i = 0
     while i < len(tokens):
@@ -268,7 +377,14 @@ def import_rules(importer):
             try:
                 branches = [
                     membership_branch(
-                        t.model, obj.extends, rewrite_expression(importer, text)
+                        t.model,
+                        obj.extends,
+                        rewrite_expression(
+                            importer,
+                            exists_on_attribute(
+                                importer, ancestor_subject(importer, obj.extends, text)
+                            ),
+                        ),
                     )
                     for text in derived
                 ]
@@ -330,6 +446,10 @@ def import_rules(importer):
     for element, raw, path, key in importer.origins:
         for field, kind in [("requires", "constraint"), ("derived_by", "derivation")]:
             for i, text in enumerate(raw.get(field, [])):
+                if isinstance(element, Property):
+                    text = bind_role_variables(
+                        text, attribute_variables(importer, element, raw)
+                    )
                 try:
                     translated = reified_expression(importer, element, text)
                 except (ValueError, SqlglotError) as error:

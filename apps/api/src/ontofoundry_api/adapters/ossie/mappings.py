@@ -312,8 +312,15 @@ def import_datasets(importer, scope, used):
 def property_for(importer, owner, name):
     t = importer.t
     obj = t.objects[owner]
-    for oid in DraftIndex(t.model).lineage(obj.id):
-        original = next(n for n, o in t.objects.items() if o.id == oid)
+    lineage = [
+        next(n for n, o in t.objects.items() if o.id == oid)
+        for oid in DraftIndex(t.model).lineage(obj.id)
+    ]
+    # Ossie may qualify the member with its owner, e.g. "library.version".
+    prefix, dot, rest = name.partition(".")
+    if dot and prefix in lineage:
+        name = rest
+    for original in lineage:
         prop = t.members.get((original, name))
         if prop:
             return prop
