@@ -494,3 +494,28 @@ def test_computed_property_keeps_algorithm_and_resolved_physical_columns():
 
     assert formulas(model)
     assert formulas(model) == formulas(restored.model)
+
+
+def test_expanded_relationship_identifier_exports_flat_and_reads_back():
+    # Design 2026-11-24 RI-05: the flat form is exported as is, not rebuilt.
+    from test_core1_ossie_import import (
+        BIN_CODE,
+        ZONE_REF,
+        bins_mapping,
+        document,
+        run,
+        storage,
+    )
+
+    imported = run(document(*storage(), ontology_mappings=[bins_mapping([ZONE_REF, BIN_CODE])]))
+    result, restored = roundtrip(imported.model)
+    names = {
+        o.name: sorted(p.name for p in restored.model.properties if p.owner_type_id == o.id and p.identifier)
+        for o in restored.model.object_types
+    }
+    assert names["bin"] == ["bin_code", "zone_warehouse_code", "zone_zone_code"]
+    assert names["zone"] == ["warehouse_code", "zone_code"]
+    # Only bin has data, so the joins cannot be written as physical links.
+    assert [i.message for i in result.report.issues if i.rule_id == "RT-53"] == [
+        "关系端点属性没有直接列映射，导出只保留普通关系"
+    ] * 2

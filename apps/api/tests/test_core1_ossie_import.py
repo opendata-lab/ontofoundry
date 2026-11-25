@@ -141,6 +141,196 @@ def test_relationship_identifier_does_not_shrink_to_an_attribute():
     assert issues(result, "RT-32", "dropped")
 
 
+def storage(*, zone_link="ManyToOne"):
+    return [
+        entity("warehouse", identify_by=["code"], relationships=[rel("code", "String")]),
+        entity(
+            "zone",
+            identify_by=["warehouse", "zone_code"],
+            relationships=[
+                rel("warehouse", "warehouse", source="zone", multiplicity=zone_link),
+                rel("zone_code", "String", source="zone"),
+            ],
+        ),
+        entity(
+            "bin",
+            identify_by=["zone", "bin_code"],
+            relationships=[
+                rel("zone", "zone", source="bin", multiplicity="ManyToOne"),
+                rel("bin_code", "String", source="bin"),
+            ],
+        ),
+    ]
+
+
+def identifier_names(result, name):
+    obj = next(o for o in result.model.object_types if o.name == name)
+    return sorted(p.name for p in DraftIndex(result.model).identifier(obj.id))
+
+
+def test_relationship_identifier_expands_to_the_parent_key_level_by_level():
+    result = run(document(*storage()))
+    assert identifier_names(result, "zone") == ["warehouse_code", "zone_code"]
+    assert identifier_names(result, "bin") == [
+        "bin_code",
+        "zone_warehouse_code",
+        "zone_zone_code",
+    ]
+    props = {p.id: p for p in result.model.properties}
+    generated = [p for p in props.values() if p.name.startswith(("warehouse_", "zone_w", "zone_z"))]
+    assert generated and all(p.required for p in generated)
+    zone_link = next(link for link in result.model.link_types if link.name == "zone")
+    pairs = zip(
+        zone_link.data_join.source_property_ids,
+        zone_link.data_join.target_property_ids,
+        strict=True,
+    )
+    assert sorted((props[s].name, props[t].name) for s, t in pairs) == [
+        ("zone_warehouse_code", "warehouse_code"),
+        ("zone_zone_code", "zone_code"),
+    ]
+    assert len(issues(result, "RT-32", "converted")) == 2
+    assert "不保证上级对象一定存在" in issues(result, "RT-32", "converted")[0].message
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["many_to_many", "one_to_one_composite", "no_target_key", "cycle", "ancestor_link"],
+)
+def test_relationship_identifier_falls_back_to_whole_group_drop(change):
+    data = document(*storage())
+    zone, bin_ = data["ontology"][1], data["ontology"][2]
+    if change == "many_to_many":
+        del bin_["relationships"][0]["multiplicity"]
+    elif change == "one_to_one_composite":
+        bin_["relationships"][0]["multiplicity"] = "OneToOne"
+    elif change == "no_target_key":
+        del zone["identify_by"]
+    elif change == "cycle":
+        zone["identify_by"] = ["bin_ref"]
+        zone["relationships"].append(rel("bin_ref", "bin", source="zone", multiplicity="ManyToOne"))
+    else:
+        data["ontology"].append(entity("rack", extends=["bin"], identify_by=["zone", "bin_code"]))
+        data["ontology"][2].pop("identify_by")
+    result = run(data)
+    target = "rack" if change == "ancestor_link" else "bin"
+    assert identifier_names(result, target) == []
+    assert issues(result, "RT-32", "dropped")
+
+
+def test_one_to_one_identifying_link_to_a_single_key_stays_unique():
+    data = document(
+        entity("warehouse", identify_by=["code"], relationships=[rel("code", "String")]),
+        entity(
+            "dock",
+            identify_by=["warehouse"],
+            relationships=[rel("warehouse", "warehouse", source="dock", multiplicity="OneToOne")],
+        ),
+    )
+    result = run(data)
+    [key] = [p for p in result.model.properties if p.name == "warehouse_code"]
+    assert key.identifier and key.unique and key.required
+
+
+def bins_mapping(refs, *, link_children=()):
+    bins = dataset(
+        "bins",
+        fields=[field("wh"), field("zc"), field("bc")],
+        primary_key=["wh", "zc", "bc"],
+    )
+    concept = {"concept": "bin", "object_mappings": [{"referent_mappings": refs}]}
+    if link_children:
+        concept["link_mappings"] = [
+            {"object_mapping": {"referent_mappings": refs}, "children": list(link_children)}
+        ]
+    return ontology_map([bins], concepts=[concept])
+
+
+ZONE_REF = {
+    "relationship": "bin.zone",
+    "referent_mappings": [
+        {
+            "relationship": "zone.warehouse",
+            "referent_mappings": [{"relationship": "warehouse.code", "expression": "bins.wh"}],
+        },
+        {"relationship": "zone.zone_code", "expression": "bins.zc"},
+    ],
+}
+BIN_CODE = {"relationship": "bin_code", "expression": "bins.bc"}
+
+
+def bin_fields(result):
+    obj = next(o for o in result.model.object_types if o.name == "bin")
+    mapping = next(m for m in result.model.mappings if m.type_id == obj.id)
+    return {name: f.column for name, f in mapping.fields.items()}
+
+
+def test_nested_referent_mappings_bind_each_expanded_key_to_its_column():
+    result = run(document(*storage(), ontology_mappings=[bins_mapping([ZONE_REF, BIN_CODE])]))
+    assert bin_fields(result) == {
+        "zone_warehouse_code": "wh",
+        "zone_zone_code": "zc",
+        "bin_code": "bc",
+    }
+    # Compatibility shorthand: a single-value parent key written as a value.
+    shorthand = copy.deepcopy(ZONE_REF)
+    shorthand["referent_mappings"][0] = {"relationship": "zone.warehouse", "expression": "bins.wh"}
+    result = run(document(*storage(), ontology_mappings=[bins_mapping([shorthand, BIN_CODE])]))
+    assert bin_fields(result)["zone_warehouse_code"] == "wh"
+
+
+@pytest.mark.parametrize("change", ["composite_shorthand", "missing_member", "duplicate"])
+def test_nested_referent_mappings_that_do_not_match_member_by_member_are_dropped(change):
+    refs = [copy.deepcopy(ZONE_REF), BIN_CODE]
+    if change == "composite_shorthand":
+        refs[0] = {"relationship": "zone", "expression": "bins.zc"}
+    elif change == "missing_member":
+        refs[0]["referent_mappings"].pop()
+    else:
+        refs[0]["referent_mappings"].append({"relationship": "zone_code", "expression": "bins.bc"})
+    result = run(document(*storage(), ontology_mappings=[bins_mapping(refs)]))
+    assert not result.model.mappings
+    assert any(
+        i.construct == "ObjectMapping" and i.outcome == "dropped" for i in result.report.issues
+    )
+
+
+@pytest.mark.parametrize("swap", [False, True])
+def test_identifying_link_mapping_must_name_the_same_columns(swap):
+    zone_refs = [
+        {
+            "relationship": "zone.warehouse",
+            "referent_mappings": [{"relationship": "warehouse.code", "expression": "bins.wh"}],
+        },
+        {"relationship": "zone.zone_code", "expression": "bins.wh" if swap else "bins.zc"},
+    ]
+    child = {
+        "relationship": "zone",
+        "object_mapping": {"concept": "zone", "referent_mappings": zone_refs},
+    }
+    mapping = bins_mapping([ZONE_REF, BIN_CODE], link_children=[child])
+    result = run(document(*storage(), ontology_mappings=[mapping]))
+    bindings = [i for i in result.report.issues if i.construct == "RelationshipBinding"]
+    assert [i.outcome for i in bindings] == ["dropped" if swap else "converted"]
+    zone_link = next(link for link in result.model.link_types if link.name == "zone")
+    assert zone_link.data_join is not None
+
+
+def test_nary_relationship_on_an_expanded_entity_gets_its_tuple_identifier():
+    data = document(*storage())
+    data["ontology"][2]["relationships"].append(
+        {
+            "name": "counted_on",
+            "roles": [{"concept": "Date"}, {"concept": "Integer", "name": "quantity"}],
+            "multiplicity": "ManyToOne",
+            "verbalizes": ["{bin} counted on {Date} {Integer:quantity}"],
+        }
+    )
+    result = run(data)
+    assert identifier_names(result, "bin_counted_on")
+    assert not issues(result, "RT-28", "error")
+
+
 def test_first_parent_is_file_order_and_child_does_not_change_parent_identity():
     result = run(
         document(
