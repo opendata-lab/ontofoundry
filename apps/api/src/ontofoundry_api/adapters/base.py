@@ -46,6 +46,10 @@ class ImportContext:
     workspace_id: UUID
     connections: tuple[dict, ...] = ()
     registered_tables: tuple[dict, ...] = ()
+    # A modeling run's fixed table list (table_snapshot entries). When given,
+    # a dataset without a sidecar connection binds to the one session table of
+    # the same schema and name; None keeps the build-page import unchanged.
+    session_tables: tuple[dict, ...] | None = None
 
 
 @dataclass(frozen=True)
