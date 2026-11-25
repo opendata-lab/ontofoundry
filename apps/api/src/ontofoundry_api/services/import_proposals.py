@@ -51,7 +51,7 @@ def _build_import_batch(base, changes, *, batch_id, lookup, evidence_by_target=N
             )
         )
     group_items(base, items, references_resolved=True)
-    return ParsedBatch(batch_id, payload_sha256([i.fingerprint for i in items]), items)
+    return ParsedBatch(batch_id, payload_sha256([batch_id, *[i.fingerprint for i in items]]), items)
 
 
 def build_import_batch(base, changes, *, batch_id, lookup, evidence_by_target=None):

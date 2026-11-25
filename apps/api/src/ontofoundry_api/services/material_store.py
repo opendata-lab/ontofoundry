@@ -63,9 +63,12 @@ def store_text_material(
     return item
 
 
-def discard_new_files(db):
+def discard_new_files(db, *, since=0):
     """After a rollback: remove files written in it that no committed material uses."""
-    for workspace_id, sha, path in db.info.pop("new_material_files", []):
+    files = db.info.get("new_material_files", [])
+    discarded = files[since:]
+    del files[since:]
+    for workspace_id, sha, path in discarded:
         kept = db.scalar(select(MaterialRecord.id).where(
             MaterialRecord.workspace_id == workspace_id, MaterialRecord.sha256 == sha,
         ).limit(1))

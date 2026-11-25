@@ -266,6 +266,11 @@ def main():
 def run_paths(work_pack, pack):
     """This run's files and commands; copy them rather than composing paths."""
     lines = ["本轮路径（相对工作区，直接复制）：", f"- 工作包：{work_pack}"]
+    if report := pack.get("import_report"):
+        lines.append(
+            f"- Ossie 导入报告：{report['file']}（导入提案 {report['proposal_count']} 条，"
+            f"缺表数据集 {report['missing_table_count']} 个）。{report['note']}"
+        )
     for material in pack.get("materials") or []:
         if material.get("path") and material.get("from_request"):
             lines.append(f"- 用户消息原文：{material['path']}（id {material.get('id', '?')}；内容就是本轮或之前的消息，引证时用这个 id，不必再读）")

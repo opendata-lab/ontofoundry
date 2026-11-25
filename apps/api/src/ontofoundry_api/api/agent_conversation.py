@@ -40,6 +40,7 @@ from ontofoundry_api.services.material_source import (
     MaterialSourceMissing,
     material_source_path,
 )
+from ontofoundry_api.services.material_store import discard_new_files, keep_new_files
 from ontofoundry_api.services.material_types import material_media_type
 from ontofoundry_api.services.modeling_input import (
     build_work_pack,
@@ -51,7 +52,11 @@ from ontofoundry_api.services.modeling_input import (
     upload_work_pack,
 )
 from ontofoundry_api.services.modeling_runs import _persist_task_projection
-from ontofoundry_api.services.proposals import proposal_context, submitted_batch
+from ontofoundry_api.services.proposals import (
+    proposal_context,
+    run_review_context,
+    submitted_batch,
+)
 from ontofoundry_api.services.request_material import store_request_material
 from ontofoundry_api.services.run_credentials import (
     RunGrant,
@@ -63,6 +68,10 @@ from ontofoundry_api.services.run_credentials import (
     issue as issue_run_credential,
 )
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES, to_run_status
+from ontofoundry_api.services.session_material_imports import (
+    import_report_note,
+    preimport_materials,
+)
 from ontofoundry_api.services.sessions import (
     get_modeling_session,
     session_draft,
@@ -372,81 +381,91 @@ async def send_message(
         else None,
     }
     proposals = manifest["result_contract"] == "proposals"
-    if proposals:
-        from ontofoundry_api.services.proposals import run_review_context
+    previous_mode = item.dataagent_task_mode
+    import_reports, import_batch_id = [], None
+    try:
+        table_catalog, tables_body = [], None
+        if proposals:
+            from ontofoundry_api.services.dataset_sources import (
+                linked_table_details,
+                resolve_session_table_scope,
+            )
 
-        # Results are parsed against exactly the draft this run was given: the
-        # session draft with the pending proposals applied, so the agent can
-        # revise them; what is pending and unpublished is listed for review.
-        review = run_review_context(db, item)
-        manifest.update(review)
-        manifest["pinned_draft"] = review.pop("candidate_draft", None) or draft
-        manifest.pop("candidate_draft", None)
+            linked, skipped = resolve_session_table_scope(db, workspace_id, item)
+            manifest["skipped_tables"] = skipped
+            table_catalog, tables_body = linked_tables_payload(linked_table_details(db, workspace_id, linked))
+            # Keep the server-side snapshot in the same immutable run manifest as its
+            # uploaded path and digest; submissions never consult fresh metadata.
+            manifest["table_snapshot"] = json.loads(tables_body)
+            manifest["table_scope"] = table_scope_summary(table_catalog, item.table_scope, len(skipped))
 
-    table_catalog, tables_body = [], None
-    if proposals:
-        from ontofoundry_api.services.dataset_sources import (
-            linked_table_details,
-            resolve_session_table_scope,
+        # Reserve the run before any nested import transaction. This starts
+        # the outer write transaction on SQLite as well as on PostgreSQL.
+        changed = db.execute(
+            update(ModelingSessionRecord)
+            .where(
+                ModelingSessionRecord.id == item.id,
+                ModelingSessionRecord.revision == expected_revision,
+                ModelingSessionRecord.task_status.not_in(ACTIVE_RUN_STATUSES),
+            )
+            .values(
+                title=title,
+                material_ids=selected_material_ids,
+                task_status="submitting",
+                task_detail="正在提交到 DataAgent",
+                dataagent_task_id=None,
+                dataagent_task_mode=mode,
+                dataagent_run_token=run_token,
+                result_state="",
+                last_result_task_id=None,
+                result_claimed_at=None,
+                result_warnings=[],
+                revision=expected_revision + 1,
+                updated_at=utc_now(),
+            )
         )
+        if changed.rowcount != 1:
+            raise HTTPException(409, "会话正在处理或已更新，请刷新后重试")
+        if proposals:
+            import_reports, import_batch_id = preimport_materials(
+                db, request.app.state.settings, item, draft, manifest, materials,
+            )
+            if import_batch_id:
+                manifest["session_material_import_batch_id"] = import_batch_id
+            # Results are parsed against exactly the draft this run was given: the
+            # session draft with the pending proposals applied, so the agent can
+            # revise them; what is pending and unpublished is listed for review.
+            review = run_review_context(db, item)
+            manifest["pinned_draft"] = review.pop("candidate_draft", None) or draft
+            manifest.update(review)
 
-        linked, skipped = resolve_session_table_scope(db, workspace_id, item)
-        manifest["skipped_tables"] = skipped
-        table_catalog, tables_body = linked_tables_payload(linked_table_details(db, workspace_id, linked))
-        # Keep the server-side snapshot in the same immutable run manifest as its
-        # uploaded path and digest; submissions never consult fresh metadata.
-        manifest["table_snapshot"] = json.loads(tables_body)
-        manifest["table_scope"] = table_scope_summary(table_catalog, item.table_scope, len(skipped))
+            manifest["baseline"] = modeling_baseline(manifest, materials)
+            previous_token = str(previous_manifest.get("run_token") or "")
+            # Keep the previous run's work only while it can still be valid: same
+            # baseline and nothing of it stored (design MR-01, MR-02, MR-05). How
+            # to continue is the agent's decision.
+            if (
+                previous_token
+                and previous_mode == "model"
+                and previous_manifest.get("baseline") == manifest["baseline"]
+                and submitted_batch(db, workspace_id, session_id, previous_token) is None
+            ):
+                # A run that failed before it initialised never claimed the
+                # workspace, so the files may still carry any earlier token of
+                # the same unbroken chain; the agent's script matches any of them.
+                chain = list((previous_manifest.get("resume") or {}).get("previous_run_tokens") or [])
+                manifest["resume"] = {
+                    "previous_run_token": previous_token,
+                    "previous_run_tokens": [*chain, previous_token],
+                }
 
-    if proposals:
-        manifest["baseline"] = modeling_baseline(manifest, materials)
-        previous_token = str(previous_manifest.get("run_token") or "")
-        # Keep the previous run's work only while it can still be valid: same
-        # baseline and nothing of it stored (design MR-01, MR-02, MR-05). How
-        # to continue is the agent's decision.
-        if (
-            previous_token
-            and item.dataagent_task_mode == "model"
-            and previous_manifest.get("baseline") == manifest["baseline"]
-            and submitted_batch(db, workspace_id, session_id, previous_token) is None
-        ):
-            # A run that failed before it initialised never claimed the
-            # workspace, so the files may still carry any earlier token of
-            # the same unbroken chain; the agent's script matches any of them.
-            chain = list((previous_manifest.get("resume") or {}).get("previous_run_tokens") or [])
-            manifest["resume"] = {
-                "previous_run_token": previous_token,
-                "previous_run_tokens": [*chain, previous_token],
-            }
-
-    changed = db.execute(
-        update(ModelingSessionRecord)
-        .where(
-            ModelingSessionRecord.id == item.id,
-            ModelingSessionRecord.revision == expected_revision,
-            ModelingSessionRecord.task_status.not_in(ACTIVE_RUN_STATUSES),
-        )
-        .values(
-            title=title,
-            material_ids=selected_material_ids,
-            task_status="submitting",
-            task_detail="正在提交到 DataAgent",
-            dataagent_task_id=None,
-            dataagent_task_mode=mode,
-            dataagent_run_token=run_token,
-            run_manifest_json=manifest,
-            result_state="",
-            last_result_task_id=None,
-            result_claimed_at=None,
-            result_warnings=[],
-            revision=expected_revision + 1,
-            updated_at=utc_now(),
-        )
-    )
-    if changed.rowcount != 1:
+        item.run_manifest_json = manifest
+        db.commit()
+    except Exception:
         db.rollback()
-        raise HTTPException(409, "会话正在处理或已更新，请刷新后重试")
-    db.commit()
+        discard_new_files(db)
+        raise
+    keep_new_files(db)
 
     dataagent = _client(request, workspace_id, session_id)
     created_topic = False
@@ -557,7 +576,14 @@ async def send_message(
                 topic_id, f"ontofoundry-tables-{run_token}.json", tables_body, "application/json"
             )
             tables_file = str(uploaded_tables["rel_path"])
-            facts = scenario_facts(draft, manifest, previous_manifest, table_catalog)
+            import_note = None
+            if import_reports:
+                report = await dataagent.upload(
+                    topic_id, f"ontofoundry-import-report-{run_token}.json",
+                    encode({"materials": import_reports}), "application/json",
+                )
+                import_note = import_report_note(import_reports, import_batch_id, report["rel_path"])
+            facts = scenario_facts(manifest["pinned_draft"], manifest, previous_manifest, table_catalog)
             pack, pages = build_work_pack(
                 fixed_context,
                 material_indices,
@@ -569,6 +595,7 @@ async def send_message(
                 tables_file=tables_file,
                 table_scope=manifest["table_scope"],
                 scenario_facts=facts,
+                import_report=import_note,
             )
             work_pack_file = await upload_work_pack(
                 dataagent, topic_id, run_token, pack, pages
@@ -586,6 +613,7 @@ async def send_message(
                 "tables_file": tables_file,
                 "tables_sha256": hashlib.sha256(tables_body).hexdigest(),
                 "scenario_facts": facts,
+                **({"import_report": import_note} if import_note else {}),
             }
             proposal_prompt = proposal_instructions(
                 work_pack_file=manifest["input_files"]["work_pack"],
@@ -904,6 +932,7 @@ def modeling_baseline(manifest: dict, materials: list) -> str:
         "base_version_id": manifest.get("base_version_id"),
         "base_version_sha256": manifest.get("base_version_sha256"),
         "draft_sha256": manifest.get("source_draft_sha256"),
+        "pinned_draft_sha256": draft_sha256(manifest["pinned_draft"]),
         "materials": sorted(
             (m.id, m.sha256) for m in materials if getattr(m, "origin", None) != "conversation_request"
         ),

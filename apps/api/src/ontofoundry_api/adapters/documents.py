@@ -4,11 +4,47 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 
 
 def escape_pointer(part) -> str:
     return str(part).replace("~", "~0").replace("/", "~1")
+
+
+def raw_json_spans(text: str) -> dict[str, tuple[int, int]]:
+    """Value offsets by JSON Pointer in text already validated by SourceDocument."""
+    decoder = json.JSONDecoder()
+    whitespace = re.compile(r"[ \t\r\n]*")
+    spans = {}
+
+    def skip(position):
+        return whitespace.match(text, position).end()
+
+    def read(position, pointer):
+        start = position = skip(position)
+        char = text[position]
+        if char in "{[":
+            closing = "}" if char == "{" else "]"
+            position = skip(position + 1)
+            index = 0
+            while text[position] != closing:
+                key = index
+                if char == "{":
+                    key, position = decoder.raw_decode(text, position)
+                    position = skip(position) + 1  # colon
+                position = skip(read(position, pointer + "/" + escape_pointer(key)))
+                if text[position] == ",":
+                    position = skip(position + 1)
+                    index += 1
+            position += 1
+        else:
+            _, position = decoder.raw_decode(text, position)
+        spans[pointer] = (start, position)
+        return position
+
+    read(0, "")
+    return spans
 
 
 def _object(pairs):
