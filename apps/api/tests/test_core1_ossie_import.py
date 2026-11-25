@@ -333,6 +333,73 @@ def test_membership_is_all_or_nothing_and_keeps_or_and_reverse_exists():
     assert issues(bad, "RT-31", "error")
 
 
+def test_attribute_rule_binds_its_value_role_without_touching_literals():
+    data = document(
+        entity(
+            "customer",
+            relationships=[
+                rel(
+                    "level",
+                    "String",
+                    roles=[{"concept": "String", "name": "customer_level"}],
+                    requires=["customer_level IN ('customer_level', 'VIP')"],
+                )
+            ],
+        )
+    )
+    result = run(data)
+    [rule] = result.model.rules
+    assert rule.expression == "customer.level IN ('customer_level', 'VIP')"
+    assert not [i for i in result.report.issues if i.outcome == "error"]
+
+
+def test_membership_names_an_ancestor_and_exists_on_an_attribute_means_present():
+    data = document(
+        entity(
+            "party",
+            relationships=[rel("level", "String"), rel("region", "String")],
+        ),
+        entity("customer", extends=["party"]),
+        entity(
+            "vip",
+            extends=["customer"],
+            derived_by=["party.level = 'VIP' AND EXISTS ( party.region )"],
+        ),
+    )
+    result = run(data)
+    vip = next(o for o in result.model.object_types if o.name == "vip")
+    [branch] = vip.derived_by
+    assert branch.kind == "simple"
+    assert [c.operator for c in branch.conditions] == ["eq", "not_null"]
+    assert issues(result, "RT-67", "converted")
+
+
+def test_identity_mapping_accepts_owner_qualified_members():
+    customer = entity(
+        "customer",
+        identify_by=["tenant", "code"],
+        relationships=[rel("tenant", "String"), rel("code", "String")],
+    )
+    customers = dataset(
+        "customers", fields=[field("tenant"), field("code")], primary_key=["tenant", "code"]
+    )
+    customer_map = {
+        "concept": "customer",
+        "object_mappings": [
+            {
+                "referent_mappings": [
+                    {"relationship": "customer.tenant", "expression": "customers.tenant"},
+                    {"relationship": "customer.code", "expression": "customers.code"},
+                ]
+            }
+        ],
+    }
+    mapping = ontology_map([customers], concepts=[customer_map])
+    result = run(document(customer, ontology_mappings=[mapping]))
+    assert len(result.model.mappings) == 1
+    assert not [i for i in result.report.issues if i.construct == "ObjectMapping"]
+
+
 def test_legacy_extension_is_not_read_and_core_extension_restores_presentation_only():
     data = document(
         entity("customer", relationships=[rel("code", "String")]),

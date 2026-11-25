@@ -184,7 +184,7 @@ outcome 为 converted、dropped、error；severity 为 info、warning、error。
 | 规则 | 可解析项转具体元素规则；角色语法不支持时保留原文报告。规则命名等不靠 Ossie 无损保存。 |
 | Dataset | 所有条目一一登记，包括未引用者；导出每项一份，不按对象复制。任意 source query 不能表示表位置时报 RT-63 error。 |
 | 绑定 | 识别单主身份、一层属性映射、可确认的星形多来源和同行表达式；深树、嵌套 referent 与歧义绑定逐项报告。 |
-| 子类成员 | ObjectType.derived_by 完整解析并等价输出者 RT-67 converted，支持分支并集、逐层限定和关系 EXISTS；不能闭合整项 error 待补全。成员扩展及额外继承绑定仍 RT-57。 |
+| 子类成员 | ObjectType.derived_by 完整解析并等价输出者 RT-67 converted，支持分支并集、逐层限定和关系 EXISTS；条件可用任一祖先名称起头，属性上的 EXISTS 表示值存在（not_null）；不能闭合整项 error 待补全。成员扩展及额外继承绑定仍 RT-57。 |
 | Metric | 符合单数据集表达式边界的 OSI 指标与核心指标一一对应，只用本数据集字段；固定聚合与条件结构化，其余本数据集算法用 expression。ratio 仅复用已登记同数据集 simple，否则保留单条 expression；COUNT 可空列不转行计数，来源不明待选择。超出边界者按 RT-69 本项 error，原文及来源留转换报告并标待补全，不生成核心指标；用户可改写为单个数据集上的指标。 |
 | 指标导出 | 单个数据集上的指标一一导出；simple 按本数据集列聚合，ratio 展开同数据集分量，expression 保持本数据集算法、字面量及 NULL 行为；来源、列未闭合或违反单数据集边界时报 RT-61 error，不因对象映射缺失丢指标。比率执行约定按 RT-58 报告。 |
 | 快照、指标时间字段、方言与元数据 | 无同构字段时写说明并按 RT-60、RT-66 报结构损失，不从说明自动回读。键冲突或快照唯一性边界另按 RT-64。 |
