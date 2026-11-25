@@ -81,6 +81,8 @@ def batch_read_only(session, batch):
     """Closed batches never change; an older agent batch is read-only once a newer run started."""
     if batch_closed(session, batch):
         return True
-    if batch.id == session.human_batch_id:
+    manifest = session.run_manifest_json or {}
+    # The next run can reuse the same pending material import after a retry.
+    if batch.id in (session.human_batch_id, manifest.get("session_material_import_batch_id")):
         return False
-    return (session.run_manifest_json or {}).get("source_session_revision", -1) > batch.source_session_revision
+    return manifest.get("source_session_revision", -1) > batch.source_session_revision

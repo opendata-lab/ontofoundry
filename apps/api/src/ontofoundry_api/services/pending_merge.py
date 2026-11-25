@@ -80,7 +80,9 @@ def instance_overlay(baseline: dict, pending: list[ProposalItemRecord], session_
     return out
 
 
-def merge(parsed: ParsedBatch, pending: list[ProposalItemRecord]) -> tuple[ParsedBatch, dict[str, str]]:
+def merge(
+    parsed: ParsedBatch, pending: list[ProposalItemRecord], *, import_batch_id: str | None = None,
+) -> tuple[ParsedBatch, dict[str, str]]:
     """The merged batch and, for each pending item, what became of it ("revised",
     "withdrawn" or "carried")."""
     by_target = {(p.target_kind, p.target_id): p for p in pending}
@@ -94,6 +96,13 @@ def merge(parsed: ParsedBatch, pending: list[ProposalItemRecord]) -> tuple[Parse
         combined = _combine(earlier, item)
         fate[earlier.id] = "withdrawn" if combined is None else "revised"
         if combined is not None:
+            if earlier.batch_id == import_batch_id:
+                references = [{k: v for k, v in entry.items() if k != "id"} for entry in combined.evidence]
+                combined.evidence = [
+                    *combined.evidence,
+                    *(entry for entry in earlier.evidence_json or []
+                      if {k: v for k, v in entry.items() if k != "id"} not in references),
+                ]
             items.append(combined)
     for row in by_target.values():
         fate[row.id] = "carried"

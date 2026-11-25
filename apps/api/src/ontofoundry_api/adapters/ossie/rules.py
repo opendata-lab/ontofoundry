@@ -21,6 +21,7 @@ from ontofoundry_api.domain.core import (
 )
 from ontofoundry_api.domain.expressions import resolve_derived_expression
 from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.rule_evaluation import required_properties
 
 from .metrics import literal, unwrap
 
@@ -358,18 +359,7 @@ def membership_branch(model, parent_id, text):
         return DerivedExpression(kind="expression", expression=text)
 
 
-def own_required(importer, obj, text):
-    """The object's own properties a constraint only requires to be filled.
-
-    `code IS NOT NULL` (possibly joined with AND) says the property is required;
-    as a rule a conversation submission refuses it. Only the object's own
-    properties qualify: making an inherited one required would bind its siblings
-    (design 2026-11-24-ossie-in-conversation-import OC-04).
-    """
-    from ontofoundry_api.domain.core import Rule
-    from ontofoundry_api.domain.expressions import ExpressionError, resolve_rule_expression
-
-    t = importer.t
+def object_required(t, obj, text):
     try:
         probe = Rule(
             id=t.id("probe"),
@@ -379,32 +369,9 @@ def own_required(importer, obj, text):
             rule_kind="constraint",
             expression=text,
         )
-        resolved = resolve_rule_expression(t.model, probe)
-    except (ValueError, ExpressionError):
+    except ValueError:
         return []
-    props = {p.id: p for p in t.model.properties}
-    found = []
-
-    def visit(node):
-        while isinstance(node, exp.Paren):
-            node = node.this
-        if isinstance(node, exp.And):
-            return visit(node.this) and visit(node.expression)
-        if not (
-            isinstance(node, exp.Not)
-            and isinstance(node.this, exp.Is)
-            and isinstance(node.this.expression, exp.Null)
-        ):
-            return False
-        column = node.this.this
-        ref = column.meta.get("core_reference") if isinstance(column, exp.Column) else None
-        prop = props.get(ref.property_id) if ref and not ref.links else None
-        if prop is None or prop.owner_type_id != obj.id:
-            return False
-        found.append(prop)
-        return True
-
-    return found if visit(resolved.ast) else []
+    return required_properties(t.model, probe)
 
 
 def import_rules(importer):
@@ -414,12 +381,21 @@ def import_rules(importer):
         path = importer.paths[name]
         for i, text in enumerate(c.get("requires", [])):
             rewritten = rewrite_expression(importer, text)
-            required = own_required(importer, obj, rewritten)
+            path_to_rule = path + f"/requires/{i}"
+            required = object_required(t, obj, rewritten)
             if required:
+                if any(prop.owner_type_id != obj.id for prop in required):
+                    # Making a parent property required would also bind siblings.
+                    t.issue(
+                        path_to_rule, "dropped", "Rule", "RT-71",
+                        "继承属性的非空约束不能等价转为本对象的属性必填，需按对象范围补全",
+                        completion=True,
+                    )
+                    continue
                 for prop in required:
                     prop.required = True
                 t.issue(
-                    path + f"/requires/{i}",
+                    path_to_rule,
                     "converted",
                     "Rule",
                     "RT-71",
@@ -432,7 +408,7 @@ def import_rules(importer):
                 importer,
                 obj,
                 rewritten,
-                path + f"/requires/{i}",
+                path_to_rule,
                 f"rule:object:{name}:constraint:{i}",
                 "constraint",
             )

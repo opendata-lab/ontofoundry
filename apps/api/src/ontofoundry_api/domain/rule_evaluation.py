@@ -21,7 +21,14 @@ from uuid import UUID
 
 from sqlglot import exp
 
-from ontofoundry_api.domain.core import CoreDraft, Rule, RuleKind, RuleOwnerKind, ValueKind
+from ontofoundry_api.domain.core import (
+    CoreDraft,
+    Property,
+    Rule,
+    RuleKind,
+    RuleOwnerKind,
+    ValueKind,
+)
 from ontofoundry_api.domain.expressions import ExpressionError, resolve_rule_expression
 from ontofoundry_api.domain.graph import draft_index
 
@@ -250,6 +257,10 @@ def unchecked_message(outcome: RuleOutcome) -> str:
 
 
 def only_says_required(draft: CoreDraft, rule: Rule) -> list[str]:
+    return [_label(prop) for prop in required_properties(draft, rule)]
+
+
+def required_properties(draft: CoreDraft, rule: Rule) -> list[Property]:
     """Properties a constraint only requires to be filled (``x IS NOT NULL``, possibly
     joined with AND). Required belongs on the property, where acceptance checks it;
     as a rule it would never be evaluated on an empty value. Empty when the rule
@@ -261,7 +272,7 @@ def only_says_required(draft: CoreDraft, rule: Rule) -> list[str]:
     except ExpressionError:
         return []
     index = draft_index(draft)
-    names = []
+    properties = []
 
     def visit(node) -> bool:
         while isinstance(node, exp.Paren):
@@ -274,8 +285,7 @@ def only_says_required(draft: CoreDraft, rule: Rule) -> list[str]:
         ref = column.meta.get("core_reference") if isinstance(column, exp.Column) else None
         if ref is None or ref.links or ref.property_id not in index.properties:
             return False
-        prop = index.properties[ref.property_id]
-        names.append(_label(prop))
+        properties.append(index.properties[ref.property_id])
         return True
 
-    return names if visit(resolved.ast) else []
+    return properties if visit(resolved.ast) else []

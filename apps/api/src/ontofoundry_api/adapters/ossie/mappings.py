@@ -115,12 +115,15 @@ def source_table(source):
 
 def registered_keys(*infos):
     """The session tables' declared keys, for the agent to judge an unproven join."""
-    parts = [
-        f"{info.session_table['key']} {info.session_table['table']} 登记主键 "
-        f"({', '.join(info.session_table.get('primary_key') or []) or '无'})"
-        for info in infos
-        if info is not None and info.session_table
-    ]
+    parts = []
+    for info in infos:
+        if info is None or not info.session_table:
+            continue
+        table = info.session_table
+        keys = ", ".join(table.get("primary_key") or []) or "无"
+        columns = ", ".join(column["name"] for column in table.get("columns") or [])
+        parts.append(f"{table['key']} {table['table']} 登记主键 ({keys})"
+                     + (f"，登记列 ({columns})" if columns else ""))
     return "；" + "，".join(parts) if parts else ""
 
 
@@ -152,7 +155,7 @@ def session_match(t, path, source, tables):
         "RT-72",
         f"本会话有 {len(found)} 张同名表 {source}，请选择"
         if found
-        else f"本会话没有表 {source}，请把它加入本会话后再导入",
+        else f"本会话没有表 {source}，请把它加入本会话后再补全",
         completion=True,
     )
     return None
@@ -280,8 +283,8 @@ def import_datasets(importer, scope, used):
                 connection_id=connection["id"] if connection else None,
                 dialect=engine,
                 snapshot_date_column=metadata.get("snapshot_date_column"),
-                schema_name=schema,
-                table_name=table,
+                schema_name=session_table.get("schema_name") if session_table else schema,
+                table_name=session_table["table_name"] if session_table else table,
                 description=raw.get("description", ""),
                 columns=list(columns.values()) or None,
             )

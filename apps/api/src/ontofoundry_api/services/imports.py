@@ -282,6 +282,21 @@ def source_evidence(record, settings, *, changes=None, batch_id=None, db):
     return result
 
 
+def store_import_batch(db, settings, session, base, changes, *, batch_id, evidence, manifest, actor_id):
+    from ontofoundry_api.services.changes import check_proposal
+
+    parsed = build_import_batch(
+        base, changes, batch_id=batch_id,
+        lookup=material_lookup(db, settings, session.workspace_id),
+        evidence_by_target=evidence,
+    )
+    parsed.items = check_proposal(db, session.workspace_id, session, parsed.items, settings).items
+    return store_batch(
+        db, workspace_id=session.workspace_id, session_id=session.id, task_id=None,
+        manifest=manifest, parsed=parsed, actor_id=actor_id, actor_kind="import",
+    )
+
+
 def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, body):
     workspace = db.scalar(
         select(WorkspaceRecord)
@@ -386,21 +401,10 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
     db.add(session)
     db.flush()
     batch_id = str(uuid5(UUID(record.id), "initial-batch"))
-    parsed = build_import_batch(
-        base,
-        record.preview_json["changes"],
+    store_import_batch(
+        db, settings, session, base, record.preview_json["changes"],
         batch_id=batch_id,
-        lookup=material_lookup(db, settings, workspace_id),
-        evidence_by_target=source_evidence(record, settings, batch_id=batch_id, db=db),
-    )
-    # store_batch no longer validates (SC-04); imports run the same trial.
-    from ontofoundry_api.services.changes import check_proposal
-    parsed.items = check_proposal(db, workspace_id, session, parsed.items, settings).items
-    store_batch(
-        db,
-        workspace_id=workspace_id,
-        session_id=session.id,
-        task_id=None,
+        evidence=source_evidence(record, settings, batch_id=batch_id, db=db),
         manifest={
             "run_token": "import:" + record.id,
             "base_version_id": record.base_version_id,
@@ -416,9 +420,7 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
                 "report_id": record.id,
             },
         },
-        parsed=parsed,
         actor_id=actor_id,
-        actor_kind="import",
     )
     record.session_id, record.batch_id, record.confirmation_sha256 = (
         session.id,

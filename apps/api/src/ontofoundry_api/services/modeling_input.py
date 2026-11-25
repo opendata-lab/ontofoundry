@@ -73,6 +73,7 @@ def build_work_pack(
     tables_file: str | None = None,
     scenario_facts: dict | None = None,
     table_scope: dict | None = None,
+    import_report: dict | None = None,
 ) -> tuple[dict, list[bytes]]:
     """Keep all index entries, spilling oversized indices to bounded pages."""
     if any(not m.get("path") or "lines" not in m for m in materials):
@@ -130,6 +131,8 @@ def build_work_pack(
     pack["table_scope"] = table_scope or table_scope_summary(tables or [])
     if tables_file:
         pack["tables_file"] = tables_file
+    if import_report:
+        pack["import_report"] = import_report
     if len(encode(pack)) <= PACK_LIMIT:
         return pack, []
     # No index entries disappear: the page list replaces the inline index.

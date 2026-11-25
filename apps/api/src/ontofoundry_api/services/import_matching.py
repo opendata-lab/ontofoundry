@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from uuid import UUID
 
 from ontofoundry_api.contracts.proposals import walk_references
+from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import CoreDraft, DerivedExpression, ExpressionMetric
 from ontofoundry_api.domain.dependencies import (
     reference_index,
@@ -155,6 +156,7 @@ def build_candidate_graph(
     *,
     native: bool,
     registered: dict[str, str] | None = None,
+    dataset_scope_error=None,
 ) -> CandidateGraph:
     ids = match_import(base, source, native=native)
     imported = rewrite_import_ids(source, ids)
@@ -164,6 +166,14 @@ def build_candidate_graph(
         str(i): {str(r.target_id) for r in refs}
         for i, refs in reference_index(imported).items()
     }
+    if dataset_scope_error is not None:
+        # Joins also depend on the mappings that make their endpoint keys physical.
+        for link in imported.link_types:
+            if link.data_join is not None:
+                for type_id in (link.source_type_id, link.target_type_id):
+                    edges[str(link.id)].update(
+                        str(mapping.id) for mapping in resolve_binding(imported, type_id).mappings
+                    )
     # Include reverse textual dependencies already present in the workspace.
     for i, refs in reference_index(base).items():
         if str(i) in incoming:
@@ -230,6 +240,8 @@ def build_candidate_graph(
         if kind == "dataset" and previous and item.get("columns") is None:
             # A missing column list means "not provided", not "remove the registered columns".
             item["columns"] = previous[1].get("columns")
+        if kind == "dataset" and dataset_scope_error is not None and (reason := dataset_scope_error(item)):
+            blocked[ident] = reason
         if previous and "evidence" in item:
             by_id = {e["id"]: e for e in item["evidence"]}
             for evidence in previous[1].get("evidence", []):

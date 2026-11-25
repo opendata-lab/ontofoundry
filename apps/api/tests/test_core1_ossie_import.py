@@ -1590,14 +1590,16 @@ def test_not_null_only_constraint_becomes_required_properties(requires):
     assert issues(result, "RT-71", "converted")
 
 
-@pytest.mark.parametrize(
-    "requires, child",
-    [
-        (["customer.code IS NOT NULL AND customer.level = 'A'"], False),
-        (["vip.code IS NOT NULL"], True),
-    ],
-)
-def test_other_constraints_stay_rules(requires, child):
-    result = run(required_document(requires, child=child))
+def test_constraint_with_an_additional_condition_stays_a_rule():
+    result = run(required_document(["customer.code IS NOT NULL AND customer.level = 'A'"]))
     assert not any(p.required for p in result.model.properties)
+    assert len(result.model.rules) == 1
     assert not issues(result, "RT-71")
+
+
+def test_required_inherited_property_is_reported_for_completion():
+    result = run(required_document(["vip.code IS NOT NULL"], child=True))
+    assert not any(p.required for p in result.model.properties)
+    assert not result.model.rules
+    [issue] = issues(result, "RT-71", "dropped")
+    assert issue.completion_status == "available"

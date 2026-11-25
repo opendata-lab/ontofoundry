@@ -461,6 +461,22 @@ class ImportRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
+class SessionMaterialImportRecord(Base):
+    """A modeling session's pre-run conversion of one material digest."""
+
+    __tablename__ = "session_material_imports"
+    __table_args__ = (
+        UniqueConstraint("session_id", "material_sha256", name="uq_session_material_import"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_id: Mapped[str] = mapped_column(ForeignKey("modeling_sessions.id", ondelete="CASCADE"))
+    material_sha256: Mapped[str] = mapped_column(String(64))
+    report_json: Mapped[dict] = mapped_column(JSON)
+    batch_id: Mapped[str | None] = mapped_column(
+        ForeignKey("proposal_batches.id", ondelete="SET NULL")
+    )
+
+
 class MetadataSyncJobRecord(Base):
     __tablename__ = "metadata_sync_jobs"
     id: Mapped[str] = mapped_column(String(36), primary_key=True)

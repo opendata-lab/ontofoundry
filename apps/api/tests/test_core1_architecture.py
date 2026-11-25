@@ -11,7 +11,10 @@ ROOT = Path(__file__).parents[1] / "src/ontofoundry_api"
 
 
 def test_no_runtime_adapter_dependency():
-    allowed = {"import_materials.py", "imports.py", "import_completion.py", "exports.py"}
+    allowed = {
+        "import_materials.py", "imports.py", "import_completion.py",
+        "session_material_imports.py", "exports.py",
+    }
     for directory in ("domain", "services", "api", "contracts"):
         for path in (ROOT / directory).glob("*.py"):
             tree = ast.parse(path.read_text())

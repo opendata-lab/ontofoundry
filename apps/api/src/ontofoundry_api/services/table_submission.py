@@ -23,6 +23,39 @@ from ontofoundry_api.services.material_store import store_text_material
 from ontofoundry_api.services.metadata_sync import normalize_schema
 
 
+def dataset_scope_tables(db, workspace_id, dataset, physical):
+    connection_id = dataset.get("connection_id")
+    connection = db.get(ConnectionRecord, connection_id) if connection_id else None
+    source = dataset.get("table_name") or dataset.get("query_sql")
+    name = dataset.get("display_name") or dataset.get("name")
+    if not connection or connection.workspace_id != workspace_id:
+        raise ServiceError(
+            f"数据集“{name}”的表 {source} 未绑定本轮范围内的连接；请删去并列为未交付项",
+            code="TABLE_NOT_IN_SESSION_SCOPE",
+            status_code=422,
+        )
+    schema_name = normalize_schema(connection, dataset.get("schema_name"))
+    refs = (
+        physical_tables(parse_query(dataset.get("query_sql"), connection.kind))
+        if dataset.get("source_kind", "table") == "query"
+        else [TableReference(schema_name, dataset.get("table_name"))]
+    )
+    tables = []
+    for ref in refs:
+        table = physical.get((connection_id, ref.schema or schema_name, ref.name))
+        if table is None or (
+            ref.catalog and ref.catalog != connection.config_json.get("database", "")
+        ):
+            qualified = ".".join(filter(None, [ref.catalog, ref.schema or schema_name, ref.name]))
+            raise ServiceError(
+                f"数据集“{name}”使用的表 {qualified} 不在本轮固定范围内；请删去该数据集及依赖提案，并在回答中列为未交付项",
+                code="TABLE_NOT_IN_SESSION_SCOPE",
+                status_code=422,
+            )
+        tables.append(table)
+    return tables
+
+
 def prepare_table_submission(db, settings, session, raw):
     """Normalize a copy, preserving the digest of the original submission elsewhere."""
     try:
@@ -72,34 +105,7 @@ def prepare_table_submission(db, settings, session, raw):
             or item["operation"] == "delete"
         ):
             continue
-        connection_id = after.get("connection_id")
-        connection = db.get(ConnectionRecord, connection_id) if connection_id else None
-        if not connection or connection.workspace_id != session.workspace_id:
-            raise ServiceError(
-                f"数据集“{after.get('display_name') or after.get('name')}”的表 {after.get('table_name') or after.get('query_sql')} 未绑定本轮范围内的连接；请删去并列为未交付项",
-                code="TABLE_NOT_IN_SESSION_SCOPE",
-                status_code=422,
-            )
-        schema_name = normalize_schema(connection, after.get("schema_name")) or ""
-        refs = (
-            physical_tables(parse_query(after.get("query_sql"), connection.kind))
-            if after.get("source_kind", "table") == "query"
-            else [TableReference(schema_name, after.get("table_name"))]
-        )
-        for ref in refs:
-            identity = (connection_id, ref.schema or schema_name, ref.name)
-            table = physical.get(identity)
-            if table is None or (
-                ref.catalog and ref.catalog != connection.config_json.get("database", "")
-            ):
-                name = ".".join(
-                    filter(None, [ref.catalog, ref.schema or schema_name, ref.name])
-                )
-                raise ServiceError(
-                    f"数据集“{after.get('display_name') or after.get('name')}”使用的表 {name} 不在本轮固定范围内；请删去该数据集及依赖提案，并在回答中列为未交付项",
-                    code="TABLE_NOT_IN_SESSION_SCOPE",
-                    status_code=422,
-                )
+        for table in dataset_scope_tables(db, session.workspace_id, after, physical):
             used.add(table["key"])
             if after.get("source_kind", "table") == "table":
                 # Derivable from the pinned snapshot (design MS-02). Always taken from

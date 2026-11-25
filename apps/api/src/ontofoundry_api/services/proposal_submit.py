@@ -9,7 +9,12 @@ from ontofoundry_api.contracts.proposal_submit import (
     ProposalSubmitIssue,
     ProposalSubmitResponse,
 )
-from ontofoundry_api.contracts.proposals import ParsedBatch, RunContext, result_digest
+from ontofoundry_api.contracts.proposals import (
+    MAX_ITEMS,
+    ParsedBatch,
+    RunContext,
+    result_digest,
+)
 from ontofoundry_api.db_models import utc_now
 from ontofoundry_api.services.changes import check_proposal
 from ontofoundry_api.services.errors import ServiceError
@@ -163,7 +168,13 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, act
         fate: dict[str, str] = {}
         if pending:
             # One pending batch per session (AI-08): the result absorbs what is pending.
-            parsed, fate = merge(parsed, pending)
+            parsed, fate = merge(
+                parsed, pending, import_batch_id=manifest.get("session_material_import_batch_id"),
+            )
+            if len(parsed.items) > MAX_ITEMS:
+                raise ServiceError(
+                    f"与待审提案合并后超过 {MAX_ITEMS} 条", code="RESULT_SCHEMA_INVALID", status_code=422,
+                )
             trial = check_proposal(db, workspace_id, session, parsed.items, settings)
             parsed = ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
         batch = store_batch(
