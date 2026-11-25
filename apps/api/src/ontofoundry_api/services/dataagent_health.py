@@ -45,15 +45,12 @@ async def dataagent_health(settings: Settings, username: str) -> dict[str, Any]:
                     _skipped("Agent 存在性", "DataAgent 不可达", exc.hint),
                 ]
             )
-        elif str(exc) in {
-            "DataAgent 拒绝了本站点",
-            "DataAgent 拒绝了服务端接入密钥",
-        }:
+        elif str(exc) == "DataAgent 拒绝了本站点":
             checks.extend(
                 [
                     _check("连通性", True, "已连接 DataAgent"),
                     _check("站点放行", False, str(exc), exc.hint),
-                    _skipped("Agent 存在性", "接入校验未通过", exc.hint),
+                    _skipped("Agent 存在性", "站点校验未通过", exc.hint),
                 ]
             )
         elif str(exc) == "DataAgent 上找不到该 Agent":

@@ -14,7 +14,7 @@
 
 | 编号 | 决定 | 说明与来源 | 状态 |
 |---|---|---|---|
-| DU-01 | **DataAgent 调用以会话创建人身份发出** | `X-DataAgent-User-Id` 改为建模会话 `created_by` 对应用户的 `username`（平台内唯一）。发消息、取消、回答、读消息、下载文件、读时对账与结果结算都用创建人，不论谁触发。DataAgent 站点开启「信任同命名空间用户名」后与 DataAgent 同名账号对应。 | 2026-11-24 用户确认（“widget 传入的用户就是真实用户”） |
+| DU-01 | **DataAgent 调用以会话创建人身份发出** | `X-DataAgent-User-Id` 改为建模会话 `created_by` 对应用户的纯 `username`（平台内唯一）。发消息、取消、回答、读消息、下载文件、读时对账与结果结算都用创建人，不论谁触发。2026-11-25 起 DataAgent 取消站点访问密钥（移除 `ONTOFOUNDRY_DATAAGENT_ACCESS_KEY` 与 `X-DataAgent-Access-Key`）：在 DataAgent 登记站点 `ontofoundry` 后，BFF 从后端发出无 `Origin` 请求即可直接对应 DataAgent 同名账号。 | 2026-11-24 / 2026-11-25 用户确认 |
 | DU-02 | **只有创建人能在会话中发问** | 发消息、取消运行、回答确认/提问由 BFF 校验当前用户是会话创建人，否则 403「只有会话创建人可以在此会话中发消息，请新建自己的会话」。其他有读权限的成员照常查看会话、消息和结果。`SessionRead` 增加 `created_by`，构建页对非创建人禁用输入框并显示同一句说明。 | 2026-11-24 用户确认（“不允许共享会话”） |
 | DU-03 | **旧会话解除与 DataAgent 旧对话的绑定** | 旧对话属于已取消的会话伪用户，切换后 DataAgent 中没有归属，只有 DataAgent 管理员能在审计中查看。迁移 `20261124_000001` 清空已有建模会话的 `dataagent_topic_id`、`dataagent_task_id`、`dataagent_run_token`，运行状态回到 `idle`。草稿、提案和材料保留；界面不再显示旧聊天记录，下一条消息开新对话。 | 2026-11-24 用户选择方案 A |
 | DU-04 | **部署诊断以请求的平台管理员身份调用** | 诊断接口本来只允许平台管理员，改为以其 `username` 调用 DataAgent，同时验证该账号能看到建模 Agent。 | 2026-11-24 |

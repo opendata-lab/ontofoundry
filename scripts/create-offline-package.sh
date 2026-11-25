@@ -87,8 +87,6 @@ ONTOFOUNDRY_SEED_DEMO=false
 # DataAgent 后端地址：只写 协议://主机:端口，不带路径。这是从 of-backend 容器里
 # 访问的地址，不能写 127.0.0.1 / localhost（那指容器自己），要写服务器 IP 或域名。
 ONTOFOUNDRY_DATAAGENT_BASE_URL=
-# 可选，一般留空。只有 DataAgent 上用接口为该站点开启了服务端接入校验时才填。
-ONTOFOUNDRY_DATAAGENT_ACCESS_KEY=
 # 管理端创建 Agent 后返回的 agent_id，形如 agent_7895f271d13c40f9bc2fabf7。
 ONTOFOUNDRY_DATAAGENT_AGENT_ID=
 # 一般不用改：站点 ID 与接口前缀。

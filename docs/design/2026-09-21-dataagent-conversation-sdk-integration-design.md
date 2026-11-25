@@ -165,7 +165,7 @@ data: {"task_id":"t-1","status":"finished","detail":"...","metadata":{"mode":"mo
 
 ### 6.4 身份与隔离
 
-> 2026-11-24 起由[DataAgent 会话按创建人归属设计](2026-11-24-dataagent-per-user-conversations.md)取代：`X-DataAgent-User-Id` 改为会话创建人的用户名，DataAgent 不再支持共享会话。下文保留原决定作为历史。
+> 2026-11-24 起由[DataAgent 会话按创建人归属设计](2026-11-24-dataagent-per-user-conversations.md)取代：`X-DataAgent-User-Id` 改为会话创建人的纯用户名，DataAgent 不再支持共享会话；2026-11-25 起 DataAgent 取消站点访问密钥，`ONTOFOUNDRY_DATAAGENT_ACCESS_KEY` 与 `X-DataAgent-Access-Key` 已移除。下文保留原决定作为历史。
 
 ```
 X-DataAgent-Client: widget

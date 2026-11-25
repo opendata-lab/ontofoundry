@@ -39,7 +39,6 @@ class Settings(BaseSettings):
     dataagent_base_url: str = ""
     dataagent_api_prefix: str = "/api/v1/nl2sql"
     dataagent_website_id: str = "ontofoundry"
-    dataagent_access_key: str = ""
     dataagent_agent_id: str = "agent_ontofoundry"
     dataagent_request_timeout_seconds: int = Field(default=30, gt=0)
     dataagent_execution_mode: Literal["interactive", "background", "auto"] = "auto"

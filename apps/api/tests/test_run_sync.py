@@ -24,7 +24,6 @@ def _fresh_throttle():
 
 def _configure(client) -> None:
     client.app.state.settings.dataagent_base_url = "https://dataagent.example"
-    client.app.state.settings.dataagent_access_key = "server-secret"
 
 
 def _set(client, session_id: str, **values) -> None:

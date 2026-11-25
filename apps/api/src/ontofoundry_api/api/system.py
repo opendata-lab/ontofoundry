@@ -7,7 +7,7 @@ from ontofoundry_api.api.users import platform_admin
 from ontofoundry_api.services.dataagent_health import dataagent_health
 
 # The DataAgent check reports internal addresses and agent ids and calls
-# DataAgent with the deployment's access key, so only platform admins may run it.
+# DataAgent as the calling admin, so only platform admins may run it.
 router = APIRouter(prefix="/api/v1/system", tags=["system"], dependencies=[Depends(platform_admin)])
 
 

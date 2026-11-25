@@ -37,8 +37,6 @@ class DataAgentError(RuntimeError):
 
 
 def require_dataagent_configuration(base_url: str) -> None:
-    # The access key is optional: DataAgent only checks it on sites whose
-    # server-side access was switched on, and its admin UI has no switch for that.
     if not base_url.strip():
         raise DataAgentError(
             "DataAgent 未配置",
@@ -52,7 +50,6 @@ def dataagent_client(settings: Any, username: str) -> "DataAgentClient":
         settings.dataagent_base_url,
         prefix=settings.dataagent_api_prefix,
         website_id=settings.dataagent_website_id,
-        access_key=settings.dataagent_access_key,
         username=username,
         timeout_seconds=settings.dataagent_request_timeout_seconds,
     )
@@ -82,14 +79,12 @@ class DataAgentClient:
         *,
         prefix: str,
         website_id: str,
-        access_key: str,
         username: str,
         timeout_seconds: int = 30,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.prefix = "/" + prefix.strip("/")
         self.website_id = website_id
-        self.access_key = access_key
         # DataAgent attributes every request to this OntoFoundry user; a
         # modeling session always acts as its creator.
         self.username = username
@@ -102,8 +97,6 @@ class DataAgentClient:
             "X-DataAgent-Website-Id": self.website_id,
             "X-DataAgent-User-Id": self.username,
         }
-        if self.access_key:
-            headers["X-DataAgent-Access-Key"] = self.access_key
         # Carry the caller's id so both services' logs share it.
         request_id = request_id_var.get()
         if request_id:
@@ -152,15 +145,6 @@ class DataAgentClient:
                     "DataAgent 拒绝了本站点",
                     status_code=502,
                     hint=(f"在管理端 → Widget 接入设置中放行 website_id={self.website_id}"),
-                )
-            if response.status_code == 403 and "access key" in normalized_detail:
-                raise DataAgentError(
-                    "DataAgent 拒绝了服务端接入密钥",
-                    status_code=502,
-                    hint=(
-                        "该站点开启了服务端接入校验：把 access-key 接口生成的密钥"
-                        "填入 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
-                    ),
                 )
             raise DataAgentError(
                 f"DataAgent 请求失败 ({response.status_code}): {detail or response.reason_phrase}",

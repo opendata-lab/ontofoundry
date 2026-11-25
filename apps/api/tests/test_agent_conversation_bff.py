@@ -51,7 +51,6 @@ def _install_transport(monkeypatch, handler) -> None:
 def _configure(client) -> None:
     settings = client.app.state.settings
     settings.dataagent_base_url = "https://dataagent.example"
-    settings.dataagent_access_key = "server-secret"
 
 
 def _json_request(request: httpx.Request) -> dict:
@@ -241,7 +240,7 @@ def test_dataagent_identity_headers_are_complete(client, monkeypatch):
         assert headers["X-DataAgent-Website-Id"] == "ontofoundry"
         # Every call is made as the session creator (dev mode: "dev").
         assert headers["X-DataAgent-User-Id"] == "dev"
-        assert headers["X-DataAgent-Access-Key"] == "server-secret"
+        assert "X-DataAgent-Access-Key" not in headers
 
 
 def test_get_fetches_all_history_pages(client, monkeypatch):
