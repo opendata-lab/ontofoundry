@@ -11,6 +11,7 @@ export function modelingSession(
   return {
     id: "s1",
     workspace_id: workspaceId,
+    created_by: "u1",
     title: "建模会话",
     mode: "model",
     base_version_id: null,

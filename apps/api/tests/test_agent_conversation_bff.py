@@ -239,9 +239,8 @@ def test_dataagent_identity_headers_are_complete(client, monkeypatch):
     for headers in seen:
         assert headers["X-DataAgent-Client"] == "widget"
         assert headers["X-DataAgent-Website-Id"] == "ontofoundry"
-        assert headers["X-DataAgent-User-Id"] == (
-            f"ontofoundry:{DEMO_WORKSPACE_ID}:{session['id']}"
-        )
+        # Every call is made as the session creator (dev mode: "dev").
+        assert headers["X-DataAgent-User-Id"] == "dev"
         assert headers["X-DataAgent-Access-Key"] == "server-secret"
 
 
@@ -1174,3 +1173,38 @@ def test_mode_changes_until_the_conversation_starts(client):
     assert locked.status_code == 409
     assert locked.json()["error"]["code"] == "SESSION_MODE_LOCKED"
     assert _session_row(client, session["id"]).mode == "chat"
+
+
+def test_only_the_session_creator_sends_and_reads_go_as_the_creator(client, monkeypatch):
+    """DataAgent has no shared conversations: another member may read a session,
+    but sending is refused, and every DataAgent call names the creator."""
+    from ontofoundry_api.db_models import UserRecord
+
+    _configure(client)
+    session = _create_session(client)
+    assert session["created_by"]
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers["X-DataAgent-User-Id"])
+        raise AssertionError("a refused send must not reach DataAgent")
+
+    _install_transport(monkeypatch, handler)
+    with client.app.state.session_factory() as db:
+        other = UserRecord(id=str(uuid4()), username="colleague", display_name="同事", email=None)
+        db.add(other)
+        db.flush()
+        db.execute(
+            update(ModelingSessionRecord)
+            .where(ModelingSessionRecord.id == session["id"])
+            .values(created_by=other.id)
+        )
+        db.commit()
+
+    refused = client.post(_endpoint(session["id"]) + "/messages", json={"content": "hello", "metadata": {}})
+    assert refused.status_code == 403
+    assert "只有会话创建人" in refused.text
+    assert seen == []
+    read = client.get(ROOT + f"/sessions/{session['id']}")
+    assert read.status_code == 200
+    assert read.json()["created_by"] == other.id

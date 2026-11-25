@@ -47,6 +47,34 @@ def require_dataagent_configuration(base_url: str) -> None:
         )
 
 
+def dataagent_client(settings: Any, username: str) -> "DataAgentClient":
+    return DataAgentClient(
+        settings.dataagent_base_url,
+        prefix=settings.dataagent_api_prefix,
+        website_id=settings.dataagent_website_id,
+        access_key=settings.dataagent_access_key,
+        username=username,
+        timeout_seconds=settings.dataagent_request_timeout_seconds,
+    )
+
+
+def session_client(app: Any, session_id: str) -> "DataAgentClient":
+    """The client for one modeling session: DataAgent sees its creator.
+
+    DataAgent has no shared conversations, so every call about a session,
+    including a read another member triggers, is made as the session creator.
+    """
+    from ontofoundry_api.db_models import ModelingSessionRecord, UserRecord
+
+    with app.state.session_factory() as db:
+        item = db.get(ModelingSessionRecord, session_id)
+        owner = db.get(UserRecord, item.created_by) if item is not None else None
+        if owner is None:
+            raise DataAgentError("建模会话缺少创建人，无法访问 DataAgent", status_code=409)
+        username = owner.username
+    return dataagent_client(app.state.settings, username)
+
+
 class DataAgentClient:
     def __init__(
         self,
@@ -55,14 +83,16 @@ class DataAgentClient:
         prefix: str,
         website_id: str,
         access_key: str,
-        session_ref: str,
+        username: str,
         timeout_seconds: int = 30,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.prefix = "/" + prefix.strip("/")
         self.website_id = website_id
         self.access_key = access_key
-        self.session_ref = session_ref
+        # DataAgent attributes every request to this OntoFoundry user; a
+        # modeling session always acts as its creator.
+        self.username = username
         self.timeout = httpx.Timeout(timeout_seconds)
 
     @property
@@ -70,7 +100,7 @@ class DataAgentClient:
         headers = {
             "X-DataAgent-Client": "widget",
             "X-DataAgent-Website-Id": self.website_id,
-            "X-DataAgent-User-Id": self.session_ref,
+            "X-DataAgent-User-Id": self.username,
         }
         if self.access_key:
             headers["X-DataAgent-Access-Key"] = self.access_key

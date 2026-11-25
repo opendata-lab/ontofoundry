@@ -413,6 +413,8 @@ export type ModelingSession = {
   table_scope: "all" | "selected";
   /** Registered tables selected when table_scope is selected. */
   linked_tables?: LinkedTable[];
+  /** The user the DataAgent conversation belongs to; only they send in it. */
+  created_by: UUID;
   /** Fixed once the conversation starts (dataagent_topic_id set). */
   mode: SessionMode;
   task_status: string;

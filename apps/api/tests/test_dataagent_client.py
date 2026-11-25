@@ -19,14 +19,14 @@ def _client(monkeypatch, handler, *, access_key: str = "secret") -> DataAgentCli
         prefix="/custom/runtime/",
         website_id="website-1",
         access_key=access_key,
-        session_ref="ontofoundry:workspace-1:session-1",
+        username="alice",
     )
 
 
 def _assert_auth_headers(request: httpx.Request, *, access_key: bool = True) -> None:
     assert request.headers["X-DataAgent-Client"] == "widget"
     assert request.headers["X-DataAgent-Website-Id"] == "website-1"
-    assert request.headers["X-DataAgent-User-Id"] == "ontofoundry:workspace-1:session-1"
+    assert request.headers["X-DataAgent-User-Id"] == "alice"
     if access_key:
         assert request.headers["X-DataAgent-Access-Key"] == "secret"
     else:

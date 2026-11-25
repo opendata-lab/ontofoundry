@@ -400,6 +400,7 @@ REVIEW_DRAFT.object_types.find((item) => item.id === SUPPLIER.id)!.description =
 const REVIEW_SESSION: ModelingSession = {
   id: REVIEW_SESSION_ID,
   workspace_id: WORKSPACE_ID,
+  created_by: "user-visual-demo",
   title: "供应商范围修订",
   mode: "model",
   table_scope: "all",

@@ -2209,6 +2209,10 @@
           "title": "Base Version Sha256",
           "type": "string"
         },
+        "created_by": {
+          "title": "Created By",
+          "type": "string"
+        },
         "dataagent_run_token": {
           "anyOf": [
             {
@@ -2407,6 +2411,7 @@
         "id",
         "title",
         "workspace_id",
+        "created_by",
         "base_version_id",
         "revision",
         "base_version_sha256",

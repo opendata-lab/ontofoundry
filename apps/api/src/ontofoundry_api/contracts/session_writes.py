@@ -37,6 +37,7 @@ class SessionRead(Strict):
     id: str
     title: str
     workspace_id: str
+    created_by: str
     base_version_id: str | None
     revision: int
     base_version_sha256: str

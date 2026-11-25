@@ -31,7 +31,7 @@ def _dataagent_client(
         prefix="/api/v1/nl2sql",
         website_id="ontofoundry",
         access_key=access_key,
-        session_ref="ontofoundry:workspace-1:diagnostics",
+        username="dev",
     )
 
 
@@ -146,11 +146,11 @@ def test_health_checks_agent_profile_public_route_and_reports_all_checks(
     settings.dataagent_base_url = "https://dataagent.example"
     settings.dataagent_access_key = "server-secret"
     requested_paths: list[str] = []
-    seen_session_refs: list[str] = []
+    seen_users: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requested_paths.append(request.url.path)
-        seen_session_refs.append(request.headers["X-DataAgent-User-Id"])
+        seen_users.append(request.headers["X-DataAgent-User-Id"])
         return httpx.Response(200, json={"agent_id": settings.dataagent_agent_id})
 
     _dataagent_client(monkeypatch, handler)
@@ -166,7 +166,8 @@ def test_health_checks_agent_profile_public_route_and_reports_all_checks(
     ]
     assert all(check["ok"] for check in response.json()["checks"])
     assert requested_paths == [f"/api/v1/dataagent/agents/{settings.dataagent_agent_id}"]
-    assert seen_session_refs == ["ontofoundry:system:diagnostics"]
+    # The check runs as the requesting platform admin.
+    assert seen_users == ["dev"]
 
 
 def test_health_reports_missing_agent_without_using_topic_filter(client, monkeypatch):

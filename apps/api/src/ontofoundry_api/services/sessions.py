@@ -143,6 +143,7 @@ def session_data(item):
         "id": item.id,
         "title": item.title,
         "workspace_id": item.workspace_id,
+        "created_by": item.created_by,
         "base_version_id": item.base_version_id,
         "revision": item.revision,
         "base_version_sha256": item.base_version_sha256,

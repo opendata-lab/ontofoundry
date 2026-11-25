@@ -35,6 +35,7 @@ from ontofoundry_api.services.dataagent import (
     build_turn_prompt,
     proposal_instructions,
     require_dataagent_configuration,
+    session_client,
 )
 from ontofoundry_api.services.material_source import (
     MaterialSourceMissing,
@@ -173,19 +174,14 @@ def present_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
-    return _app_client(request.app, workspace_id, session_id)
+    return session_client(request.app, session_id)
 
 
-def _app_client(app, workspace_id: str, session_id: str) -> DataAgentClient:
-    settings = app.state.settings
-    return DataAgentClient(
-        settings.dataagent_base_url,
-        prefix=settings.dataagent_api_prefix,
-        website_id=settings.dataagent_website_id,
-        access_key=settings.dataagent_access_key,
-        session_ref=f"ontofoundry:{workspace_id}:{session_id}",
-        timeout_seconds=settings.dataagent_request_timeout_seconds,
-    )
+def _require_creator(item, user: Principal) -> None:
+    # A DataAgent conversation belongs to one user: only the session creator
+    # sends, cancels or answers in it; other members can read it.
+    if item.created_by != user.id:
+        raise HTTPException(403, "只有会话创建人可以在此会话中发消息，请新建自己的会话")
 
 
 def _require_configured(request: Request) -> None:
@@ -301,6 +297,7 @@ async def send_message(
     require_edit(db, str(workspace_id), user)
     from ontofoundry_api.services.session_gate import lock_session, require_idle
     item = lock_session(db, workspace_id, session_id)
+    _require_creator(item, user)
     # Pending proposals no longer block a run: the agent sees them and its
     # result is merged with them on submit (AI-08).
     require_idle(item)
@@ -820,6 +817,7 @@ async def cancel(
 ) -> dict[str, Any]:
     require_edit(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
+    _require_creator(item, user)
     _require_configured(request)
     if item.dataagent_task_id and body.task_id != item.dataagent_task_id:
         raise HTTPException(409, "任务不属于当前会话")
@@ -856,6 +854,7 @@ async def interact(
 ) -> dict[str, Any]:
     require_edit(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
+    _require_creator(item, user)
     _require_configured(request)
     if item.dataagent_task_id and body.task_id != item.dataagent_task_id:
         raise HTTPException(409, "任务不属于当前会话")

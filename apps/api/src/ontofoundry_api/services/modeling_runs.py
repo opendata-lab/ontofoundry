@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import update
 
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
-from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
+from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError, session_client
 from ontofoundry_api.services.model_result import reconcile_run
 from ontofoundry_api.services.proposals import submitted_batch
 from ontofoundry_api.services.run_status import (
@@ -22,18 +22,6 @@ from ontofoundry_api.services.run_status import (
 )
 
 logger = logging.getLogger(__name__)
-
-def _app_client(app, workspace_id: str, session_id: str) -> DataAgentClient:
-    settings = app.state.settings
-    return DataAgentClient(
-        settings.dataagent_base_url,
-        prefix=settings.dataagent_api_prefix,
-        website_id=settings.dataagent_website_id,
-        access_key=settings.dataagent_access_key,
-        session_ref=f"ontofoundry:{workspace_id}:{session_id}",
-        timeout_seconds=settings.dataagent_request_timeout_seconds,
-    )
-
 
 def _detail(status: str, error: object = None) -> str:
     if status in {"waiting", "queued", "submitting"}:
@@ -296,7 +284,7 @@ async def _sync_session_run(app, workspace_id: str, session_id: str) -> None:
         topic_id = str(item.dataagent_topic_id or "")
         status = str(item.task_status or "")
 
-    dataagent = _app_client(app, workspace_id, session_id)
+    dataagent = session_client(app, session_id)
     if status == "submitting":
         if not topic_id:
             _fail_stale_submission(app.state.session_factory, item, detail="上次提交未创建可对账的 DataAgent Topic，请重试")
