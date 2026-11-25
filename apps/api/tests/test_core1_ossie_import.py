@@ -1466,3 +1466,138 @@ def test_duplicate_metric_names_drop_both_definitions_and_keep_independent_metri
         )
         == 2
     )
+
+
+# Design 2026-11-24-ossie-in-conversation-import: a run's tables and OC-04.
+SALES = "55555555-5555-4555-8555-555555555555"
+
+
+def session_table(key, name, schema="sales", connection=SALES, primary_key=("order_no",)):
+    return {
+        "key": key,
+        "table": f"{schema}.{name}",
+        "connection_id": connection,
+        "connection": "fiction_sales",
+        "dialect": "mysql",
+        "schema_name": schema,
+        "table_name": name,
+        "primary_key": list(primary_key),
+    }
+
+
+def run_in(data, tables):
+    context = ImportContext(CTX.workspace_id, session_tables=tuple(tables))
+    return OssieAdapter().import_document(json.dumps(data, ensure_ascii=False).encode(), context)
+
+
+def orders_document():
+    orders = dataset("orders", fields=[field("order_no")], primary_key=["order_no"])
+    orders["source"] = "sales.order_df"
+    return document(
+        entity("order", identify_by=["order_no"], relationships=[rel("order_no", "String")]),
+        ontology_mappings=[
+            ontology_map([orders], concepts=[mapped_concept("order", "orders.order_no")])
+        ],
+    )
+
+
+def connection_issues(result):
+    return [i for i in result.report.issues if i.rule_id == "RT-72"]
+
+
+def test_dataset_binds_to_the_one_session_table_of_the_same_name():
+    result = run_in(orders_document(), [session_table("t1", "order_df")])
+    [dataset_] = result.model.datasets
+    assert str(dataset_.connection_id) == SALES and dataset_.dialect == "mysql"
+    assert [i.outcome for i in connection_issues(result)] == ["converted"]
+
+
+@pytest.mark.parametrize(
+    "tables, message",
+    [
+        ([session_table("t1", "customer_df")], "本会话没有表 sales.order_df"),
+        ([session_table("t1", "order_df", schema="archive")], "本会话没有表 sales.order_df"),
+        (
+            [
+                session_table("t1", "order_df"),
+                session_table("t2", "order_df", connection="66666666-6666-4666-8666-666666666666"),
+            ],
+            "本会话有 2 张同名表",
+        ),
+    ],
+)
+def test_missing_or_ambiguous_session_table_leaves_the_dataset_unbound(tables, message):
+    result = run_in(orders_document(), tables)
+    assert result.model.datasets[0].connection_id is None
+    [issue] = connection_issues(result)
+    assert issue.outcome == "dropped" and message in issue.message
+
+
+def test_build_page_import_does_not_bind_by_table_name():
+    result = run(orders_document())
+    assert result.model.datasets[0].connection_id is None
+    assert not connection_issues(result)
+
+
+def test_unproven_physical_join_reports_both_registered_keys():
+    data = orders_document()
+    customers = dataset("customers", fields=[field("customer_no")], primary_key=[])
+    customers["source"] = "sales.customer_df"
+    orders = data["ontology_mappings"][0]["semantic_model"]["datasets"][0]
+    orders["fields"].append(field("customer_no"))
+    semantic = data["ontology_mappings"][0]["semantic_model"]
+    semantic["datasets"].append(customers)
+    semantic["relationships"] = [
+        {
+            "name": "order_customer",
+            "from": "orders",
+            "to": "customers",
+            "from_columns": ["customer_no"],
+            "to_columns": ["customer_no"],
+        }
+    ]
+    tables = [
+        session_table("t1", "order_df", primary_key=("order_no", "ds")),
+        session_table("t2", "customer_df", primary_key=("customer_no", "ds")),
+    ]
+    result = run_in(data, tables)
+    [issue] = [i for i in result.report.issues if i.construct == "PhysicalRelationship"]
+    assert "t2 sales.customer_df 登记主键 (customer_no, ds)" in issue.message
+    assert "t1 sales.order_df 登记主键 (order_no, ds)" in issue.message
+
+
+def required_document(requires, *, child=False):
+    owner = entity(
+        "customer",
+        relationships=[rel("code", "String"), rel("name", "String"), rel("level", "String")],
+        **({} if child else {"requires": requires}),
+    )
+    objects = [owner]
+    if child:
+        objects.append(entity("vip", extends=["customer"], requires=requires))
+    return document(*objects)
+
+
+@pytest.mark.parametrize(
+    "requires",
+    [["customer.code IS NOT NULL"], ["customer.code IS NOT NULL AND customer.name IS NOT NULL"]],
+)
+def test_not_null_only_constraint_becomes_required_properties(requires):
+    result = run(required_document(requires))
+    assert not result.model.rules
+    required = sorted(p.name for p in result.model.properties if p.required)
+    assert required == (["code"] if "AND" not in requires[0] else ["code", "name"])
+    assert issues(result, "RT-71", "converted")
+
+
+@pytest.mark.parametrize(
+    "requires, child",
+    [
+        (["customer.code IS NOT NULL AND customer.level = 'A'"], False),
+        (["vip.code IS NOT NULL"], True),
+    ],
+)
+def test_other_constraints_stay_rules(requires, child):
+    result = run(required_document(requires, child=child))
+    assert not any(p.required for p in result.model.properties)
+    assert not issues(result, "RT-71")

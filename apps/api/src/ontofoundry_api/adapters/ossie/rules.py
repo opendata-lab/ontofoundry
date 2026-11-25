@@ -358,16 +358,80 @@ def membership_branch(model, parent_id, text):
         return DerivedExpression(kind="expression", expression=text)
 
 
+def own_required(importer, obj, text):
+    """The object's own properties a constraint only requires to be filled.
+
+    `code IS NOT NULL` (possibly joined with AND) says the property is required;
+    as a rule a conversation submission refuses it. Only the object's own
+    properties qualify: making an inherited one required would bind its siblings
+    (design 2026-11-24-ossie-in-conversation-import OC-04).
+    """
+    from ontofoundry_api.domain.core import Rule
+    from ontofoundry_api.domain.expressions import ExpressionError, resolve_rule_expression
+
+    t = importer.t
+    try:
+        probe = Rule(
+            id=t.id("probe"),
+            name="probe",
+            owner_kind="object_type",
+            owner_id=obj.id,
+            rule_kind="constraint",
+            expression=text,
+        )
+        resolved = resolve_rule_expression(t.model, probe)
+    except (ValueError, ExpressionError):
+        return []
+    props = {p.id: p for p in t.model.properties}
+    found = []
+
+    def visit(node):
+        while isinstance(node, exp.Paren):
+            node = node.this
+        if isinstance(node, exp.And):
+            return visit(node.this) and visit(node.expression)
+        if not (
+            isinstance(node, exp.Not)
+            and isinstance(node.this, exp.Is)
+            and isinstance(node.this.expression, exp.Null)
+        ):
+            return False
+        column = node.this.this
+        ref = column.meta.get("core_reference") if isinstance(column, exp.Column) else None
+        prop = props.get(ref.property_id) if ref and not ref.links else None
+        if prop is None or prop.owner_type_id != obj.id:
+            return False
+        found.append(prop)
+        return True
+
+    return found if visit(resolved.ast) else []
+
+
 def import_rules(importer):
     t = importer.t
     for name, obj in list(t.objects.items()):
         c = importer.concepts[name]
         path = importer.paths[name]
         for i, text in enumerate(c.get("requires", [])):
+            rewritten = rewrite_expression(importer, text)
+            required = own_required(importer, obj, rewritten)
+            if required:
+                for prop in required:
+                    prop.required = True
+                t.issue(
+                    path + f"/requires/{i}",
+                    "converted",
+                    "Rule",
+                    "RT-71",
+                    "约束只要求属性不为空，转为属性必填，不生成规则："
+                    + "、".join(p.name for p in required),
+                    targets=[p.id for p in required],
+                )
+                continue
             add_rule(
                 importer,
                 obj,
-                rewrite_expression(importer, text),
+                rewritten,
                 path + f"/requires/{i}",
                 f"rule:object:{name}:constraint:{i}",
                 "constraint",

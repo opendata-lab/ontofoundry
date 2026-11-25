@@ -58,6 +58,8 @@ class DatasetInfo:
     model: Dataset
     fields: dict[str, exp.Expression]
     keys: list[list[str]]
+    # The run's table this dataset bound to by name, if any.
+    session_table: dict | None = None
 
     def direct(self, name):
         ast = self.fields.get(name)
@@ -111,6 +113,51 @@ def source_table(source):
     return ".".join(p.name for p in ast.parts[:-1]) or None, ast.name
 
 
+def registered_keys(*infos):
+    """The session tables' declared keys, for the agent to judge an unproven join."""
+    parts = [
+        f"{info.session_table['key']} {info.session_table['table']} 登记主键 "
+        f"({', '.join(info.session_table.get('primary_key') or []) or '无'})"
+        for info in infos
+        if info is not None and info.session_table
+    ]
+    return "；" + "，".join(parts) if parts else ""
+
+
+def session_match(t, path, source, tables):
+    """The one table of this run with the dataset's schema and name (OC-02)."""
+    try:
+        schema, table = source_table(source)
+    except (ValueError, SqlglotError):
+        return None  # A query source keeps no connection; it is reported as before.
+    found = [
+        entry
+        for entry in tables
+        if entry["table_name"].casefold() == table.casefold()
+        and (entry.get("schema_name") or "").casefold() == (schema or "").casefold()
+    ]
+    if len(found) == 1:
+        t.issue(
+            path,
+            "converted",
+            "DatasetConnection",
+            "RT-72",
+            f"按表名接到本会话的表 {found[0]['key']}（{found[0].get('connection', '')}）",
+        )
+        return found[0]
+    t.issue(
+        path,
+        "dropped",
+        "DatasetConnection",
+        "RT-72",
+        f"本会话有 {len(found)} 张同名表 {source}，请选择"
+        if found
+        else f"本会话没有表 {source}，请把它加入本会话后再导入",
+        completion=True,
+    )
+    return None
+
+
 def import_datasets(importer, scope, used):
     t = importer.t
     source_names = Counter(
@@ -132,6 +179,19 @@ def import_datasets(importer, scope, used):
             context = getattr(t, "import_context", None)
             matches = [c for c in (context.connections if context else ()) if c["name"] == metadata.get("connection_name")]
             connection = matches[0] if len(matches) == 1 else None
+            session_table = None
+            if (
+                connection is None
+                and not metadata.get("connection_name")
+                and context is not None
+                and context.session_tables is not None
+            ):
+                session_table = session_match(t, path, raw["source"], context.session_tables)
+                if session_table:
+                    connection = {
+                        "id": session_table["connection_id"],
+                        "kind": session_table.get("dialect"),
+                    }
             engine = connection["kind"] if connection else None
             source_kind, query_sql = "table", None
             try:
@@ -225,7 +285,7 @@ def import_datasets(importer, scope, used):
                 description=raw.get("description", ""),
                 columns=list(columns.values()) or None,
             )
-            info = DatasetInfo(raw, path, model, fields, [])
+            info = DatasetInfo(raw, path, model, fields, [], session_table)
             for key in [raw.get("primary_key", []), *raw.get("unique_keys", [])]:
                 if not key:
                     continue
@@ -302,7 +362,8 @@ def import_datasets(importer, scope, used):
                 "dropped",
                 "PhysicalRelationship",
                 "RT-53",
-                "物理连接的完整列组或目标唯一键未证明，不猜测连接",
+                "物理连接的完整列组或目标唯一键未证明，不猜测连接"
+                + registered_keys(source, target),
                 completion=True,
             )
         else:

@@ -1197,6 +1197,8 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-66 | 来源引擎和物理元数据不能保证自动往返 | Dataset.dialect、元数据快照列类型及采集来源 | 无同构标准字段者写数据集描述并报告损失，不能从 ANSI_SQL 猜引擎或伪造元数据快照 |
 | RT-67 | 成员派生定义按本体 id 转换 | 简单条件或关系 EXISTS，多分支并集、多层逐级限定 | 完整解析且等价输出者 converted；不能闭合的整项 RT-31 error 待补全，不取部分分支，不重复建 Rule |
 | RT-68 | 子类首选属性标识不能改写已有父身份 | Person.person_no；Employee extends Person，identify_by 为 employee_no | Employee 沿用 person_no；employee_no 为普通 unique 属性，原首选标识 dropped，逐项报告且原文保留；依赖该标识且不能等价改写的映射 error 待补全 |
+| RT-71 | 只要求非空的约束转为属性必填 | `customer.requires: ["customer.code IS NOT NULL"]` | 约束属于该属性所属对象本身、每个合取项都只要求本对象属性非空时，设这些属性 `required=true`，不生成规则，converted；含其他条件或涉及继承属性时照常作为规则（`docs/design/2026-11-24-ossie-in-conversation-import.md` OC-04） |
+| RT-72 | 建模运行中按会话表名接连接 | 数据集 `source: sales.order_df`，本会话有一张 `sales.order_df` | 仅在建模运行导入时（传入会话表清单）生效：扩展文件没有连接名时，本会话恰好一张同 schema 同表名的表即采用其连接，converted；没有或多张时不接连接，dropped 待补全。构建页“导入文件”不按表名接连接（同上 OC-02）。物理连接未证明时，报告附两端会话表的登记主键 |
 | RT-70 | 反向关系并入原关系 | `customer.orders`，`derived_by: ["order.buyer(customer)"]`，`order.buyer` 是指向 customer 的二元关系 | 不另建关系（`docs/concepts/link-types.md`：关系只定义一次）；读法作为反向读法并入 `order.buyer`，converted；反向关系的标识和显示名 dropped；声明的基数与原关系反过来不一致时 dropped 提示业务确认，以原关系为准。`derived_by` 带其他条件、原关系不存在或本身是派生的，按普通关系处理 |
 | RT-69 | OSI 指标超出单数据集表达式边界 | 引用多个数据集，或含 SELECT、FROM、JOIN、额外查询作用域 | 首版不承载；本项 error，原文、来源及定位保留转换报告并标待补全，不生成核心指标；用户可改写为单个数据集上的指标 |
 
