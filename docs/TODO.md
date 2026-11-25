@@ -119,6 +119,12 @@
 - **要做**：不再生成角色编号属性，中间对象直接用表上的多个键列关联参与对象（例：排班 → 医生 用 `schedules.doctor_pk = doctors.doctor_pk`）；同步修改概念文档和 Ossie 导入。
 - **来源**：用户 2026-11-15 决定。
 
+### 7. 本体标识与登记表主键不一致时报告
+
+- **现状**（2026-11-24）：Ossie 导入的对象映射直接优先采用数据集声明的主键作为来源键（`adapters/ossie/mappings.py` `identity`），本体标识与表主键不一致时不报告。内网材料中有 3 处：组件标识只有名称而表主键含环境、区域；规则标识只有 key 而表主键为 domain、label、key；问题标识四段而 issue_key 可能本身唯一。
+- **要做**：导入报告列出这类差异，交由业务确认哪一边是对的，不自动改标识。
+- **来源**：`docs/design/2026-11-24-ossie-relational-identifiers.md` RI-06，用户 2026-11-24“不要将错就错”。
+
 ### 6. 校验阶段余项
 
 - **现状**（2026-11-15）：Codex 校验阶段审查（`~/.agents/handoffs/2026-11-15-codex-validation-review/`）列出的缺口已由用户逐项决定，见 `docs/design/2026-11-15-accept-completeness.md` AC-09 至 AC-12；相同业务标识的实例保留只提示。

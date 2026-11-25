@@ -24,6 +24,7 @@ from ontofoundry_api.domain.core import (
     empty_draft,
 )
 from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.validation import validate_core_graph
 
 from .extension import read_extension
 from .ids import identifier_name
@@ -56,6 +57,8 @@ class OntologyImporter:
         self.value_cache = {}
         self.value_types = {}
         self.role_bindings = {}
+        # identifying link id -> [(target identifier property, generated property)]
+        self.identity_links = {}
 
     def issue(self, *args, **kwargs):
         return self.t.issue(*args, **kwargs)
@@ -423,74 +426,233 @@ class OntologyImporter:
                         )
 
     def identifiers(self):
-        for name, obj in sorted(
-            self.t.objects.items(),
-            key=lambda p: len(DraftIndex(self.t.model).ancestors(p[1].id)),
-        ):
-            names = self.concepts[name].get("identify_by", [])
-            if not names:
+        # Parents first; an identifier that names a relationship waits until
+        # the target's identifier exists, so multi-level schemes expand in order.
+        def depth(item):
+            return len(DraftIndex(self.t.model).ancestors(item[1].id))
+
+        pending = [
+            (name, obj)
+            for name, obj in sorted(self.t.objects.items(), key=depth)
+            if self.concepts[name].get("identify_by")
+        ]
+        while pending:
+            waiting = {name for name, _ in pending}
+            rest = []
+            for name, obj in pending:
+                ancestors = {
+                    n
+                    for n, o in self.t.objects.items()
+                    if o.id in DraftIndex(self.t.model).ancestors(obj.id)
+                }
+                if ancestors & waiting or not self.identifier(name, obj, waiting):
+                    rest.append((name, obj))
+                else:
+                    waiting.discard(name)
+            if len(rest) == len(pending):
+                for name, _obj in rest:
+                    self.issue(
+                        self.paths[name] + "/identify_by",
+                        "dropped",
+                        "Identifier",
+                        "RT-32",
+                        "标识关系的目标没有完整标识或互相依赖成环，整组标识待补全",
+                        completion=True,
+                    )
+                break
+            pending = rest
+
+    def identifier(self, name, obj, waiting):
+        """Return False to retry after the targets of identifying links."""
+        names = self.concepts[name]["identify_by"]
+        path = self.paths[name] + "/identify_by"
+        index = DraftIndex(self.t.model)
+        members = []
+        for n in names:
+            member = self.t.members.get((name, n))
+            if member is None:
+                for ancestor in index.ancestors(obj.id):
+                    source = next(
+                        k for k, v in self.t.objects.items() if v.id == ancestor
+                    )
+                    member = self.t.members.get((source, n))
+                    if member is not None:
+                        break
+            members.append(member)
+        if not all(isinstance(m, (Property, LinkType)) for m in members) or len(
+            set(names)
+        ) != len(names):
+            self.drop_identifier(
+                path,
+                "RT-32" if any(isinstance(m, LinkType) for m in members) else "RT-30",
+                "标识必须整组转换；存在缺失成员，不裁剪为较小键",
+            )
+            return True
+        inherited = index.identifier(obj.extends) if obj.extends else []
+        if any(isinstance(m, LinkType) for m in members):
+            return self.expand_identifier(name, obj, names, members, path, inherited, waiting)
+        props = members
+        conflict = inherited and {p.id for p in props} != {p.id for p in inherited}
+        for prop in props:
+            if len(props) == 1:
+                if not prop.unique:
+                    self.issue(
+                        path,
+                        "converted",
+                        "Identifier",
+                        "RT-33",
+                        "单属性编号补充唯一性",
+                        targets=[prop.id],
+                    )
+                prop.unique = True
+            if not conflict and not inherited:
+                prop.identifier = True
+        if conflict:
+            self.issue(
+                path,
+                "dropped",
+                "Identifier",
+                "RT-68",
+                "子类沿用完整父标识；本地编号保留普通属性，不改变父身份",
+                completion=True,
+            )
+        else:
+            self.issue(
+                path,
+                "converted",
+                "Identifier",
+                None,
+                "完整标识已转换",
+                targets=[p.id for p in props],
+            )
+        return True
+
+    def drop_identifier(self, path, rule, message):
+        self.issue(path, "dropped", "Identifier", rule, message, completion=True)
+
+    def expand_identifier(self, name, obj, names, members, path, inherited, waiting):
+        # An identifying relationship becomes required properties holding the
+        # target's full identifier, joined to it (design 2026-11-24 RI-01).
+        if inherited:
+            self.issue(
+                path,
+                "dropped",
+                "Identifier",
+                "RT-68",
+                "子类沿用完整父标识；含关系的本地标识不展开，不改变父身份",
+                completion=True,
+            )
+            return True
+        index = DraftIndex(self.t.model)
+        plan = []
+        for member_name, member in zip(names, members, strict=True):
+            if isinstance(member, Property):
+                plan.append((member_name, member, None))
                 continue
-            path = self.paths[name] + "/identify_by"
-            index = DraftIndex(self.t.model)
-            props = []
-            for n in names:
-                prop = self.t.members.get((name, n))
-                if prop is None:
-                    for ancestor in index.ancestors(obj.id):
-                        source = next(
-                            k for k, v in self.t.objects.items() if v.id == ancestor
-                        )
-                        prop = self.t.members.get((source, n))
-                        if prop is not None:
-                            break
-                props.append(prop)
-            if not all(isinstance(p, Property) for p in props) or len(set(names)) != len(
-                names
-            ):
-                rule = "RT-32" if any(isinstance(p, LinkType) for p in props) else "RT-30"
-                self.issue(
-                    path,
-                    "dropped",
-                    "Identifier",
-                    rule,
-                    "标识必须整组转换；存在关系成员或缺失属性，不裁剪为较小键",
-                    completion=True,
+            target = next(n for n, o in self.t.objects.items() if o.id == member.target_type_id)
+            targets = index.identifier(member.target_type_id)
+            if not targets:
+                if target in waiting and target != name:
+                    return False
+                self.drop_identifier(
+                    path, "RT-32", f"标识关系 {member_name} 的目标没有完整标识，整组标识待补全"
                 )
+                return True
+            reason = None
+            if member.source_type_id != obj.id:
+                reason = f"标识关系 {member_name} 声明在祖先上，不能用本对象属性对接"
+            elif member.multiplicity == "many_to_many":
+                reason = f"标识关系 {member_name} 是多对多"
+            elif member.multiplicity == "one_to_one" and len(targets) > 1:
+                reason = f"标识关系 {member_name} 是一对一，但目标标识有多项，核心无法表达联合唯一"
+            elif len(targets) > 16:
+                reason = f"标识关系 {member_name} 的目标标识超过 16 项"
+            elif member.data_join is not None:
+                reason = f"标识关系 {member_name} 已有对接定义"
+            if reason:
+                self.drop_identifier(path, "RT-32", reason + "，整组标识待补全")
+                return True
+            plan.append((member_name, member, targets))
+        generated = []
+        joins = []
+        identifiers = []
+        for member_name, member, targets in plan:
+            if targets is None:
+                identifiers.append(member)
                 continue
-            inherited = index.identifier(obj.extends) if obj.extends else []
-            conflict = inherited and {p.id for p in props} != {p.id for p in inherited}
-            for prop in props:
-                if len(props) == 1:
-                    if not prop.unique:
-                        self.issue(
-                            path,
-                            "converted",
-                            "Identifier",
-                            "RT-33",
-                            "单属性编号补充唯一性",
-                            targets=[prop.id],
-                        )
-                    prop.unique = True
-                if not conflict and not inherited:
-                    prop.identifier = True
-            if conflict:
-                self.issue(
-                    path,
-                    "dropped",
-                    "Identifier",
-                    "RT-68",
-                    "子类沿用完整父标识；本地编号保留普通属性，不改变父身份",
-                    completion=True,
+            pairs = []
+            for target_prop in targets:
+                tech, _label = self.names(obj, member.name + "_" + target_prop.name, None)
+                # "所属仓库·编码": the link's name, then the parent key's name.
+                link_label = member.display_name or member.name
+                key_label = target_prop.display_name or target_prop.name
+                prop = Property(
+                    id=self.t.id(f"identity-property:{name}.{member_name}:{target_prop.id}"),
+                    owner_type_id=obj.id,
+                    name=tech,
+                    display_name=f"{link_label}·{key_label}",
+                    description=f"{link_label} 的标识 {key_label}；由标识关系 {member.name} 展开，"
+                    f"按它对接 {target}",
+                    value_kind=target_prop.value_kind,
+                    value_type_id=target_prop.value_type_id,
+                    required=True,
+                    identifier=True,
+                    unique=member.multiplicity == "one_to_one",
                 )
-            else:
-                self.issue(
-                    path,
-                    "converted",
-                    "Identifier",
-                    None,
-                    "完整标识已转换",
-                    targets=[p.id for p in props],
-                )
+                generated.append(prop)
+                pairs.append((target_prop, prop))
+            identifiers.extend(p for _t, p in pairs)
+            joins.append((member_name, member, pairs))
+        candidate = self.t.model.model_copy(deep=True)
+        candidate.properties.extend(p.model_copy() for p in generated)
+        single = len(identifiers) == 1
+        for prop in candidate.properties:
+            if prop.id in {p.id for p in identifiers}:
+                prop.identifier = True
+                prop.unique = prop.unique or single
+        links = {
+            member.id: member.model_copy(
+                update={
+                    "data_join": DirectJoin(
+                        kind="direct",
+                        source_property_ids=[p.id for _t, p in pairs],
+                        target_property_ids=[t.id for t, _p in pairs],
+                    )
+                }
+            )
+            for _n, member, pairs in joins
+        }
+        candidate.link_types = [links.get(link.id, link) for link in candidate.link_types]
+        try:
+            validate_core_graph(candidate)
+        except ValueError as error:
+            self.drop_identifier(path, "RT-32", f"展开后的标识不能形成合法核心定义：{error}")
+            return True
+        # Commit in place so existing member references stay valid.
+        self.t.model.properties.extend(generated)
+        for prop in identifiers:
+            prop.identifier = True
+            prop.unique = prop.unique or single
+        for i, link in enumerate(self.t.model.link_types):
+            if link.id in links:
+                self.t.model.link_types[i] = links[link.id]
+        for key, member in list(self.t.members.items()):
+            if member.id in links:
+                self.t.members[key] = links[member.id]
+        for _member_name, member, pairs in joins:
+            self.identity_links[links[member.id].id] = pairs
+            for _target, prop in pairs:
+                self.t.property_sources[prop.id] = (name, prop.name, path)
+        self.issue(
+            path,
+            "converted",
+            "Identifier",
+            "RT-32",
+            "标识中的关系按上级完整标识展开为必填属性，并按这些属性对接上级；"
+            "模型不保证上级对象一定存在：" + "、".join(p.name for p in generated),
+            targets=[*(p.id for p in identifiers), *links],
+        )
+        return True
 
     def reify_nary(self, owner, name, rel, path):
         if rel.get("multiplicity") == "OneToOne":

@@ -87,7 +87,7 @@ WHERE l.order_id = :order_id AND l.line_no = :line_no;
 
 正例：订单明细把订单号和行号都设为 identifier，两个属性分别允许 unique=false。反例：只保留行号并设 unique=true，会把不同订单的第 1 行当成同一实例。
 
-关系不参与核心标识。“所属订单”关系支持导航；订单号属性支持标识与过滤，两者可以同时存在。Ossie 导入的 identify_by 如果包含关系成员，整组标识保留为待补全，不截掉关系只留剩余属性。
+关系不参与核心标识。“所属订单”关系支持导航；订单号属性支持标识与过滤，两者可以同时存在。Ossie 导入的 identify_by 如果包含关系成员（如订单行 = 所属订单 + 行号），上级有完整标识时，把关系换成上级标识对应的必填属性（订单行得到“所属订单·订单号”），与行号一起作为标识，“所属订单”关系按该属性对接订单；否则整组标识保留为待补全，不截掉关系只留剩余属性。展开后模型不保证上级订单一定存在（`docs/design/2026-11-24-ossie-relational-identifiers.md`）。
 
 数据库实例身份由实际具体 type_id 与带类型的有序键元组共同确定；物理键按主来源 key_columns 顺序解释，业务标识按属性 UUID 顺序解释。这里说明身份含义，不另定义调用载荷。反例：用 `a + '::' + b` 拼成身份，既可能发生分隔符冲突，又会丢失类型与 NULL 语义。虚拟父查询保留具体 type_id，不把设备和车辆中相同的局部键合并。
 
@@ -117,4 +117,4 @@ Palantir 的 [Primary key 与 title key](https://www.palantir.com/docs/foundry/o
 
 Fabric 的 [Entity type 定义](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-create-entity-types)与[定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)包含标识相关配置；本次核对的 Fabric 本体定义协议以属性或列声明标识；Palantir 也以属性声明主键。它们不等于本平台复合键排序合同。
 
-Ossie 的 [identify_by](https://github.com/apache/ossie/blob/main/ontology/ontology.md#identifying-relationships)列出标识关系，可含实体引用。本平台仅在全部成员均可折叠为属性且不改变已有父标识时整组转换；含关系成员按 RT-32 待补全，子类自有首选标识受 RT-68 继承边界限制。
+Ossie 的 [identify_by](https://github.com/apache/ossie/blob/main/ontology/ontology.md#identifying-relationships)列出标识关系，可含实体引用。本平台仅在全部成员均可折叠为属性且不改变已有父标识时整组转换；含关系成员在上级有完整标识时按 RI-01 展开为上级标识属性，否则按 RT-32 待补全，子类自有首选标识受 RT-68 继承边界限制。

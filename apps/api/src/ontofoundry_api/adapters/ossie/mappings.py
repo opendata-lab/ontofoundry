@@ -327,6 +327,63 @@ def property_for(importer, owner, name):
     return None
 
 
+def referent_columns(importer, scope, owner, refs):
+    """Resolve (possibly nested) referent mappings to {identifier property id: column}.
+
+    Each member appears exactly once; a nested level must cover the target's whole
+    identifier, and every leaf is a direct column of one dataset (RI-03).
+    """
+    t = importer.t
+    info = None
+    columns = {}
+    seen = set()
+    generated = {p.id for pairs in importer.identity_links.values() for _t, p in pairs}
+
+    def column(expression):
+        nonlocal info
+        dataset, ast = scope.reference(expression)
+        if not isinstance(ast, exp.Column):
+            raise ValueError("身份字段不能是计算表达式")
+        if info and info is not dataset:
+            raise ValueError("一个对象身份跨多个数据集")
+        info = dataset
+        return ast.name
+
+    for ref in refs:
+        member = property_for(importer, owner, ref.get("relationship", ""))
+        if member is None or member.id in seen:
+            raise ValueError("身份成员缺失或重复")
+        seen.add(member.id)
+        nested = ref.get("referent_mappings")
+        if bool(nested) == bool(ref.get("expression")):
+            raise ValueError("身份成员必须二选一：expression 或嵌套 referent_mappings")
+        if isinstance(member, Property):
+            if nested:
+                raise ValueError("属性成员不能嵌套 referent_mappings")
+            columns[member.id] = column(ref["expression"])
+            continue
+        pairs = importer.identity_links.get(member.id)
+        if pairs is None:
+            raise ValueError("身份成员不是已转换属性")
+        if nested:
+            target = next(n for n, o in t.objects.items() if o.id == member.target_type_id)
+            sub_info, sub = referent_columns(importer, scope, target, nested)
+            if info and info is not sub_info:
+                raise ValueError("一个对象身份跨多个数据集")
+            info = sub_info
+            if set(sub) != {target_prop.id for target_prop, _p in pairs}:
+                raise ValueError("嵌套 referent_mappings 必须对应上级完整标识")
+            for target_prop, prop in pairs:
+                columns[prop.id] = sub[target_prop.id]
+        else:
+            # Compatibility shorthand: an entity referent written as a value is
+            # accepted only when the target is identified by one plain value.
+            if len(pairs) != 1 or pairs[0][0].id in generated:
+                raise ValueError("实体型标识成员须用嵌套 referent_mappings 展开")
+            columns[pairs[0][1].id] = column(ref["expression"])
+    return info, columns
+
+
 def identity(importer, scope, owner, raw):
     refs = raw.get("referent_mappings", [])
     obj = importer.t.objects[owner]
@@ -334,20 +391,11 @@ def identity(importer, scope, owner, raw):
     fields = {}
     info = None
     if refs:
-        for ref in refs:
-            if ref.get("referent_mappings"):
-                raise ValueError("嵌套 referent_mappings 未承载")
-            prop = property_for(importer, owner, ref["relationship"])
-            if not isinstance(prop, Property):
-                raise ValueError("身份成员不是已转换属性")
-            dataset, ast = scope.reference(ref["expression"])
-            if not isinstance(ast, exp.Column):
-                raise ValueError("身份字段不能是计算表达式")
-            if info and info is not dataset:
-                raise ValueError("一个对象身份跨多个数据集")
-            info = dataset
-            fields[prop.name] = ColumnBinding(
-                kind="column", source_id="main", column=ast.name
+        info, columns = referent_columns(importer, scope, owner, refs)
+        names = {p.id: p.name for p in DraftIndex(importer.t.model).effective_properties(obj.id)}
+        for prop_id, column in columns.items():
+            fields[names[prop_id]] = ColumnBinding(
+                kind="column", source_id="main", column=column
             )
         if {p.name for p in identifiers} != set(fields):
             raise ValueError("referent_mappings 必须对应完整有效标识")
@@ -652,10 +700,58 @@ def restore_declared_uniqueness(importer, scopes):
             )
 
 
+def check_identity_link(importer, scope, owner, root, child, link, path):
+    """An identifying link is joined by its identifier (RI-01); a link mapping
+    for it must name, member by member, the same columns (RI-04)."""
+    t = importer.t
+    try:
+        bound = scope.bindings.get(link.source_type_id)
+        if not bound:
+            raise ValueError("关系端点缺少本作用域主身份映射")
+        source, mapping = bound
+        root_info, root_fields, _ = identity(importer, scope, owner, root["object_mapping"])
+        if root_info is not source or any(
+            mapping.fields.get(name) != field for name, field in root_fields.items()
+        ):
+            raise ValueError("关系映射的根与对象主身份不一致")
+        if child.get("children"):
+            raise ValueError("多层关系 children 未承载")
+        refs = child["object_mapping"].get("referent_mappings")
+        target = next(n for n, o in t.objects.items() if o.id == link.target_type_id)
+        if refs:
+            ref_info, columns = referent_columns(importer, scope, target, refs)
+        else:
+            ref_info, ast = scope.reference(child["object_mapping"].get("expression", ""))
+            pairs = importer.identity_links[link.id]
+            if len(pairs) != 1 or not isinstance(ast, exp.Column):
+                raise ValueError("实体型关系端点须用嵌套 referent_mappings 展开")
+            columns = {pairs[0][0].id: ast.name}
+        if ref_info is not source:
+            raise ValueError("关系端点引用与对象主身份不在同一数据集")
+        for target_prop, prop in importer.identity_links[link.id]:
+            field = mapping.fields.get(prop.name)
+            if not isinstance(field, ColumnBinding) or columns.get(target_prop.id) != field.column:
+                raise ValueError("关系映射的列与标识展开的列不一致")
+    except (ValueError, SqlglotError) as error:
+        t.issue(path, "dropped", "RelationshipBinding", "RT-53", str(error), completion=True)
+        return
+    t.issue(
+        path,
+        "converted",
+        "RelationshipBinding",
+        "RT-53",
+        "标识关系按展开的标识属性对接，与映射逐项一致",
+        targets=[link.id],
+    )
+
+
 def bind_relationship(importer, scope, owner, root, child, path):
     t = importer.t
     link = property_for(importer, owner, child.get("relationship", ""))
     if not isinstance(link, LinkType):
+        return
+    if link.id in importer.identity_links:
+        check_identity_link(importer, scope, owner, root, child, link, path)
         return
     if link.data_join is not None:
         t.issue(

@@ -429,6 +429,8 @@ class MappingExporter:
                 )
 
     def property_columns(self, obj_id, props):
+        if any((obj_id, p) not in self.property_fields for p in props):
+            raise ValueError("关系端点属性没有直接列映射，导出只保留普通关系")
         values = [self.property_fields[obj_id, p] for p in props]
         if (
             not values
