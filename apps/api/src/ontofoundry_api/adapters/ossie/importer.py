@@ -32,6 +32,8 @@ from .translation import Translation
 from .validator import BUILTIN_VALUE_CONCEPTS, validate_schema, validate_semantics
 
 BUILTINS = {name: ValueKind(name.lower()) for name in BUILTIN_VALUE_CONCEPTS}
+# "target_role.relationship(owner)": a relationship read from its other end.
+INVERSE = re.compile(r"\s*([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]\w*)\s*\)\s*")
 
 
 class OntologyImporter:
@@ -339,6 +341,7 @@ class OntologyImporter:
 
     def import_relationships(self):
         # Parents precede children, so inherited names are already reserved.
+        inverses = []
         for owner, _obj in sorted(
             self.t.objects.items(),
             key=lambda pair: len(DraftIndex(self.t.model).ancestors(pair[1].id)),
@@ -402,6 +405,8 @@ class OntologyImporter:
                                 "属性值类型未闭合，不能默认转字符串",
                                 completion=True,
                             )
+                    elif (base := self.inverse_of(owner, rel)) is not None:
+                        inverses.append((owner, rel, path, base))
                     else:
                         self.import_binary_link(owner, name, rel, path)
                 except ValueError as error:
@@ -424,6 +429,95 @@ class OntologyImporter:
                             "RT-21",
                             "独立角色名不存储；规则转换单独核对变量绑定",
                         )
+        for owner, rel, path, base in inverses:
+            self.merge_inverse(owner, rel, path, base)
+
+    def inverse_of(self, owner, rel):
+        """Name the relationship this one only reads backwards, if any.
+
+        `component.owns: derived_by ["api.owner(component)"]` is `api.owner` read
+        from the other end; it is not a second relationship (link-types.md).
+        """
+        derived = rel.get("derived_by") or []
+        if len(derived) != 1 or rel.get("requires"):
+            return None
+        match = INVERSE.fullmatch(derived[0])
+        if not match:
+            return None
+        role = rel["roles"][0]
+        target = role["concept"]
+        variable, base_name, subject = match.groups()
+        if variable != role.get("name", target) or subject != owner:
+            return None
+        base = next(
+            (
+                r
+                for r in self.concepts.get(target, {}).get("relationships", [])
+                if isinstance(r, dict) and r.get("name") == base_name
+            ),
+            None,
+        )
+        if (
+            base is None
+            or base.get("derived_by")
+            or len(base.get("roles", [])) != 1
+            or base["roles"][0]["concept"] != owner
+        ):
+            return None
+        return target, base_name
+
+    def merge_inverse(self, owner, rel, path, base):
+        target, base_name = base
+        link = self.t.members.get((target, base_name))
+        if not isinstance(link, LinkType):
+            # The forward relationship did not survive; keep the old behaviour.
+            self.import_binary_link(owner, rel["name"], rel, path)
+            return
+        role = rel["roles"][0]
+        owner_role = "{" + owner + "}"
+        target_roles = {
+            "{" + target + "}",
+            "{" + target + ":" + role.get("name", target) + "}",
+        }
+        readings = [
+            re.sub(
+                r"\{[^{}]+\}",
+                lambda m: "{target}"
+                if m.group() == owner_role
+                else "{source}"
+                if m.group() in target_roles
+                else m.group(),
+                reading,
+            )
+            for reading in rel.get("verbalizes", [])
+        ]
+        added = [r for r in readings if r not in link.verbalizes]
+        merged = link.model_copy(update={"verbalizes": [*link.verbalizes, *added]})
+        if not self.t.replace(
+            "link_types",
+            merged,
+            path,
+            rule="RT-70",
+            message=f"反向关系并入 {target}.{base_name}，读法作为反向读法保留",
+        ):
+            return
+        self.issue(
+            path + "/name",
+            "dropped",
+            "Relationship",
+            "RT-70",
+            f"反向关系的标识 {rel['name']} 和显示名不单独保存；从 {owner} 反向浏览 {target}.{base_name} 即可",
+        )
+        declared = rel.get("multiplicity")
+        if declared and link.multiplicity != "one_to_one":
+            self.issue(
+                path + "/multiplicity",
+                "dropped",
+                "Relationship",
+                "RT-70",
+                f"反向关系声明 {declared}，与 {target}.{base_name}（{link.multiplicity}）反过来不一致，"
+                "以原关系为准，请业务确认",
+            )
 
     def identifiers(self):
         # Parents first; an identifier that names a relationship waits until
