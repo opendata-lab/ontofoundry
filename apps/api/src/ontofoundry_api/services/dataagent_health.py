@@ -4,8 +4,8 @@ from typing import Any
 
 from ontofoundry_api.config import Settings
 from ontofoundry_api.services.dataagent import (
-    DataAgentClient,
     DataAgentError,
+    dataagent_client,
     require_dataagent_configuration,
 )
 
@@ -18,9 +18,9 @@ def _skipped(name: str, reason: str, hint: str) -> dict[str, Any]:
     return _check(name, False, f"未执行：{reason}", hint)
 
 
-async def dataagent_health(settings: Settings) -> dict[str, Any]:
-    # Deployment-level check: the result depends only on server settings, so no
-    # workspace is involved and the session reference is a fixed system value.
+async def dataagent_health(settings: Settings, username: str) -> dict[str, Any]:
+    # Deployment-level check: no workspace is involved. DataAgent attributes
+    # every request to a user, so the check runs as the requesting admin.
     try:
         require_dataagent_configuration(settings.dataagent_base_url)
     except DataAgentError as exc:
@@ -33,14 +33,7 @@ async def dataagent_health(settings: Settings) -> dict[str, Any]:
         return {"ok": False, "checks": checks}
 
     checks = [_check("配置完整性", True, "服务端地址已配置")]
-    client = DataAgentClient(
-        settings.dataagent_base_url,
-        prefix=settings.dataagent_api_prefix,
-        website_id=settings.dataagent_website_id,
-        access_key=settings.dataagent_access_key,
-        session_ref="ontofoundry:system:diagnostics",
-        timeout_seconds=settings.dataagent_request_timeout_seconds,
-    )
+    client = dataagent_client(settings, username)
     try:
         await client.agent_profile(settings.dataagent_agent_id)
     except DataAgentError as exc:
@@ -52,15 +45,12 @@ async def dataagent_health(settings: Settings) -> dict[str, Any]:
                     _skipped("Agent 存在性", "DataAgent 不可达", exc.hint),
                 ]
             )
-        elif str(exc) in {
-            "DataAgent 拒绝了本站点",
-            "DataAgent 拒绝了服务端接入密钥",
-        }:
+        elif str(exc) == "DataAgent 拒绝了本站点":
             checks.extend(
                 [
                     _check("连通性", True, "已连接 DataAgent"),
                     _check("站点放行", False, str(exc), exc.hint),
-                    _skipped("Agent 存在性", "接入校验未通过", exc.hint),
+                    _skipped("Agent 存在性", "站点校验未通过", exc.hint),
                 ]
             )
         elif str(exc) == "DataAgent 上找不到该 Agent":

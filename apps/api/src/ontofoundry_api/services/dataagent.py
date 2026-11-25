@@ -37,14 +37,39 @@ class DataAgentError(RuntimeError):
 
 
 def require_dataagent_configuration(base_url: str) -> None:
-    # The access key is optional: DataAgent only checks it on sites whose
-    # server-side access was switched on, and its admin UI has no switch for that.
     if not base_url.strip():
         raise DataAgentError(
             "DataAgent 未配置",
             status_code=503,
             hint="设置 ONTOFOUNDRY_DATAAGENT_BASE_URL 后重启",
         )
+
+
+def dataagent_client(settings: Any, username: str) -> "DataAgentClient":
+    return DataAgentClient(
+        settings.dataagent_base_url,
+        prefix=settings.dataagent_api_prefix,
+        website_id=settings.dataagent_website_id,
+        username=username,
+        timeout_seconds=settings.dataagent_request_timeout_seconds,
+    )
+
+
+def session_client(app: Any, session_id: str) -> "DataAgentClient":
+    """The client for one modeling session: DataAgent sees its creator.
+
+    DataAgent has no shared conversations, so every call about a session,
+    including a read another member triggers, is made as the session creator.
+    """
+    from ontofoundry_api.db_models import ModelingSessionRecord, UserRecord
+
+    with app.state.session_factory() as db:
+        item = db.get(ModelingSessionRecord, session_id)
+        owner = db.get(UserRecord, item.created_by) if item is not None else None
+        if owner is None:
+            raise DataAgentError("建模会话缺少创建人，无法访问 DataAgent", status_code=409)
+        username = owner.username
+    return dataagent_client(app.state.settings, username)
 
 
 class DataAgentClient:
@@ -54,15 +79,15 @@ class DataAgentClient:
         *,
         prefix: str,
         website_id: str,
-        access_key: str,
-        session_ref: str,
+        username: str,
         timeout_seconds: int = 30,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.prefix = "/" + prefix.strip("/")
         self.website_id = website_id
-        self.access_key = access_key
-        self.session_ref = session_ref
+        # DataAgent attributes every request to this OntoFoundry user; a
+        # modeling session always acts as its creator.
+        self.username = username
         self.timeout = httpx.Timeout(timeout_seconds)
 
     @property
@@ -70,10 +95,8 @@ class DataAgentClient:
         headers = {
             "X-DataAgent-Client": "widget",
             "X-DataAgent-Website-Id": self.website_id,
-            "X-DataAgent-User-Id": self.session_ref,
+            "X-DataAgent-User-Id": self.username,
         }
-        if self.access_key:
-            headers["X-DataAgent-Access-Key"] = self.access_key
         # Carry the caller's id so both services' logs share it.
         request_id = request_id_var.get()
         if request_id:
@@ -122,15 +145,6 @@ class DataAgentClient:
                     "DataAgent 拒绝了本站点",
                     status_code=502,
                     hint=(f"在管理端 → Widget 接入设置中放行 website_id={self.website_id}"),
-                )
-            if response.status_code == 403 and "access key" in normalized_detail:
-                raise DataAgentError(
-                    "DataAgent 拒绝了服务端接入密钥",
-                    status_code=502,
-                    hint=(
-                        "该站点开启了服务端接入校验：把 access-key 接口生成的密钥"
-                        "填入 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
-                    ),
                 )
             raise DataAgentError(
                 f"DataAgent 请求失败 ({response.status_code}): {detail or response.reason_phrase}",

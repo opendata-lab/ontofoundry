@@ -17,7 +17,6 @@ def _dataagent_client(
     handler,
     *,
     base_url: str = "https://dataagent.example",
-    access_key: str = "server-secret",
 ) -> DataAgentClient:
     transport = httpx.MockTransport(handler)
     real_async_client = httpx.AsyncClient
@@ -30,8 +29,7 @@ def _dataagent_client(
         base_url,
         prefix="/api/v1/nl2sql",
         website_id="ontofoundry",
-        access_key=access_key,
-        session_ref="ontofoundry:workspace-1:diagnostics",
+        username="dev",
     )
 
 
@@ -58,15 +56,6 @@ def _dataagent_client(
             "在管理端 → Widget 接入设置中放行 website_id=ontofoundry",
         ),
         (
-            "access_key_rejected",
-            502,
-            "DataAgent 拒绝了服务端接入密钥",
-            (
-                "该站点开启了服务端接入校验：把 access-key 接口生成的密钥"
-                "填入 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
-            ),
-        ),
-        (
             "agent_missing",
             502,
             "DataAgent 上找不到该 Agent",
@@ -77,7 +66,7 @@ def _dataagent_client(
         ),
     ],
 )
-async def test_five_failures_have_stable_http_status_message_and_hint(
+async def test_four_failures_have_stable_http_status_message_and_hint(
     monkeypatch,
     case,
     expected_status,
@@ -89,8 +78,6 @@ async def test_five_failures_have_stable_http_status_message_and_hint(
             raise httpx.ConnectError("connection refused", request=request)
         if case == "site_denied":
             return httpx.Response(403, json={"detail": "site is not allowed"})
-        if case == "access_key_rejected":
-            return httpx.Response(403, json={"detail": "invalid access key"})
         if case == "agent_missing":
             return httpx.Response(404, json={"detail": "agent not found"})
         raise AssertionError("local configuration failures must not call DataAgent")
@@ -115,7 +102,6 @@ async def test_five_failures_have_stable_http_status_message_and_hint(
 def test_bff_returns_message_and_hint_for_dataagent_failure(client, monkeypatch):
     settings = client.app.state.settings
     settings.dataagent_base_url = "https://dataagent.example"
-    settings.dataagent_access_key = "server-secret"
 
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(403, json={"detail": "site is not allowed"})
@@ -144,13 +130,12 @@ def test_health_checks_agent_profile_public_route_and_reports_all_checks(
 ):
     settings = client.app.state.settings
     settings.dataagent_base_url = "https://dataagent.example"
-    settings.dataagent_access_key = "server-secret"
     requested_paths: list[str] = []
-    seen_session_refs: list[str] = []
+    seen_users: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requested_paths.append(request.url.path)
-        seen_session_refs.append(request.headers["X-DataAgent-User-Id"])
+        seen_users.append(request.headers["X-DataAgent-User-Id"])
         return httpx.Response(200, json={"agent_id": settings.dataagent_agent_id})
 
     _dataagent_client(monkeypatch, handler)
@@ -166,13 +151,13 @@ def test_health_checks_agent_profile_public_route_and_reports_all_checks(
     ]
     assert all(check["ok"] for check in response.json()["checks"])
     assert requested_paths == [f"/api/v1/dataagent/agents/{settings.dataagent_agent_id}"]
-    assert seen_session_refs == ["ontofoundry:system:diagnostics"]
+    # The check runs as the requesting platform admin.
+    assert seen_users == ["dev"]
 
 
 def test_health_reports_missing_agent_without_using_topic_filter(client, monkeypatch):
     settings = client.app.state.settings
     settings.dataagent_base_url = "https://dataagent.example"
-    settings.dataagent_access_key = "server-secret"
     settings.dataagent_agent_id = "missing-agent"
     requested_paths: list[str] = []
 

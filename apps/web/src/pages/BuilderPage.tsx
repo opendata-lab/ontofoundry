@@ -173,7 +173,7 @@ function BuilderSplit({ conversation, results }: { conversation: ReactNode; resu
 }
 
 export function BuilderPage() {
-  const { workspace } = useWorkspaceContext();
+  const { workspace, user } = useWorkspaceContext();
   const { canEdit } = useWorkspacePermissions();
   const model = useModeling(workspace.id, true, true);
   const { session, sessionId, setSession, error, setError } = model;
@@ -266,10 +266,13 @@ export function BuilderPage() {
   // Sending waits for DataAgent to be configured, the previous run and its
   // result, pending proposals and uploads. The SDK itself requires some text.
   // Pending proposals do not block a run: the agent sees them and revises them (AI-08).
-  const blocked = !canEdit || !capabilities?.agent_configured || running || resultPending || busy || uploading;
+  // A DataAgent conversation belongs to its creator; other members read it.
+  const notCreator = !!session && !!user && session.created_by !== user.id;
+  const blocked = !canEdit || notCreator || !capabilities?.agent_configured || running || resultPending || busy || uploading;
   // Why sending is refused, shown above the input. A live run needs no note:
   // the composer shows its stop button.
   const blockedReason = !canEdit ? ""
+    : notCreator ? "只有会话创建人可以在此会话中发消息，请新建自己的会话"
     : running ? ""
     : capabilities && !capabilities.agent_configured ? "DataAgent 建模服务未配置，请联系部署管理员"
     : resultPending ? "上一轮结果还在处理，请稍候"
@@ -673,7 +676,7 @@ export function BuilderPage() {
                     That object is null while a session loads, and an endpoint that
                     momentarily goes empty reads as a conversation switch — the
                     element would clear itself and reload for no reason. */}
-                  <dataagent-conversation ref={conversation} disabled={!canEdit || !!session?.abandoned_at} placeholder={canEdit ? (mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…") : "只读模式下不可发送消息"} className={CONVERSATION}>
+                  <dataagent-conversation ref={conversation} disabled={!canEdit || notCreator || !!session?.abandoned_at} placeholder={!canEdit ? "只读模式下不可发送消息" : notCreator ? "只有会话创建人可以在此会话中发消息" : mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
                     <BuilderConversationEmpty mode={mode} />
                     {blockedReason && (
                       <div slot="composer-overlay" className="px-1 pb-1">

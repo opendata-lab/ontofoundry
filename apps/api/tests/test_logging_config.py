@@ -124,7 +124,7 @@ def test_requests_get_an_id_and_one_completion_line(client, caplog):
 def test_calls_to_dataagent_carry_the_request_id():
     from ontofoundry_api.services.dataagent import DataAgentClient
 
-    client = DataAgentClient("http://agent.invalid", prefix="/api", website_id="w", access_key="", session_ref="s")
+    client = DataAgentClient("http://agent.invalid", prefix="/api", website_id="w", username="s")
     assert "X-Request-ID" not in client.headers
     token = request_id_var.set("req-42")
     try:

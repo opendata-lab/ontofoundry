@@ -8,7 +8,7 @@ from ontofoundry_api.config import Settings
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 
 
-def _client(monkeypatch, handler, *, access_key: str = "secret") -> DataAgentClient:
+def _client(monkeypatch, handler) -> DataAgentClient:
     transport = httpx.MockTransport(handler)
     real_async_client = httpx.AsyncClient
     monkeypatch.setattr(
@@ -18,19 +18,16 @@ def _client(monkeypatch, handler, *, access_key: str = "secret") -> DataAgentCli
         "https://dataagent.example/",
         prefix="/custom/runtime/",
         website_id="website-1",
-        access_key=access_key,
-        session_ref="ontofoundry:workspace-1:session-1",
+        username="alice",
     )
 
 
-def _assert_auth_headers(request: httpx.Request, *, access_key: bool = True) -> None:
+def _assert_auth_headers(request: httpx.Request) -> None:
     assert request.headers["X-DataAgent-Client"] == "widget"
     assert request.headers["X-DataAgent-Website-Id"] == "website-1"
-    assert request.headers["X-DataAgent-User-Id"] == "ontofoundry:workspace-1:session-1"
-    if access_key:
-        assert request.headers["X-DataAgent-Access-Key"] == "secret"
-    else:
-        assert "X-DataAgent-Access-Key" not in request.headers
+    assert request.headers["X-DataAgent-User-Id"] == "alice"
+    assert "X-DataAgent-Access-Key" not in request.headers
+    assert "Origin" not in request.headers
 
 
 def test_dataagent_settings_defaults():
@@ -38,7 +35,7 @@ def test_dataagent_settings_defaults():
 
     assert settings.dataagent_api_prefix == "/api/v1/nl2sql"
     assert settings.dataagent_website_id == "ontofoundry"
-    assert settings.dataagent_access_key == ""
+    assert not hasattr(settings, "dataagent_access_key")
 
 
 @pytest.mark.asyncio
@@ -93,22 +90,6 @@ async def test_runtime_paths_and_auth_headers(monkeypatch):
         "request_id": "question-1",
         "answers": [{"value": "yes"}],
     }
-
-
-@pytest.mark.asyncio
-async def test_empty_access_key_calls_without_the_header(monkeypatch):
-    # DataAgent sites check the key only when server-side access is switched on.
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(200, json={"topic_id": "topic-1"})
-
-    client = _client(monkeypatch, handler, access_key="")
-
-    await client.create_topic("Topic", "agent-1")
-
-    _assert_auth_headers(requests[0], access_key=False)
 
 
 @pytest.mark.asyncio

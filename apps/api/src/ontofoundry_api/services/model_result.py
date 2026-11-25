@@ -9,24 +9,12 @@ from typing import Any
 from sqlalchemy import and_, or_, update
 
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
-from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
+from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError, session_client
 from ontofoundry_api.services.proposals import batch_item_count, submitted_batch
 
 logger = logging.getLogger(__name__)
 
 RESULT_LEASE = timedelta(minutes=5)
-
-
-def _client(app: Any, workspace_id: str, session_id: str) -> DataAgentClient:
-    settings = app.state.settings
-    return DataAgentClient(
-        settings.dataagent_base_url,
-        prefix=settings.dataagent_api_prefix,
-        website_id=settings.dataagent_website_id,
-        access_key=settings.dataagent_access_key,
-        session_ref=f"ontofoundry:{workspace_id}:{session_id}",
-        timeout_seconds=settings.dataagent_request_timeout_seconds,
-    )
 
 
 def _guarded_result_values(
@@ -131,7 +119,7 @@ async def _fail_with_workflow(
     detail: str,
 ) -> str:
     """A permanent failure that also keeps the workflow files as diagnostics."""
-    found = await workflow_diagnostics(_client(app, workspace_id, session_id), topic_id)
+    found = await workflow_diagnostics(session_client(app, session_id), topic_id)
     values: dict[str, Any] = {
         "result_state": "failed_permanent",
         "task_detail": detail
