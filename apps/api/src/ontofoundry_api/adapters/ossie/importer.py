@@ -583,10 +583,16 @@ class OntologyImporter:
             pairs = []
             for target_prop in targets:
                 tech, _label = self.names(obj, member.name + "_" + target_prop.name, None)
+                # "所属仓库·编码": the link's name, then the parent key's name.
+                link_label = member.display_name or member.name
+                key_label = target_prop.display_name or target_prop.name
                 prop = Property(
                     id=self.t.id(f"identity-property:{name}.{member_name}:{target_prop.id}"),
                     owner_type_id=obj.id,
                     name=tech,
+                    display_name=f"{link_label}·{key_label}",
+                    description=f"{link_label} 的标识 {key_label}；由标识关系 {member.name} 展开，"
+                    f"按它对接 {target}",
                     value_kind=target_prop.value_kind,
                     value_type_id=target_prop.value_type_id,
                     required=True,

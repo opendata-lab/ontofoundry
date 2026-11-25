@@ -179,6 +179,9 @@ def test_relationship_identifier_expands_to_the_parent_key_level_by_level():
     props = {p.id: p for p in result.model.properties}
     generated = [p for p in props.values() if p.name.startswith(("warehouse_", "zone_w", "zone_z"))]
     assert generated and all(p.required for p in generated)
+    labels = {p.name: p.display_name for p in generated}
+    assert labels["zone_warehouse_code"] == "zone·warehouse·code"
+    assert "由标识关系 zone 展开" in next(p for p in generated if p.name == "zone_zone_code").description
     zone_link = next(link for link in result.model.link_types if link.name == "zone")
     pairs = zip(
         zone_link.data_join.source_property_ids,
