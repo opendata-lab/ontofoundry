@@ -1061,6 +1061,7 @@ Ossie 的必填字段优先从核心推导；无法推导或无法合法表达�
 | 属性型关系（实体 → 值） | ✅ | ✅ |
 | 二元关系（实体 → 实体） | ✅ | ✅（三种基数） |
 | 自关联 | ✅ | ✅（角色名 `related`） |
+| 反向关系（`derived_by` 只是 `B.r(A)`） | 🔁 并入原关系的反向读法（RT-70） | 原关系带正反读法导出，不再单列 |
 | 一元关系 | 🔁 布尔属性 | 不还原 |
 | 多元关系 | 🔁 中间对象 | 不还原 |
 | `identify_by` 含关系成员 | 🔁 上级标识可完整展开时等价平铺为必填属性 + DirectJoin（RI-01）；否则整组不导入，报“标识待补全” | 平铺写法，不还原（RI-05） |
@@ -1196,6 +1197,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-66 | 来源引擎和物理元数据不能保证自动往返 | Dataset.dialect、元数据快照列类型及采集来源 | 无同构标准字段者写数据集描述并报告损失，不能从 ANSI_SQL 猜引擎或伪造元数据快照 |
 | RT-67 | 成员派生定义按本体 id 转换 | 简单条件或关系 EXISTS，多分支并集、多层逐级限定 | 完整解析且等价输出者 converted；不能闭合的整项 RT-31 error 待补全，不取部分分支，不重复建 Rule |
 | RT-68 | 子类首选属性标识不能改写已有父身份 | Person.person_no；Employee extends Person，identify_by 为 employee_no | Employee 沿用 person_no；employee_no 为普通 unique 属性，原首选标识 dropped，逐项报告且原文保留；依赖该标识且不能等价改写的映射 error 待补全 |
+| RT-70 | 反向关系并入原关系 | `customer.orders`，`derived_by: ["order.buyer(customer)"]`，`order.buyer` 是指向 customer 的二元关系 | 不另建关系（`docs/concepts/link-types.md`：关系只定义一次）；读法作为反向读法并入 `order.buyer`，converted；反向关系的标识和显示名 dropped；声明的基数与原关系反过来不一致时 dropped 提示业务确认，以原关系为准。`derived_by` 带其他条件、原关系不存在或本身是派生的，按普通关系处理 |
 | RT-69 | OSI 指标超出单数据集表达式边界 | 引用多个数据集，或含 SELECT、FROM、JOIN、额外查询作用域 | 首版不承载；本项 error，原文、来源及定位保留转换报告并标待补全，不生成核心指标；用户可改写为单个数据集上的指标 |
 
 **支持范围内保持不变的部分**：实体概念名（RT-12 除外）、实体继承（RT-34 除外）、实体描述（RT-59 合并说明除外）、属性和二元关系的名字与指向、二元关系的基数、

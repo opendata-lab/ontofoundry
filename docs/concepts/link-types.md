@@ -109,7 +109,7 @@ LEFT JOIN dw.customers AS c ON o.customer_id = c.customer_id;
 
 反例：把它声明为一对一，与两张订单属于同一客户的事实冲突；声明不等于数据库已验证约束。
 
-正例：订单指向客户设为 many_to_one，关系标识 customer，正向含义“{source}属于{target}”，反向含义“{target}拥有{source}”。反例：为了从客户浏览订单，再建一条意义相同的反向关系，会产生两个独立定义。core-1 不存 one_to_many 枚举，统一从多的一端定义。
+正例：订单指向客户设为 many_to_one，关系标识 customer，正向含义“{source}属于{target}”，反向含义“{target}拥有{source}”。反例：为了从客户浏览订单，再建一条意义相同的反向关系，会产生两个独立定义。core-1 不存 one_to_many 枚举，统一从多的一端定义。Ossie 材料里写成另一条关系、`derived_by` 只是 `order.buyer(customer)` 的反向关系，导入时并入 `order.buyer` 的反向读法，不另建（RT-70）。
 
 没有附加信息的学生选课可以用 many_to_many 和映射表。选课若还有成绩、选课日期或重修次数，应把“选课记录”建为中间对象；三方供货事实也使用中间对象和多条二元关系。
 

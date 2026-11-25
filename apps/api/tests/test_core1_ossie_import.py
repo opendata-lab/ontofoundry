@@ -334,6 +334,54 @@ def test_nary_relationship_on_an_expanded_entity_gets_its_tuple_identifier():
     assert not issues(result, "RT-28", "error")
 
 
+def orders_and_customers(derived="order.buyer(customer)", **inverse):
+    return document(
+        entity(
+            "order",
+            relationships=[
+                rel("buyer", "customer", source="order", multiplicity="ManyToOne",
+                    verbalizes=["{order} 属于 {customer}"]),
+            ],
+        ),
+        entity(
+            "customer",
+            relationships=[
+                rel("orders", "order", verbalizes=["{customer} 拥有 {order}"],
+                    derived_by=[derived], **inverse),
+            ],
+        ),
+    )
+
+
+def test_inverse_relationship_is_one_link_read_both_ways():
+    result = run(orders_and_customers())
+    [link] = result.model.link_types
+    assert link.name == "buyer"
+    assert link.verbalizes == ["{source} 属于 {target}", "{target} 拥有 {source}"]
+    assert issues(result, "RT-70", "converted")
+    assert [i.source_path for i in issues(result, "RT-70", "dropped")] == [
+        "/ontology/1/relationships/0/name"
+    ]
+    assert not issues(result, "RT-31")
+
+
+def test_inverse_with_a_contradicting_multiplicity_is_reported():
+    result = run(orders_and_customers(multiplicity="ManyToOne"))
+    assert len(result.model.link_types) == 1
+    assert any(
+        i.source_path.endswith("/multiplicity") for i in issues(result, "RT-70", "dropped")
+    )
+
+
+@pytest.mark.parametrize(
+    "derived", ["order.buyer(customer) AND order.buyer.vip", "order.seller(customer)"]
+)
+def test_other_derivations_are_not_treated_as_inverses(derived):
+    result = run(orders_and_customers(derived))
+    assert sorted(link.name for link in result.model.link_types) == ["buyer", "orders"]
+    assert not issues(result, "RT-70")
+
+
 def test_first_parent_is_file_order_and_child_does_not_change_parent_identity():
     result = run(
         document(
