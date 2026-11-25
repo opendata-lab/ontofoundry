@@ -143,7 +143,7 @@ def test_pinned_scope_and_original_single_line_evidence(client, fake_agent):
     uploads, _ = fake_agent
     manifest, pack, [report] = turn(client, session, uploads)
     assert len(uploads[manifest["input_files"]["work_pack"]]) <= 8192
-    assert "补全导入缺口" in pack["import_report"]["note"]
+    assert "计划逐项列出快照列" in pack["import_report"]["note"]
     assert pack["import_report"]["missing_table_count"] == 1
     assert {item["target_kind"] for item in report["excluded"]} == {
         "dataset",

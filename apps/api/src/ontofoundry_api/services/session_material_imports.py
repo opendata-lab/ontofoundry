@@ -258,7 +258,7 @@ def import_report_note(reports, active_batch_id, file):
     missing_count = sum(r["missing_table_count"] for r in reports)
     notes = []
     if pending_count or missing_count:
-        notes.append("计划写“补全导入缺口”，按 import-completion.md 处理")
+        notes.append("导入项已在草稿，不重读材料；计划逐项列出快照列、未证明的物理连接、中文显示名和其他待补全，按 import-completion.md 处理")
     if any(r["status"] == "skipped" for r in reports):
         notes.append("请先处理待审提案再发消息导入")
     if any(r["status"] == "failed" for r in reports):
