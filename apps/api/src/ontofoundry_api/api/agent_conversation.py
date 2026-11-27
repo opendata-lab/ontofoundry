@@ -647,7 +647,6 @@ async def send_message(
             topic_id=topic_id,
             content=prompt,
             agent_id=request.app.state.settings.dataagent_agent_id,
-            execution_mode=request.app.state.settings.dataagent_execution_mode,
             # Plan mode is a modeling choice: the agent submits its plan and
             # waits for approval inside the same run.
             permission_mode=(body.settings.permission_mode or "default") if mode == "model" else None,

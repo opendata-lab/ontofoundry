@@ -226,14 +226,12 @@ class DataAgentClient:
         topic_id: str,
         content: str,
         agent_id: str,
-        execution_mode: str,
         permission_mode: str | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {
             "topic_id": topic_id,
             "content": content,
             "agent_id": agent_id,
-            "execution_mode": execution_mode,
             "debug": False,
         }
         if permission_mode:
