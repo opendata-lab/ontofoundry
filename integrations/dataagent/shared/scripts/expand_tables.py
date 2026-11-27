@@ -4,7 +4,9 @@ The agent decides which table backs which entity, the title property, which
 columns to leave out, display names and descriptions, and which comment lists
 are real value domains; this script writes the properties, value types and
 their constraints, table datasets (columns filled by the platform) and
-single-table mappings (design 2026-11-15 MS-01, MS-03).
+single-table mappings (design 2026-11-15 MS-01, MS-03). A daily snapshot
+table names its date column in snapshot_date_column: the dataset declares it
+and the identifier is the rest of the key (design 2026-11-18 LM-04).
 
 It owns modeling/parts/01-types.json and 03-datasets.json and rewrites them on
 every run; anything written by hand goes in 01b-*.json or 03b-*.json, which
@@ -104,14 +106,18 @@ def expand(spec, tables):
     backed = {}
     for item in entities:
         claim(item.get("name"), f"实体 {item.get('display_name') or item.get('name')}")
+        snapshot = item.get("snapshot_date_column")
+        if snapshot is not None and (not isinstance(snapshot, str) or not snapshot):
+            raise SpecError(f"{item['name']} 的 snapshot_date_column 必须是一个列名（字符串）")
         table = source_table(item, tables)
         if table:
             backed[item["name"]] = table
     column_owner = {}
     for name, table in backed.items():
         item = next(i for i in entities if i["name"] == name)
+        skipped = {*(item.get("exclude_columns") or []), item.get("snapshot_date_column")}
         for column in table["columns"]:
-            if column["name"] not in set(item.get("exclude_columns") or []):
+            if column["name"] not in skipped:
                 column_owner.setdefault(f"{table['key']}.{column['name']}", []).append(name)
 
     bound = {}
@@ -153,7 +159,7 @@ def expand(spec, tables):
                 notes.append(f"值类型 {vt['name']} 的列 {ref_col} 不属于任何展开的实体，未绑定")
             bound[ref_col] = (ref, value_kind(column))
 
-    shared_datasets, columns_to_props, key_props = {}, {}, {}
+    shared_datasets, snapshots, columns_to_props, key_props = {}, {}, {}, {}
     refs = {i["name"]: f"实体 {i['name']} " for i in entities}
     repeated = {n for n in (t["table_name"] for t in tables.values()) if sum(t["table_name"] == n for t in tables.values()) > 1}
     for item in entities:
@@ -170,14 +176,18 @@ def expand(spec, tables):
         excluded = set(item.get("exclude_columns") or [])
         flags = set(item.get("boolean_columns") or [])
         overrides = item.get("properties") or {}
-        unknown = (excluded | flags | set(overrides)) - {c["name"] for c in table["columns"]}
+        snapshot = item.get("snapshot_date_column")
+        unknown = (excluded | flags | set(overrides) | {snapshot} - {None}) - {c["name"] for c in table["columns"]}
         if unknown:
             raise SpecError(f"{name} 引用了表 {table['key']} 没有的列：{', '.join(sorted(unknown))}")
-        pk = table.get("primary_key") or []
+        # The snapshot date picks the day; within one day the rest of the key identifies the entity.
+        pk = [c for c in table.get("primary_key") or [] if c != snapshot]
         if not pk:
-            raise SpecError(f"表 {table['key']} 没有声明主键；{name} 请在 01b、03b 片段里手写属性和映射")
+            raise SpecError(f"表 {table['key']} 没有声明主键（或只有快照日期列）；{name} 请在 01b、03b 片段里手写属性和映射")
         if excluded & set(pk):
-            raise SpecError(f"{name} 不能排除主键列 {', '.join(sorted(excluded & set(pk)))}")
+            raise SpecError(f"{name} 不能排除主键列 {', '.join(sorted(excluded & set(pk)))}；按 references/table-kinds.md 判断：每日全量快照表的日期列写在 snapshot_date_column，其他表在 01b、03b 手写")
+        if snapshot:
+            excluded.add(snapshot)  # declared on the dataset, not a business property
         fields = {}
         columns_to_props[name] = {}
         key_props[name] = []
@@ -223,7 +233,10 @@ def expand(spec, tables):
                 raise SpecError(f"{name} 的 title_property {title} 不是展开出的属性")
             obj["title_property_id"] = {"client_ref": f"{name}_{title_name}"}
         ds_ref = shared_datasets.get(table["key"])
+        if ds_ref is not None and snapshots.get(table["key"]) != snapshot:
+            raise SpecError(f"{name} 与同表 {table['key']} 的其他实体 snapshot_date_column 不一致")
         if ds_ref is None:
+            snapshots[table["key"]] = snapshot
             ds_name = table["table_name"]
             if ds_name in repeated:  # the same table name in two schemas or connections
                 ds_name = re.sub(r"\W", "_", f"{table.get('schema_name') or table['key']}_{ds_name}")
@@ -233,6 +246,8 @@ def expand(spec, tables):
                        "schema_name": table.get("schema_name"), "table_name": table["table_name"]}
             if table.get("dialect"):
                 dataset["dialect"] = table["dialect"]
+            if snapshot:
+                dataset["snapshot_date_column"] = snapshot
             datasets.append({"operation": "create", "target_kind": "dataset", "client_ref": ds_ref, "after": dataset})
         datasets.append({"operation": "create", "target_kind": "mapping", "client_ref": "map_" + name, "after": {
             "type_id": {"client_ref": name}, "binding_mode": "independent",

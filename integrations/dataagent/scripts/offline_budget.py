@@ -280,6 +280,8 @@ def byte_report():
         "选中示例": (len(selected), SELECTED_EXAMPLES_LIMIT),
         "方法决策段": (len(method_bytes), 6000),
         "核心语义": (len(resource("references/core-model.md").read_bytes()), 4500),
+        # Read on demand when a key holds a date; not part of any fixed route.
+        "表类型": (len(resource("references/table-kinds.md").read_bytes()), 3200),
     }
     for name, limit in zip(method_paths, [3000, 3000, 3200, 2500]):
         limits[name] = (len(resource(f"references/{name}.md").read_bytes()), limit)
