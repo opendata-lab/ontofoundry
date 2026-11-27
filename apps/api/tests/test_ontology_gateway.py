@@ -29,6 +29,12 @@ def test_tools_schemas_instructions_and_annotations(client):
     credential = token(client)["token"]
     result = rpc(client, credential, "tools/list").json()["result"]
     assert {tool["name"] for tool in result["tools"]} == set(ontology_gateway.INPUTS)
+    assert {tool["name"]: tool["title"] for tool in result["tools"]} == {
+        "list_spaces": "列出空间",
+        "search_ontology": "搜索本体",
+        "get_ontology": "查询本体",
+        "submit_feedback": "提交反馈",
+    }
     for tool in result["tools"]:
         assert tool["inputSchema"] == ontology_gateway.INPUTS[tool["name"]].model_json_schema()
         assert tool["annotations"] == {"readOnlyHint": tool["name"] != "submit_feedback", "destructiveHint": False}

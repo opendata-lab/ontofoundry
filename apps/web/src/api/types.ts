@@ -987,6 +987,7 @@ export type MCPNotification = {
 };
 export type ToolDescription = {
   name: ToolName;
+  title: string;
   description: string;
   inputSchema: Record<string, Json>;
   annotations: { readOnlyHint: true; destructiveHint: false };

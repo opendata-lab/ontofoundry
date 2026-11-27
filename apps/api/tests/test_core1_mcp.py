@@ -1,4 +1,4 @@
-"""Four-tool protocol, search, inherited definitions and signed pagination."""
+"""Workspace tool protocol, search, inherited definitions and signed pagination."""
 
 import json
 
@@ -15,12 +15,12 @@ def call(client, name, args):
 
 def test_exact_tools_and_reject_old_arguments(client):
     result = mcp_request(client, "tools/list").json()["result"]
-    assert {t["name"] for t in result["tools"]} == {
-        "search_ontology",
-        "get_ontology",
-        "search_objects",
-        "get_object",
-        "resolve_entity",
+    assert {t["name"]: t["title"] for t in result["tools"]} == {
+        "search_ontology": "搜索本体",
+        "get_ontology": "查询本体",
+        "search_objects": "搜索事实",
+        "get_object": "查看事实",
+        "resolve_entity": "解析实体",
     }
     for t in result["tools"]:
         assert "version_id" not in t["inputSchema"]["properties"]
