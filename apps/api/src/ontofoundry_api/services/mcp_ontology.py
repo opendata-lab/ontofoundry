@@ -37,7 +37,7 @@ from ontofoundry_api.services.workspaces import get_workspace
 # MCP get_ontology separates resource-projected kinds from direct definition kinds;
 # mappings are internal physical bindings and excluded from both.
 PHYSICAL_PROJECTION_KINDS = frozenset({"object_type", "link_type", "metric"})
-LIST_RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset")
+LIST_RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset", "action")
 DIRECT_ELEMENT_KINDS = ("property", "rule", "value_type")
 
 
@@ -85,6 +85,7 @@ INPUTS = {
     "get_object": GetObject,
 }
 BUDGET = 110_000  # Both text and structuredContent count toward the 256 KiB wire limit.
+ACTION_EVIDENCE_WIRE_BUDGET = 220_000  # Wire-byte budget for action evidence paging (content[].text + structuredContent) under 256 KiB.
 
 
 def size(value):
@@ -95,6 +96,35 @@ def size(value):
             jsonable_encoder(value), ensure_ascii=False, separators=(",", ":")
         ).encode()
     )
+
+
+def _wire_size(value):
+    """UTF-8 byte size of tool_result(value) as serialized by FastAPI/Starlette (used by action evidence paging)."""
+    from fastapi.encoders import jsonable_encoder
+
+    structured = jsonable_encoder(value)
+    text = json.dumps(structured, ensure_ascii=False)
+    return len(
+        json.dumps(
+            {"content": [{"type": "text", "text": text}], "structuredContent": structured},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode()
+    )
+
+
+def _wire_item_delta(value):
+    """Incremental JSON-RPC wire bytes contributed by one evidence item (structuredContent + escaped text)."""
+    from fastapi.encoders import jsonable_encoder
+
+    structured = jsonable_encoder(value)
+    compact_bytes = len(
+        json.dumps(structured, ensure_ascii=False, separators=(",", ":")).encode()
+    )
+    text = json.dumps(structured, ensure_ascii=False)
+    # json.dumps(text) adds 2 bytes for quotes, matching the ", " separator inside content[0].text.
+    escaped_text_bytes = len(json.dumps(text, ensure_ascii=False).encode())
+    return compact_bytes + 1 + escaped_text_bytes
 
 
 def _invoke(db, workspace_id, principal, name, arguments, settings):
@@ -144,6 +174,27 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             if items and size(items + [values[n]]) > BUDGET // 2:
                 break
             items.append(values[n])
+        end = start + len(items)
+        if end < len(values):
+            cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
+        return {"total": len(values), "items": items, "next_cursor": cursor}
+
+    def page_action_evidence(values, path, base_element, start=0):
+        # Measure both real JSON-RPC wire bytes and structuredContent size for action
+        # evidence so backslash-heavy evidence never overflows 256 KiB or the 120 KB cap.
+        wire_budget = max(8_000, ACTION_EVIDENCE_WIRE_BUDGET - _wire_size(base_element) - 8_000)
+        raw_budget = max(4_000, BUDGET - size(base_element) - 4_000)
+        items, cursor = [], None
+        used_wire = 0
+        for n in range(start, min(len(values), start + args.limit)):
+            delta_wire = _wire_item_delta(values[n])
+            if items and (
+                used_wire + delta_wire > wire_budget
+                or size(items + [values[n]]) > raw_budget
+            ):
+                break
+            items.append(values[n])
+            used_wire += delta_wire
         end = start + len(items)
         if end < len(values):
             cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
@@ -308,6 +359,9 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     definition["used_by_property_ids"] = d["used_by_property_ids"]
                 if definition is not None:
                     definition.pop("connection_id", None)
+                    action_evidence = None
+                    if r["kind"] == "action":
+                        action_evidence = definition.pop("evidence", None) or []
                     if r["kind"] == "dataset":
                         columns = definition.pop("columns", None) or []
                         d["columns"] = columns
@@ -327,7 +381,12 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                                 d["referenced_by"], [len(values), "referenced_by"]
                             )
                     element["definition"] = definition
-                for key in ("properties", "child_types"):
+                    if action_evidence is not None and instances:
+                        d["evidence"] = action_evidence
+                        element["evidence"] = page_action_evidence(
+                            action_evidence, [len(values), "evidence"], element
+                        )
+                for key in ("properties", "child_types", "actions"):
                     if key in d:
                         element[key] = page(d[key], [len(values), key])
                 if "rules" in args.include and "rules" in d:
@@ -355,7 +414,11 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             n, key = path
             d = lookup[values[n]["id"]]["definition"]
             raw = d.get(key)
-            values[n][key] = page(raw, path, offset)
+            if key == "evidence" and values[n]["kind"] == "action":
+                base_el = {k: v for k, v in values[n].items() if k != "evidence"}
+                values[n][key] = page_action_evidence(raw, path, base_el, offset)
+            else:
+                values[n][key] = page(raw, path, offset)
             return {
                 **envelope,
                 "total": len(values),

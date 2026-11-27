@@ -12,6 +12,7 @@ from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import (
     COLLECTIONS,
     NUMERIC_KINDS,
+    AddLinkEffect,
     Aggregation,
     BindingMode,
     ColumnBinding,
@@ -26,8 +27,10 @@ from ontofoundry_api.domain.core import (
     Multiplicity,
     Operator,
     RatioMetric,
+    RemoveLinkEffect,
     RuleKind,
     RuleOwnerKind,
+    SetPropertyEffect,
     SimpleMetric,
     ValueKind,
 )
@@ -457,6 +460,42 @@ def _metric(draft, index, metrics, metric):
             _condition(condition.operator, condition.values, kind)
 
 
+def _action(index: DraftIndex, action) -> None:
+    if action.target_type_id is not None:
+        _require(
+            action.target_type_id in index.objects,
+            f"动作 {action.name} 引用的目标对象不存在",
+        )
+    for param in action.parameters:
+        if param.value_type_id is None:
+            continue
+        value_type = index.value_types.get(param.value_type_id)
+        _require(
+            value_type is not None,
+            f"参数 {param.name} 引用的值类型不存在，请先改绑或一并保留值类型",
+        )
+        _require(
+            param.value_kind == value_type.value_kind,
+            f"参数 {param.name} 的基础类型须与值类型 {value_type.name} 一致（{value_type.value_kind}）",
+        )
+    for effect in action.effects:
+        if isinstance(effect, SetPropertyEffect):
+            _require(
+                effect.property_id in index.properties,
+                "set_property 效果引用的属性不存在或类型不符",
+            )
+        elif isinstance(effect, (AddLinkEffect, RemoveLinkEffect)):
+            _require(
+                effect.link_type_id in index.links,
+                f"{effect.kind} 效果引用的关系不存在或类型不符",
+            )
+        else:
+            _require(
+                effect.object_type_id in index.objects,
+                "create_object 效果引用的对象类型不存在或类型不符",
+            )
+
+
 def validate_core_graph(draft: CoreDraft) -> CoreDraft:
     """Raise on known invalid structure; missing physical metadata stays valid."""
     ids = [
@@ -477,6 +516,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
     _names(draft.object_types, "对象")
     _names(draft.datasets, "数据集", technical=False)
     _names(draft.metrics, "指标")
+    _names(draft.actions, "动作")
     for obj in draft.object_types:
         seen = {obj.id}
         current = obj
@@ -527,5 +567,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
     metrics = {metric.id: metric for metric in draft.metrics}
     for metric in draft.metrics:
         problems.check(f"指标 {metric.name}", _metric, draft, index, metrics, metric)
+    for action in draft.actions:
+        problems.check(f"动作 {action.name}", _action, index, action)
     problems.raise_any()
     return draft

@@ -1,5 +1,124 @@
 {
   "$defs": {
+    "AfterActionParameter": {
+      "additionalProperties": false,
+      "description": "Caller-supplied scalar input for an action definition.",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/AfterValueKind"
+        },
+        "value_type_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_ref": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_ref"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Type Id"
+        }
+      },
+      "required": [
+        "name",
+        "value_kind"
+      ],
+      "title": "ActionParameter",
+      "type": "object"
+    },
+    "AfterAddLinkEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "add_link",
+          "title": "Kind",
+          "type": "string"
+        },
+        "link_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "link_type_id"
+      ],
+      "title": "AddLinkEffect",
+      "type": "object"
+    },
     "AfterAggregation": {
       "enum": [
         "sum",
@@ -128,6 +247,49 @@
         "operator"
       ],
       "title": "Condition",
+      "type": "object"
+    },
+    "AfterCreateObjectEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "create_object",
+          "title": "Kind",
+          "type": "string"
+        },
+        "object_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "object_type_id"
+      ],
+      "title": "CreateObjectEffect",
       "type": "object"
     },
     "AfterDatasetColumn": {
@@ -1032,6 +1194,49 @@
       "title": "RatioMetric",
       "type": "object"
     },
+    "AfterRemoveLinkEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "remove_link",
+          "title": "Kind",
+          "type": "string"
+        },
+        "link_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "link_type_id"
+      ],
+      "title": "RemoveLinkEffect",
+      "type": "object"
+    },
     "AfterRuleKind": {
       "enum": [
         "constraint",
@@ -1049,6 +1254,49 @@
       ],
       "title": "RuleOwnerKind",
       "type": "string"
+    },
+    "AfterSetPropertyEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "set_property",
+          "title": "Kind",
+          "type": "string"
+        },
+        "property_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "property_id"
+      ],
+      "title": "SetPropertyEffect",
+      "type": "object"
     },
     "AfterSimpleMetric": {
       "additionalProperties": false,
@@ -1228,6 +1476,157 @@
       ],
       "title": "ValueKind",
       "type": "string"
+    },
+    "action_after": {
+      "additionalProperties": false,
+      "description": "Declarative business action definition (not executed by the platform).",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "effects": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "add_link": "#/$defs/AfterAddLinkEffect",
+                "create_object": "#/$defs/AfterCreateObjectEffect",
+                "remove_link": "#/$defs/AfterRemoveLinkEffect",
+                "set_property": "#/$defs/AfterSetPropertyEffect"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/AfterSetPropertyEffect"
+              },
+              {
+                "$ref": "#/$defs/AfterAddLinkEffect"
+              },
+              {
+                "$ref": "#/$defs/AfterRemoveLinkEffect"
+              },
+              {
+                "$ref": "#/$defs/AfterCreateObjectEffect"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Effects",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/AfterManualEvidence",
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/AfterActionParameter"
+          },
+          "maxItems": 50,
+          "title": "Parameters",
+          "type": "array"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "target_type_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_ref": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_ref"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Type Id"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Action",
+      "type": "object"
     },
     "dataset_after": {
       "additionalProperties": false,
@@ -1543,6 +1942,23 @@
               "const": "value_type"
             }
           }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/action_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "action"
+            }
+          }
         }
       ],
       "properties": {
@@ -1624,7 +2040,8 @@
             "mapping",
             "material_object",
             "material_link",
-            "value_type"
+            "value_type",
+            "action"
           ]
         }
       },

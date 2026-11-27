@@ -7,6 +7,7 @@ export type ElementTab =
   | "mapping"
   | "relations"
   | "rules"
+  | "actions"
   | "members"
   | "instances"
   | "definition"

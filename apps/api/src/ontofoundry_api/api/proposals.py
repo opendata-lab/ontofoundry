@@ -140,9 +140,14 @@ def _item_view(item, statuses, dependencies, elements, context) -> dict[str, Any
         "owner_label": owner_label(item.target_kind, element, elements),
         "before": before,
         "after": after,
-        # Agents may omit field_changes (display data); derive them then.
-        "field_changes": item.field_changes_json
-        or (field_changes(before, after) if before and after else []),
+        # Action diffs are always derived on read from normalized before/after;
+        # submitter field_changes are ignored for create/update/delete.
+        "field_changes": (
+            (field_changes(before, after) if before and after else [])
+            if item.target_kind == "action"
+            else item.field_changes_json
+            or (field_changes(before, after) if before and after else [])
+        ),
         "evidence": _evidence_view(
             db,
             workspace_id,

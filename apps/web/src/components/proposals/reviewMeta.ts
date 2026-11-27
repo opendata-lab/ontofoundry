@@ -1,4 +1,5 @@
-import type { CoreElement, Draft, FieldChange, MaterialObject, ProposalItem, TargetKind } from "../../api/types";
+import type { CoreElement, Draft, FieldChange, LinkType, MaterialObject, ObjectType, Property, ProposalItem, TargetKind } from "../../api/types";
+import { buildQualifiedReferenceNames, type ReferenceNameSource } from "../../lib/actionFormat";
 import { byId } from "../../lib/coreModel";
 import { NAMED_DRAFT_COLLECTIONS } from "../../lib/elementKinds";
 import { documentDisplayText } from "../../lib/instanceDisplay";
@@ -151,4 +152,50 @@ export function elementNames(draft: Draft, items: ProposalItem[]) {
   for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
   for (const item of items) names.set(item.target_id, item.display_name);
   return names;
+}
+
+function proposalReferenceSource(items: ProposalItem[], pick: (item: ProposalItem) => CoreElement | null): ReferenceNameSource {
+  const object_types: ObjectType[] = [];
+  const properties: Property[] = [];
+  const link_types: LinkType[] = [];
+  for (const item of items) {
+    const element = pick(item);
+    if (!element) continue;
+    if (item.target_kind === "object_type") object_types.push(element as ObjectType);
+    else if (item.target_kind === "property") properties.push(element as Property);
+    else if (item.target_kind === "link_type") link_types.push(element as LinkType);
+  }
+  return { object_types, properties, link_types };
+}
+
+/**
+ * Qualified names (`owner.property`, `link（source → target）`) for proposal diff columns.
+ * The `before` side prefers pre-change snapshots; `after` prefers proposed snapshots.
+ */
+export function qualifiedProposalNames(draft: Draft, items: ProposalItem[], side: "before" | "after"): Map<string, string> {
+  const base = elementNames(draft, items);
+  if (side === "before") {
+    for (const item of items) {
+      const before = item.before as { name?: string; display_name?: string | null } | null;
+      if (before && (before.display_name || before.name)) {
+        base.set(item.target_id, before.display_name || before.name || item.display_name);
+      }
+    }
+    return buildQualifiedReferenceNames(
+      [
+        proposalReferenceSource(items, (item) => item.after),
+        draft,
+        proposalReferenceSource(items, (item) => item.before),
+      ],
+      base,
+    );
+  }
+  return buildQualifiedReferenceNames(
+    [
+      proposalReferenceSource(items, (item) => item.before),
+      draft,
+      proposalReferenceSource(items, (item) => item.after),
+    ],
+    base,
+  );
 }

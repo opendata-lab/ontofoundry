@@ -2,14 +2,16 @@ import { Alert, Button, Collapse, Descriptions, Drawer, Empty, Form, Input, List
 import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
-import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, VersionSummary } from "../../api/types";
+import type { ElementChange, LinkType, MergeConflict, ModelingSession, ObjectType, Property, PublishPreview, VersionSummary } from "../../api/types";
+import { buildQualifiedReferenceNames, parseActionField, type ReferenceNameSource } from "../../lib/actionFormat";
 import type { ElementRequest } from "../../lib/elementInspector";
 import { NAMED_DRAFT_COLLECTIONS, PUBLISH_KIND_ORDER } from "../../lib/elementKinds";
 import { documentDisplayText } from "../../lib/instanceDisplay";
 import { lineDiff } from "../../lib/lineDiff";
 import { fieldLabel, KIND } from "../proposals/elementMeta";
-import { FieldDiff } from "../proposals/FieldDiff";
+import { ActionFieldLines, FieldDiff } from "../proposals/FieldDiff";
 import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "../layout";
+import { ActionDefinitionTag } from "../elements/ActionPanel";
 import { ElementModal } from "../elements/ElementInspector";
 import { ConflictResolver } from "./ConflictResolver";
 
@@ -37,6 +39,7 @@ const REFERENCE_FIELDS = new Set([
   "numerator_id",
   "denominator_id",
   "title_property_id",
+  "value_type_id",
 ]);
 
 type Filter = "all" | ElementChange["change"];
@@ -92,9 +95,20 @@ function JsonSplit({ before, after }: { before: unknown; after: unknown }) {
 }
 
 /** The fields of a created or deleted element, minus identity and empty values. */
-function FieldList({ value, names }: { value: Record<string, unknown>; names: Map<string, string> }) {
-  const named = (key: string, v: unknown) =>
-    !REFERENCE_FIELDS.has(key) ? v : Array.isArray(v) ? v.map((id) => names.get(String(id)) ?? id) : (names.get(String(v)) ?? v);
+function FieldList({ value, names, actionNames }: { value: Record<string, unknown>; names: Map<string, string>; actionNames: Map<string, string> }) {
+  const renderValue = (key: string, v: unknown): ReactNode => {
+    const actionLines = parseActionField(key, v, actionNames);
+    if (actionLines !== null) return <ActionFieldLines lines={actionLines} />;
+    if (REFERENCE_FIELDS.has(key)) {
+      if (typeof v === "string" && names.has(v)) {
+        return <Tooltip title={v}><span>{names.get(v)}</span></Tooltip>;
+      }
+      if (Array.isArray(v)) {
+        return v.map((id) => names.get(String(id)) ?? id).join("、");
+      }
+    }
+    return readable(key, v);
+  };
   const rows = Object.entries(value).filter(
     ([key, v]) => key !== "id" && v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
   );
@@ -106,13 +120,25 @@ function FieldList({ value, names }: { value: Record<string, unknown>; names: Ma
       items={rows.map(([key, v]) => ({
         key,
         label: fieldLabel(key),
-        children: <span className="text-xs whitespace-pre-wrap break-all">{readable(key, named(key, v))}</span>,
+        children: <span className="text-xs whitespace-pre-wrap break-all">{renderValue(key, v)}</span>,
       }))}
     />
   );
 }
 
-function ChangeBody({ change, names }: { change: ElementChange; names: Map<string, string> }) {
+function ChangeBody({
+  change,
+  beforeNames,
+  names,
+  beforeActionNames,
+  afterActionNames,
+}: {
+  change: ElementChange;
+  beforeNames: Map<string, string>;
+  names: Map<string, string>;
+  beforeActionNames: Map<string, string>;
+  afterActionNames: Map<string, string>;
+}) {
   const [mode, setMode] = useState<"object" | "json">("object");
   return (
     <div className="flex flex-col gap-2">
@@ -136,12 +162,24 @@ function ChangeBody({ change, names }: { change: ElementChange; names: Map<strin
         )
       ) : change.change === "updated" ? (
         change.field_changes.length ? (
-          <FieldDiff changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" names={names} />
+          <FieldDiff
+            changes={change.field_changes}
+            beforeLabel="当前发布版本"
+            afterLabel="发布后"
+            beforeNames={beforeNames}
+            names={names}
+            beforeActionNames={beforeActionNames}
+            actionNames={afterActionNames}
+          />
         ) : (
           <Text type="secondary">无字段级变化</Text>
         )
       ) : (
-        <FieldList value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>} names={names} />
+        <FieldList
+          value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>}
+          names={change.change === "deleted" ? beforeNames : names}
+          actionNames={change.change === "deleted" ? beforeActionNames : afterActionNames}
+        />
       )}
     </div>
   );
@@ -153,12 +191,18 @@ function changeLabel(change: ElementChange) {
 
 function ChangeList({
   changes,
+  beforeNames,
   names,
+  beforeActionNames,
+  afterActionNames,
   open,
   onInspect,
 }: {
   changes: ElementChange[];
+  beforeNames: Map<string, string>;
   names: Map<string, string>;
+  beforeActionNames: Map<string, string>;
+  afterActionNames: Map<string, string>;
   open: string[];
   onInspect?: (change: ElementChange) => void;
 }) {
@@ -178,6 +222,7 @@ function ChangeList({
             <Tag className="m-0">
               {KIND[c.element_kind].label}
             </Tag>
+            {c.element_kind === "action" && <ActionDefinitionTag />}
             <strong>{changeLabel(c)}</strong>
             {c.change === "updated" && c.field_changes.length > 0 && (
               <Text type="secondary" className="text-xs">
@@ -199,7 +244,15 @@ function ChangeList({
               查看发布后的元素
             </Button>
           ) : undefined,
-        children: <ChangeBody change={c} names={names} />,
+        children: (
+          <ChangeBody
+            change={c}
+            beforeNames={beforeNames}
+            names={names}
+            beforeActionNames={beforeActionNames}
+            afterActionNames={afterActionNames}
+          />
+        ),
       }))}
     />
   );
@@ -209,18 +262,116 @@ function sortChanges<T extends ElementChange>(changes: T[]) {
   return [...changes].sort((a, b) => KIND_ORDER.indexOf(a.element_kind) - KIND_ORDER.indexOf(b.element_kind));
 }
 
+function changeReferenceSource(changes: ElementChange[], pick: (change: ElementChange) => ElementChange["before"]): ReferenceNameSource {
+  const object_types: ObjectType[] = [];
+  const properties: Property[] = [];
+  const link_types: LinkType[] = [];
+  for (const c of changes) {
+    const element = pick(c);
+    if (!element) continue;
+    if (c.element_kind === "object_type") object_types.push(element as ObjectType);
+    else if (c.element_kind === "property") properties.push(element as Property);
+    else if (c.element_kind === "link_type") link_types.push(element as LinkType);
+  }
+  return { object_types, properties, link_types };
+}
+
+function applyNamedCollection(names: Map<string, string>, model: ModelingSession["draft"] | undefined | null) {
+  if (!model) return;
+  for (const key of NAMED_DRAFT_COLLECTIONS)
+    for (const item of (model[key] ?? []) as { id: string; name?: string; display_name?: string | null }[])
+      if (item.name) names.set(item.id, item.display_name || item.name);
+}
+
+function applyChangeNames(
+  names: Map<string, string>,
+  changes: ElementChange[],
+  pick: (change: ElementChange) => ElementChange["before"],
+) {
+  for (const change of changes) {
+    const element = pick(change) as { name?: string; display_name?: string | null } | null;
+    if (element && (element.display_name || element.name)) {
+      names.set(change.element_id, element.display_name || element.name || change.label);
+    }
+  }
+}
+
 /** Element names by id: the preview's labels first, the session's draft as fallback. */
 function elementNames(preview: PublishPreview | null, draft: ModelingSession["draft"]): Map<string, string> {
   const names = new Map<string, string>();
-  for (const key of NAMED_DRAFT_COLLECTIONS)
-    for (const item of draft[key] as { id: string; name?: string; display_name?: string | null }[]) if (item.name) names.set(item.id, item.display_name || item.name);
+  applyNamedCollection(names, draft);
   for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
   if (preview?.merged_model) {
+    applyNamedCollection(names, preview.merged_model);
     for (const fact of preview.merged_model.material_objects)
       names.set(fact.id, documentDisplayText(preview.merged_model, fact));
   }
   for (const [id, label] of Object.entries(preview?.labels ?? {})) names.set(id, label);
   return names;
+}
+
+/**
+ * Separate plain + qualified reference name maps per version boundary so each diff column
+ * uses its own snapshot's names:
+ * - `preview.changes`: `latest` (当前发布版本) -> `merged` (发布后)
+ * - `preview.auto_merged`: `base` (会话基线) -> `latest` (当前发布版本)
+ */
+function publishSideNames(preview: PublishPreview | null, draft: ModelingSession["draft"]) {
+  const changes = preview?.changes ?? [];
+  const autoMerged = preview?.auto_merged ?? [];
+  const baseMap = elementNames(preview, draft);
+
+  // `latest`: current published version (before of `changes`, after of `auto_merged`).
+  const latestNames = new Map(baseMap);
+  applyChangeNames(latestNames, autoMerged, (c) => c.after);
+  applyChangeNames(latestNames, changes, (c) => c.before);
+  const latestActionNames = buildQualifiedReferenceNames(
+    [
+      draft,
+      ...(preview?.merged_model ? [preview.merged_model] : []),
+      changeReferenceSource(autoMerged, (c) => c.after),
+      changeReferenceSource(changes, (c) => c.before),
+    ],
+    latestNames,
+  );
+
+  // `merged`: post-publish snapshot (after of `changes`).
+  const mergedNames = new Map(baseMap);
+  applyChangeNames(mergedNames, autoMerged, (c) => c.after);
+  applyNamedCollection(mergedNames, preview?.merged_model);
+  applyChangeNames(mergedNames, changes, (c) => c.after);
+  const mergedActionNames = buildQualifiedReferenceNames(
+    [
+      draft,
+      changeReferenceSource(autoMerged, (c) => c.after),
+      ...(preview?.merged_model ? [preview.merged_model] : []),
+      changeReferenceSource(changes, (c) => c.after),
+    ],
+    mergedNames,
+  );
+
+  // `base`: session starting version (before of `auto_merged`).
+  const sessionBaseNames = new Map(latestNames);
+  applyChangeNames(sessionBaseNames, autoMerged, (c) => c.before);
+  const sessionBaseActionNames = buildQualifiedReferenceNames(
+    [
+      draft,
+      ...(preview?.merged_model ? [preview.merged_model] : []),
+      changeReferenceSource(changes, (c) => c.before),
+      changeReferenceSource(autoMerged, (c) => c.after),
+      changeReferenceSource(autoMerged, (c) => c.before),
+    ],
+    sessionBaseNames,
+  );
+
+  return {
+    latestNames,
+    latestActionNames,
+    mergedNames,
+    mergedActionNames,
+    sessionBaseNames,
+    sessionBaseActionNames,
+  };
 }
 
 const versionLabel = (n: number | null | undefined) => (n ? `v${n}` : "尚未发布");
@@ -373,7 +524,7 @@ export function PublishPanel({
           ? { state: "unmapped", text: "无变更" }
           : { state: "mapped", text: "可发布" };
   const shown = filter === "all" ? changes : changes.filter((c) => c.change === filter);
-  const names = elementNames(preview, session.draft);
+  const sideNames = publishSideNames(preview, session.draft);
   return (
     <div className="flex flex-col gap-3">
       <section className="border-b border-rule pb-4">
@@ -474,7 +625,10 @@ export function PublishPanel({
                 {shown.length ? (
                   <ChangeList
                     changes={shown}
-                    names={names}
+                    beforeNames={sideNames.latestNames}
+                    names={sideNames.mergedNames}
+                    beforeActionNames={sideNames.latestActionNames}
+                    afterActionNames={sideNames.mergedActionNames}
                     open={open}
                     onInspect={(c) =>
                       setInspected({
@@ -498,7 +652,16 @@ export function PublishPanel({
                             {
                               key: "auto",
                               label: `会话开始后已发布的变化 ${preview.auto_merged.length} · 已在线，仅用于解释合并结果`,
-                              children: <ChangeList changes={sortChanges(preview.auto_merged)} names={names} open={[]} />,
+                              children: (
+                                <ChangeList
+                                  changes={sortChanges(preview.auto_merged)}
+                                  beforeNames={sideNames.sessionBaseNames}
+                                  names={sideNames.latestNames}
+                                  beforeActionNames={sideNames.sessionBaseActionNames}
+                                  afterActionNames={sideNames.latestActionNames}
+                                  open={[]}
+                                />
+                              ),
                             },
                           ]
                         : []),

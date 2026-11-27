@@ -6,6 +6,7 @@ from pydantic import Field, field_validator, model_validator
 
 from ontofoundry_api.domain.core import *  # noqa: F403
 from ontofoundry_api.domain.core import (
+    Action,
     CoreDraft,
     DataMapping,
     Dataset,
@@ -36,6 +37,7 @@ class ElementKind(StrEnum):
     MATERIAL_OBJECT = "material_object"
     MATERIAL_LINK = "material_link"
     VALUE_TYPE = "value_type"
+    ACTION = "action"
 
 
 # Ontology collections never contain instance data.
@@ -48,6 +50,7 @@ COLLECTIONS = {
     ElementKind.DATASET: "datasets",
     ElementKind.MAPPING: "mappings",
     ElementKind.VALUE_TYPE: "value_types",
+    ElementKind.ACTION: "actions",
 }
 INSTANCE_COLLECTIONS = {
     ElementKind.MATERIAL_OBJECT: "material_objects",
@@ -63,6 +66,7 @@ ELEMENT_MODELS = {
     ElementKind.DATASET: Dataset,
     ElementKind.MAPPING: DataMapping,
     ElementKind.VALUE_TYPE: ValueType,
+    ElementKind.ACTION: Action,
     ElementKind.MATERIAL_OBJECT: MaterialObject,
     ElementKind.MATERIAL_LINK: MaterialLink,
 }
@@ -84,6 +88,9 @@ class OntologyDraft(CoreDraft):
 
     def effective_properties(self, type_id):
         return draft_index(self).effective_properties(type_id)
+
+    def effective_actions(self, type_id):
+        return draft_index(self).effective_actions(type_id)
 
     def rules_of(self, owner_id, kind=None):
         return [

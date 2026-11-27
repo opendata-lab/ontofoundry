@@ -20,7 +20,7 @@ import { getWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { VALUE_KINDS } from "../lib/coreModel";
 import { notifyOntologySaved } from "../lib/elementInspector";
 import { newId } from "../lib/id";
-import { valueTypeRules, valueTypeUsages } from "../lib/valueTypes";
+import { valueTypeActionUsages, valueTypeRules, valueTypeUsages } from "../lib/valueTypes";
 
 const { Text } = Typography;
 
@@ -162,13 +162,19 @@ export function ValueTypeCatalog({ workspace, draft, sessionId, query, createReq
         rule_kind: "constraint",
         expression: c.expression.trim(),
       }));
-    // Properties referencing the type follow its base kind (VT-09: revised together).
+    // Properties and action parameters referencing the type follow its base kind (VT-09: revised together).
     const properties = baseDraft.properties.map((p) => (p.value_type_id === type.id ? { ...p, value_kind: type.value_kind } : p));
+    const actions = (baseDraft.actions ?? []).map((a) =>
+      a.parameters.some((p) => p.value_type_id === type.id)
+        ? { ...a, parameters: a.parameters.map((p) => (p.value_type_id === type.id ? { ...p, value_kind: type.value_kind } : p)) }
+        : a,
+    );
     return {
       ...baseDraft,
       value_types: [...(baseDraft.value_types ?? []).filter((v) => v.id !== type.id), { ...type, display_name: type.display_name?.trim() || null }],
       rules: [...baseDraft.rules.filter((r) => !(r.owner_kind === "value_type" && r.owner_id === type.id)), ...rules],
       properties,
+      actions,
     };
   };
   const buildCandidate = (current: Editing) => {
@@ -292,28 +298,39 @@ export function ValueTypeCatalog({ workspace, draft, sessionId, query, createReq
     }
   };
   const usageCell = (type: ValueType) => {
-    const used = valueTypeUsages(draft, type.id);
-    if (!used.length) return <Text type="secondary">0</Text>;
+    const usedProps = valueTypeUsages(draft, type.id);
+    const usedActions = valueTypeActionUsages(draft, type.id);
+    const total = usedProps.length + usedActions.length;
+    if (!total) return <Text type="secondary">0</Text>;
     return (
       <Popover
         trigger="click"
-        title={`使用「${type.display_name || type.name}」的属性`}
+        title={usedActions.length ? `使用「${type.display_name || type.name}」的属性与动作参数` : `使用「${type.display_name || type.name}」的属性`}
         content={
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            {used.map((p) => {
+            {usedProps.map((p) => {
               const owner = draft.object_types.find((o) => o.id === p.owner_type_id);
               return (
-                <li key={p.id}>
+                <li key={`prop:${p.id}`}>
                   <Link to={detail.href({ kind: "object_type", id: p.owner_type_id, tab: "properties", sessionId })}>
                     {(owner?.display_name || owner?.name) ?? "?"} · {p.display_name || p.name}
                   </Link>
                 </li>
               );
             })}
+            {usedActions.map(({ action, parameter }) => (
+              <li key={`action:${action.id}:${parameter.name}`}>
+                <Link to={detail.href({ kind: "action", id: action.id, sessionId })}>
+                  动作 {action.display_name || action.name} · 参数 {parameter.display_name || parameter.name}
+                </Link>
+              </li>
+            ))}
           </ul>
         }
       >
-        <Button type="link" size="small" className="h-auto p-0" aria-label={`查看使用 ${type.name} 的属性`}>{used.length}</Button>
+        <Button type="link" size="small" className="h-auto p-0" aria-label={usedActions.length ? `查看使用 ${type.name} 的属性和动作参数` : `查看使用 ${type.name} 的属性`}>
+          {total}
+        </Button>
       </Popover>
     );
   };
@@ -362,7 +379,17 @@ export function ValueTypeCatalog({ workspace, draft, sessionId, query, createReq
           <Form layout="vertical" component="div">
             <Form.Item label="名称"><Input aria-label="值类型名称" value={editing.type.display_name ?? ""} placeholder="例如：会员等级" onChange={(e) => updateEditing({ ...editing, type: { ...editing.type, display_name: e.target.value } })} /></Form.Item>
             <Form.Item label="英文标识" required><Input aria-label="值类型英文标识" value={editing.type.name} placeholder="例如：member_level" onChange={(e) => updateEditing({ ...editing, type: { ...editing.type, name: e.target.value } })} /></Form.Item>
-            <Form.Item label="基础类型" required extra={valueTypeUsages(editing.baseline.draft, editing.type.id).length ? "修改基础类型会同步修改使用它的属性" : undefined}>
+            <Form.Item
+              label="基础类型"
+              required
+              extra={
+                valueTypeActionUsages(editing.baseline.draft, editing.type.id).length
+                  ? "修改基础类型会同步修改使用它的属性和动作参数"
+                  : valueTypeUsages(editing.baseline.draft, editing.type.id).length
+                    ? "修改基础类型会同步修改使用它的属性"
+                    : undefined
+              }
+            >
               <Select aria-label="基础类型" value={editing.type.value_kind} options={(Object.keys(VALUE_KINDS) as ValueKind[]).map((k) => ({ value: k, label: VALUE_KINDS[k] }))} onChange={(k: ValueKind) => updateEditing({ ...editing, type: { ...editing.type, value_kind: k } })} />
             </Form.Item>
             <Form.Item label="约束" extra={`用英文标识表示当前值，例如 ${editing.type.name || "member_level"} IN ('普通', '金卡')；只约束有值时的取值，是否必填在属性上设置`}>

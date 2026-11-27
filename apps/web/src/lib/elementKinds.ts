@@ -55,16 +55,19 @@ export const NAMED_DRAFT_COLLECTIONS = [
   "rules",
   "metrics",
   "datasets",
+  "value_types",
+  "actions",
 ] as const satisfies readonly CoreCollectionKey[];
 
-// Top-level element kinds that open directly as inspector roots / can be created in the inspector.
-export const INSPECTABLE_KINDS = ["object_type", "link_type", "metric", "dataset"] as const;
+// Top-level element kinds that open directly as inspector roots.
+export const INSPECTABLE_KINDS = ["object_type", "link_type", "metric", "dataset", "action"] as const;
 export type InspectableKind = (typeof INSPECTABLE_KINDS)[number];
 export const INSPECTABLE_NOUN: Record<InspectableKind, string> = {
   object_type: "对象",
   link_type: "关系",
   metric: "指标",
   dataset: "数据集",
+  action: "动作",
 };
 // Target kinds accepted by ElementInspector (value_type is managed in ValueTypeCatalog).
 export const ELEMENT_INSPECTOR_KINDS = new Set<TargetKind>([
@@ -75,6 +78,7 @@ export const ELEMENT_INSPECTOR_KINDS = new Set<TargetKind>([
   "metric",
   "dataset",
   "mapping",
+  "action",
   "material_object",
   "material_link",
 ]);
@@ -88,15 +92,16 @@ export const PUBLISH_KIND_ORDER: TargetKind[] = [
   "metric",
   "dataset",
   "mapping",
+  "action",
   "material_object",
   "material_link",
 ];
 
 // Fields locked against inline edits during proposal review (mirrors backend proposal_revision.LOCKED_FIELDS).
-export const LOCKED_PROPOSAL_FIELDS = new Set(["id", "evidence", "extends", "type_id"]);
+export const LOCKED_PROPOSAL_FIELDS = new Set(["id", "evidence", "extends", "type_id", "parameters", "effects"]);
 
 // Resource kinds displayed in the semantic explorer sidebar and filter bar.
-export const SEMANTIC_RESOURCE_KINDS = ["object", "relation", "metric", "dataset"] as const;
+export const SEMANTIC_RESOURCE_KINDS = ["object", "relation", "metric", "dataset", "action"] as const;
 export type SemanticResourceKind = (typeof SEMANTIC_RESOURCE_KINDS)[number];
 
 // Labels and navigable subset for OntologySearchDialog (value_type has no standalone detail route yet).
@@ -108,6 +113,7 @@ export const SEARCH_KIND_LABELS: Record<OntologySearchKind, string> = {
   metric: "指标",
   dataset: "数据集",
   value_type: "值类型",
+  action: "动作",
 };
 export const NAVIGABLE_SEARCH_KINDS = new Set<OntologySearchKind>([
   "object_type",
@@ -116,10 +122,11 @@ export const NAVIGABLE_SEARCH_KINDS = new Set<OntologySearchKind>([
   "rule",
   "metric",
   "dataset",
+  "action",
 ]);
 
 // Shared catalog tab mappings for both TypeCatalogPage (draft) and PublishedTypeCatalogPage.
-export type CatalogTab = "entities" | "values" | "relations" | "metrics" | "datasets";
+export type CatalogTab = "entities" | "values" | "relations" | "metrics" | "datasets" | "actions";
 export type ResourceCatalogTab = Exclude<CatalogTab, "values">;
 export const CATALOG_TAB_LABELS: Record<CatalogTab, string> = {
   entities: "实体类型",
@@ -127,12 +134,14 @@ export const CATALOG_TAB_LABELS: Record<CatalogTab, string> = {
   relations: "关系",
   metrics: "指标",
   datasets: "数据集",
+  actions: "动作",
 };
 export const CATALOG_RESOURCE_KINDS: Record<ResourceCatalogTab, CatalogResourceKind> = {
   entities: "object_type",
   relations: "link_type",
   metrics: "metric",
   datasets: "dataset",
+  actions: "action",
 };
 export const CATALOG_TAB_COLLECTIONS = {
   entities: COLLECTION_BY_KIND.object_type,
@@ -140,4 +149,5 @@ export const CATALOG_TAB_COLLECTIONS = {
   relations: COLLECTION_BY_KIND.link_type,
   metrics: COLLECTION_BY_KIND.metric,
   datasets: COLLECTION_BY_KIND.dataset,
+  actions: COLLECTION_BY_KIND.action,
 } as const satisfies Record<CatalogTab, CoreCollectionKey>;

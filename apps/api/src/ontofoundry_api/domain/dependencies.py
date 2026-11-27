@@ -8,6 +8,7 @@ from uuid import UUID
 
 from ontofoundry_api.domain.core import (
     COLLECTIONS,
+    AddLinkEffect,
     BindingMode,
     CoreDraft,
     DerivedExpression,
@@ -17,6 +18,8 @@ from ontofoundry_api.domain.core import (
     MappingTableJoin,
     PropertiesKey,
     RatioMetric,
+    RemoveLinkEffect,
+    SetPropertyEffect,
     SimpleMetric,
 )
 from ontofoundry_api.domain.expressions import (
@@ -183,6 +186,19 @@ def reference_index(
                 mapping.type_id,
                 index.links[link_id].target_type_id,
             )
+    for action in draft.actions:
+        if owner_ids is not None and action.id not in owner_ids:
+            continue
+        add(action.id, action.target_type_id, "target_type_id")
+        for i, param in enumerate(action.parameters):
+            add(action.id, param.value_type_id, f"parameters.{i}.value_type_id")
+        for i, effect in enumerate(action.effects):
+            if isinstance(effect, SetPropertyEffect):
+                add(action.id, effect.property_id, f"effects.{i}.property_id")
+            elif isinstance(effect, (AddLinkEffect, RemoveLinkEffect)):
+                add(action.id, effect.link_type_id, f"effects.{i}.link_type_id")
+            else:
+                add(action.id, effect.object_type_id, f"effects.{i}.object_type_id")
     return {owner: tuple(values) for owner, values in refs.items()}
 
 

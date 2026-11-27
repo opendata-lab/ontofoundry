@@ -73,6 +73,23 @@ export function storedDraft(source: CoreDraft & WithInstances): Draft {
     material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o }) as Draft["material_objects"][number]),
     material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l }) as Draft["material_links"][number]),
     value_types: (source.value_types ?? []).map((v) => ({ description: "", evidence: [], display_name: null, ...v })),
+    actions: (source.actions ?? []).map((a) => ({
+      description: "",
+      display_name: null,
+      synonyms: [],
+      tags: [],
+      target_type_id: null,
+      evidence: [],
+      ...a,
+      parameters: (a.parameters ?? []).map((p) => ({
+        display_name: null,
+        value_type_id: null,
+        required: true,
+        description: "",
+        ...p,
+      })),
+      effects: (a.effects ?? []).map((e) => ({ description: "", ...e })),
+    })),
   };
 }
 

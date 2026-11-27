@@ -118,3 +118,55 @@ def test_element_hash_and_new_field_rejection():
 def test_nonfinite_scalars_are_rejected_at_storage_boundary():
     with pytest.raises(ValidationError):
         MaterialObject(id=uuid4(), type_id=uuid4(), values={"amount": float("nan")})
+
+
+def test_empty_actions_omitted_for_hash_compatibility_and_nonempty_ordered():
+    from ontofoundry_api.domain.canonical import canonical as domain_canonical
+    from ontofoundry_api.domain.core import Action, ActionParameter, CreateObjectEffect
+
+    # 1. Existing snapshot hashes (without `actions`) stay byte-for-byte unchanged.
+    empty_raw = {k: v for k, v in example_draft_json("09-empty").items() if k != "actions"}
+    sales_raw = {k: v for k, v in example_draft_json("01-basic-sales").items() if k != "actions"}
+    assert "actions" not in empty_raw
+    assert "actions" not in sales_raw
+    assert (
+        draft_sha256(empty_raw)
+        == "36a6c51c5c2fe222f7ef0467c21debe28506bb506f226625233d42fea89888a6"
+    )
+    assert (
+        draft_sha256(sales_raw)
+        == "d93f65e89f9a3456e873579ad6c0aa937700fce6b279d44f532d5046a90e01e8"
+    )
+
+    # 2. Missing `actions` and explicit empty `actions: []` hash identically via both entrypoints.
+    with_empty = {**sales_raw, "actions": []}
+    assert draft_sha256(sales_raw) == draft_sha256(with_empty)
+    assert domain_canonical(sales_raw) == domain_canonical(with_empty)
+
+    # 3. Non-empty actions compute draft and element hashes; parameter/effect order is preserved.
+    obj_id = uuid4()
+    action_a = Action(
+        id=uuid4(),
+        name="dispatch_order",
+        display_name="派单",
+        target_type_id=obj_id,
+        parameters=[
+            ActionParameter(name="team_code", value_kind="string", required=True),
+            ActionParameter(name="priority", value_kind="integer", required=False),
+        ],
+        effects=[
+            CreateObjectEffect(kind="create_object", object_type_id=obj_id, description="新建"),
+        ],
+    )
+    draft = example_draft("09-empty")
+    draft.actions = [action_a]
+    digest_1 = draft_sha256(draft)
+    elem_digest = element_sha256(action_a, "actions")
+    assert len(digest_1) == 64
+    assert len(elem_digest) == 64
+    assert elem_digest == element_sha256(action_a.model_dump(mode="json"), "actions")
+
+    # Swapping parameter order changes the hash (parameters are ORDERED).
+    reordered = draft.model_copy(deep=True)
+    reordered.actions[0].parameters.reverse()
+    assert draft_sha256(reordered) != digest_1

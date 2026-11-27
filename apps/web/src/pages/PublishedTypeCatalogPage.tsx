@@ -1,11 +1,12 @@
 import { Button, Empty, Input, Select, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Box, Download, GitBranch, Plus, RefreshCw, Rocket, Search, Sigma, Upload } from "lucide-react";
+import { Box, Download, GitBranch, Plus, RefreshCw, Rocket, Search, Sigma, Upload, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
 import type { CatalogItem, CatalogPage, VersionSummary } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
+import { ActionDefinitionTag } from "../components/elements/ActionPanel";
 import { ExportDialog } from "../components/ExportDialog";
 import { ImportDialog } from "../components/ImportDialog";
 import { PageBody, PageTabs, PageToolbar, Panel, StatusMark } from "../components/layout";
@@ -36,7 +37,7 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
   const { canEdit } = useWorkspacePermissions();
   const [params, setParams] = useSearchParams();
   const key = params.get("catalogTab");
-  const tab: Exclude<Tab, "values"> = key === "relations" || key === "metrics" || key === "datasets" ? key : initialKind === "link_type" ? "relations" : "entities";
+  const tab: Exclude<Tab, "values"> = key === "relations" || key === "metrics" || key === "datasets" || key === "actions" ? key : initialKind === "link_type" ? "relations" : "entities";
   const kind = KINDS[tab];
   const [versionId, setVersionId] = useState(workspace.version_id);
   const [result, setResult] = useState<CatalogPage | null>(null);
@@ -88,10 +89,10 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
   if (error) return <ErrorSurface message={error} retry={() => setAttempt(n => n + 1)} />;
   if (versionId && !result) return <LoadingSurface label="正在读取本体目录…" />;
   const items = result?.items ?? [];
-  const Icon = tab === "entities" ? Box : tab === "metrics" ? Sigma : GitBranch;
+  const Icon = tab === "entities" ? Box : tab === "metrics" ? Sigma : tab === "actions" ? Zap : GitBranch;
   const dash = <Text type="secondary">—</Text>;
   const columns: ColumnsType<CatalogItem> = [
-    { title: "名称", key: "name", render: (_, item) => <Link to={detail.href({ kind, id: item.id, tab: tab === "entities" ? "properties" : "basic", sessionId: null, versionId: versionId ?? undefined })} className="inline-flex items-center gap-2 font-medium whitespace-nowrap"><Icon size={14} className={tab === "entities" ? "flex-none text-object" : tab === "metrics" ? "flex-none text-accent" : "flex-none text-relation"} />{item.display_name || item.name}</Link> },
+    { title: "名称", key: "name", render: (_, item) => <span className="inline-flex items-center gap-2 whitespace-nowrap"><Link to={detail.href({ kind, id: item.id, tab: tab === "entities" ? "properties" : "basic", sessionId: null, versionId: versionId ?? undefined })} className="inline-flex items-center gap-2 font-medium whitespace-nowrap"><Icon size={14} className={tab === "entities" ? "flex-none text-object" : tab === "metrics" || tab === "actions" ? "flex-none text-accent" : "flex-none text-relation"} />{item.display_name || item.name}</Link>{tab === "actions" && <ActionDefinitionTag />}</span> },
     { title: "英文标识", key: "identifier", render: (_, item) => <code className="text-xs whitespace-nowrap">{item.name}</code> },
   ];
   const tagCell = (item: CatalogItem) => item.tags.length ? <span className="flex flex-wrap gap-1">{item.tags.map(label => <Tag key={label} className="m-0">{label}</Tag>)}</span> : dash;
@@ -114,6 +115,18 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
     { title: "标签", key: "tags", render: (_, item) => tagCell(item) },
   );
   else if (tab === "metrics") columns.push({ title: "类型", key: "kind", render: (_, item) => item.metric_kind ? METRIC_KINDS[item.metric_kind] : dash }, { title: "数据集", key: "dataset", render: (_, item) => item.dataset_name ?? "未指定" });
+  else if (tab === "actions") columns.push(
+    {
+      title: "作用对象",
+      key: "target",
+      render: (_, item) => item.target
+        ? <Link to={detail.href({ kind: "object_type", id: item.target.id, sessionId: null, versionId: versionId ?? undefined })} className="whitespace-nowrap">{item.target.display_name || item.target.name}</Link>
+        : <Tag className="m-0">全局动作</Tag>,
+    },
+    { title: "参数", key: "parameters", render: (_, item) => item.parameter_count ?? 0 },
+    { title: "效果", key: "effects", render: (_, item) => item.effect_count ?? 0 },
+    { title: "标签", key: "tags", render: (_, item) => tagCell(item) },
+  );
   else columns.push({ title: "来源", key: "source", render: (_, item) => item.source_kind === "query" ? "表达式" : "数据表" }, { title: "列", key: "columns", render: (_, item) => item.column_count ?? "未探测" });
   columns.push({ title: "描述", key: "description", render: (_, item) => item.description ? <Tooltip title={item.description} placement="topLeft"><Text type="secondary" className="block max-w-sm truncate text-xs">{item.description}</Text></Tooltip> : dash });
   return <div className="flex h-full min-h-0 flex-col bg-canvas">
@@ -130,8 +143,8 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
         </Link>
       </>}
     </>} activeKey={tab} onChange={next => { setQuery(""); setTag(undefined); reset(); setParams(current => { const value = new URLSearchParams(current); value.set("catalogTab", next); return value; }, { replace: true }); }} items={(Object.keys(LABELS) as Tab[]).map(key => ({ key, label: `${LABELS[key]} ${result?.counts[COUNT[key]] ?? 0}`, children: key !== tab ? null : <PageBody>
-      <PageToolbar extra={<>{(tab === "entities" || tab === "relations") && <Select aria-label="标签筛选" allowClear placeholder="按标签筛选" className="w-40" value={tag} options={(result?.tags ?? []).map(label => ({ value: label, label }))} onChange={value => { setTag(value); reset(); }} />}<Input type="search" prefix={<Search size={14} />} allowClear aria-label="搜索目录" placeholder="名称、标识或描述" className="w-60" value={query} onChange={event => { setQuery(event.target.value); reset(); }} /></>}>
-        {canEdit && <Button type="primary" icon={<Plus size={15} />} onClick={() => detail.open({ kind, id: "new", mode: "edit", sessionId: null })}>新建{LABELS[tab]}</Button>}
+      <PageToolbar extra={<>{(tab === "entities" || tab === "relations" || tab === "actions") && <Select aria-label="标签筛选" allowClear placeholder="按标签筛选" className="w-40" value={tag} options={(result?.tags ?? []).map(label => ({ value: label, label }))} onChange={value => { setTag(value); reset(); }} />}<Input type="search" prefix={<Search size={14} />} allowClear aria-label="搜索目录" placeholder="名称、标识或描述" className="w-60" value={query} onChange={event => { setQuery(event.target.value); reset(); }} /></>}>
+        {canEdit && tab !== "actions" && <Button type="primary" icon={<Plus size={15} />} onClick={() => detail.open({ kind, id: "new", mode: "edit", sessionId: null })}>新建{LABELS[tab]}</Button>}
       </PageToolbar>
       <Panel><Table<CatalogItem> size="middle" rowKey="id" columns={columns} dataSource={items} onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })} pagination={(result?.total ?? 0) > 20 ? { simple: { readOnly: true }, current: page, pageSize: 20, total: result?.total, showSizeChanger: false, showQuickJumper: false, onChange: next => { if (next === page + 1 && result?.next_cursor) { setCursors(value => [...value.slice(0, page), result.next_cursor!]); setPage(next); } else if (cursors[next - 1] !== undefined || next === 1) setPage(next); } } : false} locale={{ emptyText: <Empty description={query || tag ? "没有匹配的定义" : canEdit ? `还没有${LABELS[tab]}定义` : "暂无已发布定义"} /> }} /></Panel>
     </PageBody> }))} />

@@ -36,13 +36,25 @@ ORDERED = frozenset(
         "source_columns",
         "target_columns",
         "verbalizes",
+        "parameters",
+        "effects",
     }
 )
 
 
 def _normalize(value: Any, field: str | None = None) -> Any:
     if isinstance(value, dict):
-        return {key: _normalize(item, key) for key, item in value.items()}
+        # Preserve existing snapshot hashes when top-level `actions` is empty.
+        omit_empty_actions = (
+            field is None
+            and value.get("schema_version") == "core-1"
+            and "workspace_id" in value
+        )
+        return {
+            key: _normalize(item, key)
+            for key, item in value.items()
+            if not (omit_empty_actions and key == "actions" and item == [])
+        }
     if not isinstance(value, list):
         return value
     items = [_normalize(item) for item in value]

@@ -249,3 +249,50 @@ it("re-runs preview instead of storing or saving a stale payload when the form c
     expected_target_hash: "b".repeat(64),
   }]);
 });
+
+it("lists action parameter usages and syncs action parameter value_kind when base kind changes", async () => {
+  const draft: Draft = {
+    ...draftWithLevel(),
+    actions: [
+      {
+        id: "act1",
+        name: "upgrade_member",
+        display_name: "升级会员",
+        description: "",
+        synonyms: [],
+        tags: [],
+        target_type_id: "o1",
+        parameters: [
+          { name: "target_level", display_name: "目标等级", value_kind: "string", value_type_id: "vt1", required: true, description: "" },
+        ],
+        effects: [],
+        evidence: [],
+      },
+    ],
+  };
+  const personal = modelingSession({ id: "personal-1", workspace_id: "w", revision: 4 }, draft);
+  vi.mocked(modelingApi.personal).mockResolvedValue(personal);
+  vi.mocked(modelingApi.previewElementSave).mockResolvedValue({ session_revision: 4, affected_items: [] });
+  vi.mocked(modelingApi.saveElement).mockImplementation(async (_w, sid, payload) =>
+    modelingSession({ id: sid, workspace_id: "w", revision: 5, unpublished_change_count: 1 }, payload.draft),
+  );
+
+  renderCatalog(draft);
+  const row = screen.getByRole("button", { name: "会员等级" }).closest("tr")!;
+  fireEvent.click(within(row).getByRole("button", { name: "查看使用 member_level 的属性和动作参数" }));
+  expect(await screen.findByRole("link", { name: "动作 升级会员 · 参数 目标等级" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "会员等级" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText("修改基础类型会同步修改使用它的属性和动作参数")).toBeInTheDocument();
+
+  // Change base kind from string to integer via Ant Design Select.
+  fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: "基础类型" }));
+  fireEvent.click(await screen.findByTitle("整数"));
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+  await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+  const [, , payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+  expect(payload.draft.properties.find((p) => p.id === "p1")?.value_kind).toBe("integer");
+  expect(payload.draft.actions.find((a) => a.id === "act1")?.parameters[0]?.value_kind).toBe("integer");
+});

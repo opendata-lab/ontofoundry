@@ -61,10 +61,19 @@ def _schema_reference_like_fields() -> set[str]:
     return found
 
 
+DEFERRED_SKILL_KINDS = frozenset({"action"})  # added in PR C (skills)
+DEFERRED_SKILL_COLLECTIONS = frozenset({"actions"})  # added in PR C (skills)
+DEFERRED_SKILL_REFERENCE_FIELDS = frozenset({"object_type_id"})  # added in PR C (skills)
+
+
 def test_runpaths_collections_and_target_kinds_match_platform_schemas():
-    core_collections = _core_collections()
-    proposal_kinds = _proposal_target_kinds()
-    expected_pairs = {kind.value: collection for kind, collection in PLATFORM_COLLECTIONS.items()}
+    core_collections = _core_collections() - DEFERRED_SKILL_COLLECTIONS
+    proposal_kinds = _proposal_target_kinds() - DEFERRED_SKILL_KINDS
+    expected_pairs = {
+        kind.value: collection
+        for kind, collection in PLATFORM_COLLECTIONS.items()
+        if kind.value not in DEFERRED_SKILL_KINDS
+    }
 
     # Assert exact kind -> collection pairs, not only collection-name sets.
     assert runpaths.COLLECTIONS == expected_pairs
@@ -76,7 +85,7 @@ def test_runpaths_collections_and_target_kinds_match_platform_schemas():
 
 
 def test_generate_output_schemas_targets_partition_proposal_kinds():
-    proposal_kinds = _proposal_target_kinds()
+    proposal_kinds = _proposal_target_kinds() - DEFERRED_SKILL_KINDS
     discovery = generate_output_schemas.TARGETS["ontology-discovery"]
     extraction = generate_output_schemas.TARGETS["entity-extraction"]
 
@@ -89,7 +98,7 @@ def test_generate_output_schemas_targets_partition_proposal_kinds():
 
 
 def test_show_example_parts_by_kind_and_backend_kit_parts_match_extract_kit_examples():
-    proposal_kinds = _proposal_target_kinds()
+    proposal_kinds = _proposal_target_kinds() - DEFERRED_SKILL_KINDS
     assert set(show_example.PARTS_BY_KIND) == proposal_kinds
     assert show_example.PARTS_BY_KIND == KIT_PARTS
 
@@ -119,4 +128,7 @@ def test_show_element_reference_fields_cover_core_schema_element_refs():
     )
     assert non_element_refs <= schema_ref_fields
     assert not (show_element.REFERENCE_FIELDS & non_element_refs)
-    assert show_element.REFERENCE_FIELDS == schema_ref_fields - non_element_refs
+    assert (
+        show_element.REFERENCE_FIELDS
+        == schema_ref_fields - non_element_refs - DEFERRED_SKILL_REFERENCE_FIELDS
+    )

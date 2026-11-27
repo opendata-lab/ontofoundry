@@ -12,8 +12,8 @@ from ontofoundry_api.db_models import (
 from ontofoundry_api.domain.models import ELEMENT_MODELS, ElementKind
 from ontofoundry_api.services.errors import ServiceError
 
-# Identity, provenance and inheritance stay as proposed.
-LOCKED_FIELDS = {"id", "evidence", "extends", "type_id"}
+# Identity, provenance, inheritance and structured action definitions stay as proposed.
+LOCKED_FIELDS = {"id", "evidence", "extends", "type_id", "parameters", "effects"}
 
 
 def _strings(value):

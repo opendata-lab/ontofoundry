@@ -12,6 +12,7 @@ class MaterialUsage(Strict):
     properties: int = 0
     rules: int = 0
     metrics: int = 0
+    actions: int = 0
     material_objects: int = 0
     material_links: int = 0
     references: list[str]

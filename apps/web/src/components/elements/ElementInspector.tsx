@@ -1,11 +1,12 @@
 import { displayName } from "../../lib/coreModel";
 import { Alert, Button, ConfigProvider, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
-import { Box, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
+import { Box, Database, GitBranch, Maximize2, Minimize2, Sigma, Zap } from "lucide-react";
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { ApiError, api, modelingApi, publishApi } from "../../api/client";
 import {
   COLLECTION_BY_KIND,
+  type Action,
   type AffectedItem,
   type Dataset,
   type Draft,
@@ -22,7 +23,7 @@ import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
 import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
 import { useWorkspacePermissions } from "../../hooks/useWorkspacePermissions";
 import { useErrorMessage } from "../../hooks/useErrorMessage";
-import { emptyDraft, byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
+import { emptyDraft, byId, effectiveActions, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
 import { branchProblem } from "../../lib/derivedEditing";
 import { ONTOLOGY_SAVED, notifyOntologySaved, type OntologySaved, type ElementRequest, type ElementTab } from "../../lib/elementInspector";
 import {
@@ -41,6 +42,7 @@ import { objectMapping, shortObjectName } from "../../lib/objectMapping";
 import { newDataset } from "../../lib/datasetEditing";
 import { ContentBlock, ContentBlockScope, PageBody, PageHeader, PageTabs, Panel, PanelToolbar, SectionTitle, StatusMark } from "../layout";
 import { KIND } from "../proposals/elementMeta";
+import { ActionDefinitionTag, ActionReadOnlyPanel, ObjectActionsPanel } from "./ActionPanel";
 import { DatasetPanel } from "./DatasetPanel";
 import { ElementInstances } from "./ElementInstances";
 import { ObjectBasicPanel, RulesPanel } from "./ElementPanels";
@@ -55,7 +57,8 @@ import { RelationsPanel } from "./RelationMappingTable";
 const { Text } = Typography;
 
 type InspectKind = InspectableKind;
-type Element = ObjectType | LinkType | Metric | Dataset;
+type EditableInspectKind = Exclude<InspectKind, "action">;
+type Element = ObjectType | LinkType | Metric | Dataset | Action;
 type Loaded = { draft: Draft; session: ModelingSession | null; versionId: string | null; complete: boolean };
 type Resolved = { kind: InspectKind; element: Element | undefined; tab?: ElementTab; factId?: string };
 type ImpactPreview = {
@@ -66,7 +69,7 @@ type ImpactPreview = {
 };
 
 const KINDS: Set<string> = ELEMENT_INSPECTOR_KINDS;
-const NEW_KINDS: readonly InspectKind[] = INSPECTABLE_KINDS;
+const NEW_KINDS: readonly EditableInspectKind[] = INSPECTABLE_KINDS.filter((k): k is EditableInspectKind => k !== "action");
 const NOUN = INSPECTABLE_NOUN;
 
 /** Opens the owning resource for a nested element (property, rule, mapping, fact). */
@@ -76,7 +79,8 @@ function resolve(draft: Draft, kind: string, id: string): Resolved {
     case "link_type":
     case "metric":
     case "dataset":
-      return { kind, element: byId(draft[COLLECTION_BY_KIND[kind]] as Element[], id) };
+    case "action":
+      return { kind, element: byId((draft[COLLECTION_BY_KIND[kind]] ?? []) as Element[], id) };
     case "property":
       return {
         kind: "object_type",
@@ -112,7 +116,7 @@ function resolve(draft: Draft, kind: string, id: string): Resolved {
   }
 }
 
-function blank(draft: Draft, kind: InspectKind, id: string, owner: string | null): Element {
+function blank(draft: Draft, kind: EditableInspectKind, id: string, owner: string | null): Element {
   const base = { id, display_name: "", name: "", description: "", synonyms: [], evidence: [] };
   if (kind === "object_type")
     return { ...base, tags: [], extends: null, derived_by: [], title_property_id: null };
@@ -134,7 +138,7 @@ function blank(draft: Draft, kind: InspectKind, id: string, owner: string | null
 }
 
 /** First problem to fix before saving, or null. */
-function saveProblem(draft: Draft, kind: InspectKind, element: Element): string | null {
+function saveProblem(draft: Draft, kind: EditableInspectKind, element: Element): string | null {
   if (kind === "dataset") {
     const dataset = element as Dataset;
     if (!dataset.name.trim()) return "请填写数据集名称";
@@ -182,11 +186,12 @@ function affectedElementName(
     case "rule":
     case "metric":
     case "dataset":
-    case "value_type": {
+    case "value_type":
+    case "action": {
       const collection = COLLECTION_BY_KIND[kind];
       const found =
-        byId(draft[collection] as { id: string; name?: string; display_name?: string | null }[], id) ??
-        byId(base[collection] as { id: string; name?: string; display_name?: string | null }[], id);
+        byId((draft[collection] ?? []) as { id: string; name?: string; display_name?: string | null }[], id) ??
+        byId((base[collection] ?? []) as { id: string; name?: string; display_name?: string | null }[], id);
       return (found?.display_name || found?.name)?.trim() || id;
     }
     case "mapping": {
@@ -311,8 +316,9 @@ export function ElementView({
   const draftRef = useRef<Draft | null>(null);
   const propertyBindings = useRef<PropertyBindingEdits>(new Map());
   draftRef.current = draft;
+  const isActionRequest = requestedKind === "action";
   const [editing, setEditing] = useState(
-    !previewHash && (creating || startEditing) && canEdit,
+    !previewHash && !isActionRequest && (creating || startEditing) && canEdit,
   );
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -369,7 +375,7 @@ export function ElementView({
             throw new Error("待发布内容已变化，请关闭弹窗并重新预览");
           source = { draft: { ...preview.merged_model, material_objects: session.draft.material_objects, material_links: session.draft.material_links }, session: null, versionId: preview.current_version_id, complete: true };
         } else source = { draft: session.draft, session, versionId: current.version_id, complete: true };
-      } else if ((creating || startEditing) && canEdit) {
+      } else if ((creating || startEditing) && canEdit && !isActionRequest) {
         const session = await modelingApi.personal(workspace.id);
         source = { draft: session.draft, session, versionId: current.version_id, complete: true };
       } else {
@@ -382,11 +388,12 @@ export function ElementView({
         source = { draft: model, session: null, versionId: fixed, complete };
 
       }
-      let value = startEditing || creating ? structuredClone(source.draft) : source.draft;
+      let value = (startEditing || creating) && !isActionRequest ? structuredClone(source.draft) : source.draft;
       if (creating) {
         if (!canEdit) throw new Error("没有权限新建");
-        if (!NEW_KINDS.includes(requestedKind as InspectKind)) throw new Error("请从所属对象或关系中新增");
-        const kind = requestedKind as InspectKind;
+        if (isActionRequest) throw new Error("动作定义暂不支持手工新建，请通过建模对话提案或导入");
+        if (!NEW_KINDS.includes(requestedKind as EditableInspectKind)) throw new Error("请从所属对象或关系中新增");
+        const kind = requestedKind as EditableInspectKind;
         value = upsert(value, COLLECTION_BY_KIND[kind], blank(value, kind, effectiveId, owner) as never);
       }
       if (live) {
@@ -401,7 +408,7 @@ export function ElementView({
     return () => {
       live = false;
     };
-  }, [workspace.id, canRead, canEdit, requestedKind, creating, effectiveId, sessionId, previewHash, owner, attempt, requestedVersionId]);
+  }, [workspace.id, canRead, canEdit, requestedKind, isActionRequest, creating, effectiveId, sessionId, previewHash, owner, attempt, requestedVersionId]);
   useEffect(() => {
     if (!modal || (!dirty && !busy)) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -413,13 +420,14 @@ export function ElementView({
   }, [modal, dirty, busy]);
 
   const resolved = draft ? resolve(draft, requestedKind, effectiveId) : null;
-  const kind: InspectKind = resolved?.kind ?? (NEW_KINDS.includes(requestedKind as InspectKind) ? (requestedKind as InspectKind) : "object_type");
+  const kind: InspectKind = resolved?.kind ?? (INSPECTABLE_KINDS.includes(requestedKind as InspectKind) ? (requestedKind as InspectKind) : "object_type");
   const element = resolved?.element;
   const object = kind === "object_type" ? (element as ObjectType | undefined) : undefined;
   const link = kind === "link_type" ? (element as LinkType | undefined) : undefined;
   const properties = draft && object ? effectiveProperties(draft, object.id) : [];
   const relations = draft && object ? relationsFor(draft, object) : [];
   const rules = draft && (object || link) ? rulesFor(draft, (object ?? link)!) : [];
+  const objectActions = draft && object ? effectiveActions(draft, object.id) : [];
   const member = canRead;
   const tabs: { key: ElementTab; label: string; count?: number }[] = object
     ? [
@@ -427,6 +435,7 @@ export function ElementView({
         { key: "properties", label: "字段", count: properties.length },
         { key: "relations", label: "关系", count: relations.length },
         { key: "rules", label: "规则", count: rules.length },
+        { key: "actions", label: "动作", count: objectActions.length },
       ]
     : link
       ? [
@@ -517,9 +526,9 @@ export function ElementView({
     const currentResolved = resolve(sourceDraft, requestedKind, effectiveId);
     const currentKind: InspectKind =
       currentResolved?.kind ??
-      (NEW_KINDS.includes(requestedKind as InspectKind) ? (requestedKind as InspectKind) : "object_type");
+      (INSPECTABLE_KINDS.includes(requestedKind as InspectKind) ? (requestedKind as InspectKind) : "object_type");
     const currentElement = currentResolved?.element;
-    if (!currentElement) return null;
+    if (!currentElement || currentKind === "action") return null;
     const value =
       currentKind === "metric"
         ? upsert(sourceDraft, "metrics", storedMetric(currentElement as Metric))
@@ -744,7 +753,7 @@ export function ElementView({
     draft && (object || link)
       ? { draft, type: (object ?? link)!, editing, canEdit: canEdit && !previewHash, sessionId: activeSessionId, versionId: loaded?.versionId ?? undefined, partialRead: loaded?.complete === false, change, open }
       : null;
-  const Icon = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database }[kind];
+  const Icon = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database, action: Zap }[kind];
   const record = draft && object ? objectMapping(draft, object) : null;
   const title = displayName(element)
     ? kind === "object_type" || kind === "link_type"
@@ -778,6 +787,8 @@ export function ElementView({
           open={open}
         />
       );
+    if (kind === "action")
+      return <ActionReadOnlyPanel draft={draft} action={element as Action} open={open} />;
     if (kind === "dataset")
       return <DatasetPanel key={readScope} active={panelActive} draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} tab={tab} canPreview={member} revision={loaded?.session?.revision} />;
     if (!panel) return null;
@@ -792,6 +803,7 @@ export function ElementView({
       </div>;
       if (tab === "relations") return <RelationsPanel key={`${object.id}:${editing ? "edit" : "read"}`} {...props} />;
       if (tab === "rules") return <RulesPanel key={`${object.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
+      if (tab === "actions") return <ObjectActionsPanel key={object.id} draft={draft} type={object} open={open} />;
       return <ObjectBasicPanel {...props} />;
     }
     if (tab === "rules") return <RulesPanel key={`${link?.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
@@ -845,7 +857,7 @@ export function ElementView({
       {!modal && status}
       {versionChanged && <Button size={control} disabled={editing || busy} onClick={() => void refreshPublished()}>版本已更新，刷新</Button>}
       {notice && <StatusMark state="mapped" label={notice} className="font-normal" role="status" />}
-      {!editing && canEdit && !previewHash && element && (
+      {!editing && canEdit && kind !== "action" && !previewHash && element && (
         <Button size={control} onClick={() => void beginEdit()} disabled={!loaded || busy}>
           编辑
         </Button>
@@ -889,7 +901,7 @@ export function ElementView({
   }));
   const separateBlocks = !modal && (
     kind === "object_type" || kind === "link_type" ||
-    kind === "metric" || kind === "dataset"
+    kind === "metric" || kind === "dataset" || kind === "action"
   );
   const main = (
     <div ref={body} aria-busy={busy} className="element-detail-body flex min-h-0 flex-1 flex-col">
@@ -973,6 +985,7 @@ export function ElementView({
     <span className="flex flex-wrap items-baseline gap-2" aria-label={displayName(element) || title}>
       <span className={modal ? "text-lg" : undefined}>{title}</span>
       {technical && <code className="text-xs font-normal text-muted">{technical}</code>}
+      {kind === "action" && <ActionDefinitionTag />}
     </span>
   );
   if (!modal) {

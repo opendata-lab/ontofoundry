@@ -11,6 +11,7 @@ Design: docs/design/2026-10-14-core-model-and-format-adapters.md §3.
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from datetime import datetime
@@ -407,6 +408,95 @@ class Rule(Strict):
     evidence: EvidenceList
 
 
+# --- actions ----------------------------------------------------------------
+
+
+ActionDescription = Annotated[str, Field(default="", max_length=200)]
+
+
+class ActionParameter(Strict):
+    """Caller-supplied scalar input for an action definition."""
+
+    name: Identifier
+    display_name: DisplayName | None = None
+    description: ActionDescription = ""
+    value_kind: ValueKind
+    value_type_id: UUID | None = None
+    required: bool = False
+
+
+class SetPropertyEffect(Strict):
+    kind: Literal["set_property"]
+    property_id: UUID
+    description: ActionDescription = ""
+
+
+class AddLinkEffect(Strict):
+    kind: Literal["add_link"]
+    link_type_id: UUID
+    description: ActionDescription = ""
+
+
+class RemoveLinkEffect(Strict):
+    kind: Literal["remove_link"]
+    link_type_id: UUID
+    description: ActionDescription = ""
+
+
+class CreateObjectEffect(Strict):
+    kind: Literal["create_object"]
+    object_type_id: UUID
+    description: ActionDescription = ""
+
+
+ActionEffect = Annotated[
+    SetPropertyEffect | AddLinkEffect | RemoveLinkEffect | CreateObjectEffect,
+    Field(discriminator="kind"),
+]
+
+
+def _effect_target_id(effect: ActionEffect) -> UUID:
+    if isinstance(effect, SetPropertyEffect):
+        return effect.property_id
+    if isinstance(effect, (AddLinkEffect, RemoveLinkEffect)):
+        return effect.link_type_id
+    return effect.object_type_id
+
+
+ACTION_MAX_JSON_BYTES = 65_536
+
+
+class Action(Strict):
+    """Declarative business action definition (not executed by the platform)."""
+
+    id: UUID
+    name: Identifier
+    display_name: DisplayName | None = None
+    description: Description = ""
+    synonyms: Labels
+    tags: Labels
+    target_type_id: UUID | None = None
+    parameters: list[ActionParameter] = Field(default_factory=list, max_length=50)
+    effects: list[ActionEffect] = Field(default_factory=list, max_length=50)
+    evidence: EvidenceList
+
+    @model_validator(mode="after")
+    def unique_parameters_and_effects(self) -> Action:
+        param_names = [param.name.casefold() for param in self.parameters]
+        if len(param_names) != len(set(param_names)):
+            raise ValueError("同一动作的参数英文标识重复")
+        effect_keys = [(effect.kind, _effect_target_id(effect)) for effect in self.effects]
+        if len(effect_keys) != len(set(effect_keys)):
+            raise ValueError("同一动作不能包含重复的效果")
+        payload = self.model_dump(mode="json", exclude={"evidence"})
+        encoded_size = len(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+        if encoded_size > ACTION_MAX_JSON_BYTES:
+            raise ValueError("动作定义（不含证据）序列化后的 JSON 不能超过 64 KB（65536 字节）")
+        return self
+
+
 # --- metrics ----------------------------------------------------------------
 
 
@@ -638,6 +728,7 @@ class CoreDraft(Strict):
     datasets: list[Dataset] = Field(default_factory=list)
     mappings: list[DataMapping] = Field(default_factory=list)
     value_types: list[ValueType] = Field(default_factory=list)
+    actions: list[Action] = Field(default_factory=list)
 
 
 COLLECTIONS = (
@@ -649,6 +740,7 @@ COLLECTIONS = (
     "datasets",
     "mappings",
     "value_types",
+    "actions",
 )
 
 

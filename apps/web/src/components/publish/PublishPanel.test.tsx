@@ -374,6 +374,95 @@ describe("publish panel", () => {
     await act(async () => late(preview()));
     expect(screen.queryByRole("button", { name: "发布 v3" })).not.toBeInTheDocument();
   });
+
+  it("shows current published names rather than auto-merged base names in the before column for action effects", async () => {
+    const objWoId = "00000000-0000-4000-8000-000000000101";
+    const objTeamId = "00000000-0000-4000-8000-000000000102";
+    const propWoStatusId = "00000000-0000-4000-8000-000000000201";
+    const propTeamStatusId = "00000000-0000-4000-8000-000000000202";
+    const actionId = "00000000-0000-4000-8000-000000000301";
+
+    const woBase = { id: objWoId, name: "work_order", display_name: "原工单", description: "", synonyms: [], tags: [], extends: null, derived_by: [], title_property_id: null, evidence: [] };
+    const woPublished = { ...woBase, display_name: "已发布工单" };
+    const team = { id: objTeamId, name: "maintenance_team", display_name: "受理班组", description: "", synonyms: [], tags: [], extends: null, derived_by: [], title_property_id: null, evidence: [] };
+    const propWoStatus = { id: propWoStatusId, owner_type_id: objWoId, name: "status", display_name: "状态", description: "", value_kind: "string" as const, value_type_id: null, required: false, identifier: false, unique: false, synonyms: [], tags: [], evidence: [] };
+    const propTeamStatus = { id: propTeamStatusId, owner_type_id: objTeamId, name: "status", display_name: "状态", description: "", value_kind: "string" as const, value_type_id: null, required: false, identifier: false, unique: false, synonyms: [], tags: [], evidence: [] };
+    const beforeAction = {
+      id: actionId,
+      name: "dispatch_work_order",
+      display_name: "派单",
+      description: "",
+      synonyms: [],
+      tags: [],
+      target_type_id: objWoId,
+      parameters: [],
+      effects: [{ kind: "set_property" as const, property_id: propWoStatusId, description: "更新工单状态" }],
+      evidence: [],
+    };
+    const afterAction = {
+      ...beforeAction,
+      effects: [{ kind: "set_property" as const, property_id: propTeamStatusId, description: "更新班组状态" }],
+    };
+
+    // Session draft started from base (still has 原工单); another session published 已发布工单.
+    const draftFromBase = {
+      ...emptyDraft("w"),
+      object_types: [woBase, team],
+      properties: [propWoStatus, propTeamStatus],
+      actions: [afterAction],
+    };
+    const mergedModel = {
+      ...emptyDraft("w"),
+      object_types: [woPublished, team],
+      properties: [propWoStatus, propTeamStatus],
+      actions: [afterAction],
+    };
+
+    vi.spyOn(publishApi, "preview").mockResolvedValue(
+      preview({
+        merged_model: mergedModel,
+        labels: {
+          [objWoId]: "已发布工单",
+          [objTeamId]: "受理班组",
+          [propWoStatusId]: "状态",
+          [propTeamStatusId]: "状态",
+          [actionId]: "派单",
+        },
+        changes: [
+          {
+            element_kind: "action",
+            element_id: actionId,
+            label: "派单",
+            change: "updated",
+            field_changes: [
+              { path: "effects", before: beforeAction.effects, after: afterAction.effects },
+            ],
+            before: beforeAction as never,
+            after: afterAction as never,
+          },
+        ],
+        auto_merged: [
+          {
+            element_kind: "object_type",
+            element_id: objWoId,
+            label: "已发布工单",
+            change: "updated",
+            field_changes: [{ path: "display_name", before: "原工单", after: "已发布工单" }],
+            before: woBase as never,
+            after: woPublished as never,
+            side: "latest",
+          },
+        ],
+      }),
+    );
+
+    renderPanel({ session: { ...session, draft: draftFromBase } });
+    await screen.findByRole("button", { name: "发布 v3" });
+    const card = screen.getByLabelText("动作 派单").closest(".ant-collapse-item") as HTMLElement;
+    expect(within(card).getByText("已发布工单.状态")).toBeInTheDocument();
+    expect(within(card).getByText("受理班组.状态")).toBeInTheDocument();
+    expect(within(card).queryByText("原工单.状态")).not.toBeInTheDocument();
+  });
 });
 
 describe("line diff", () => {

@@ -1,4 +1,4 @@
-import { Box, Braces, Database, FileText, GitBranch, ShieldCheck, Sigma, TableProperties, Workflow, type LucideIcon } from "lucide-react";
+import { Box, Braces, Database, FileText, GitBranch, ShieldCheck, Sigma, TableProperties, Workflow, Zap, type LucideIcon } from "lucide-react";
 import type { TargetKind } from "../api/types";
 
 export type ElementCategory = { key: TargetKind; text: string; icon: LucideIcon; tone: string; background: string };
@@ -10,6 +10,7 @@ export const ELEMENT_CATEGORIES: ElementCategory[] = [
   { key: "property", text: "属性", icon: Braces, tone: "text-attribute", background: "bg-attribute-soft" },
   { key: "rule", text: "规则", icon: ShieldCheck, tone: "text-ink-2", background: "bg-canvas" },
   { key: "metric", text: "指标", icon: Sigma, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "action", text: "动作", icon: Zap, tone: "text-ink-2", background: "bg-canvas" },
   { key: "dataset", text: "数据集", icon: Database, tone: "text-ink-2", background: "bg-canvas" },
   { key: "mapping", text: "映射", icon: TableProperties, tone: "text-ink-2", background: "bg-canvas" },
   { key: "material_object", text: "文档实例", icon: FileText, tone: "text-ink-2", background: "bg-canvas" },

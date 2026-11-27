@@ -2,12 +2,13 @@ import { PublishedTypeCatalogPage } from "./PublishedTypeCatalogPage";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { Button, Empty, Input, Select, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { Box, Download, GitBranch, Plus, RefreshCw, Rocket, Search, Sigma, Upload } from "lucide-react";
+import { Box, Download, GitBranch, Plus, RefreshCw, Rocket, Search, Sigma, Upload, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
-import type { Dataset, LinkType, Metric, ObjectType, VersionSummary } from "../api/types";
+import type { Action, Dataset, LinkType, Metric, ObjectType, VersionSummary } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
+import { ActionDefinitionTag } from "../components/elements/ActionPanel";
 import { ExportDialog } from "../components/ExportDialog";
 import { ValueTypeCatalog } from "../components/ValueTypeCatalog";
 import { ImportDialog } from "../components/ImportDialog";
@@ -30,7 +31,7 @@ import { METRIC_KINDS } from "../lib/metricEditing";
 import { objectMapping } from "../lib/objectMapping";
 
 const { Text } = Typography;
-type CatalogItem = ObjectType | LinkType | Metric | Dataset;
+type CatalogItem = ObjectType | LinkType | Metric | Dataset | Action;
 const LABELS = CATALOG_TAB_LABELS;
 
 /** One catalog owns entities, relationships and metrics, including session drafts. */
@@ -94,7 +95,8 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
   const objects = tab === "entities";
   const metrics = tab === "metrics";
   const datasets = tab === "datasets";
-  const items: CatalogItem[] = tab === "values" ? [] : (draft[CATALOG_TAB_COLLECTIONS[tab]] as CatalogItem[]);
+  const actions = tab === "actions";
+  const items: CatalogItem[] = tab === "values" ? [] : ((draft[CATALOG_TAB_COLLECTIONS[tab]] ?? []) as CatalogItem[]);
   const tags = [...new Set(items.flatMap((item) => "tags" in item ? item.tags : []))];
   const normalized = query.trim().toLowerCase();
   const filtered = items.filter((item) =>
@@ -102,22 +104,22 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
     (!normalized || [(item.display_name || item.name), "name" in item ? item.name : "", item.description, ...("synonyms" in item ? item.synonyms : []),
       ...("verbalizes" in item ? item.verbalizes : []), "source_role_name" in item ? item.source_role_name ?? "" : "", "target_role_name" in item ? item.target_role_name ?? "" : ""]
       .join(" ").toLowerCase().includes(normalized)));
-  const Icon = objects ? Box : metrics ? Sigma : GitBranch;
+  const Icon = objects ? Box : metrics ? Sigma : actions ? Zap : GitBranch;
   const dash = <Text type="secondary">—</Text>;
   const tagCell = (item: CatalogItem) => "tags" in item && item.tags.length
     ? <span className="flex flex-wrap gap-1">{item.tags.map((label) => <Tag key={label} className="m-0">{label}</Tag>)}</span>
     : dash;
   // One flat row per definition, with separate labels and stable identifiers.
   const columns: ColumnsType<CatalogItem> = [{
-    title: "名称", key: "name", render: (_, item) => <Link
+    title: "名称", key: "name", render: (_, item) => <span className="inline-flex items-center gap-2 whitespace-nowrap"><Link
       to={detail.href({ kind, id: item.id, tab: objects ? "properties" : "basic", sessionId })}
       className="inline-flex items-center gap-2 font-medium whitespace-nowrap"
     >
-      <Icon size={14} className={objects ? "flex-none text-object" : metrics ? "flex-none text-accent" : "flex-none text-relation"} />{(item.display_name || item.name)}
-    </Link>,
+      <Icon size={14} className={objects ? "flex-none text-object" : metrics || actions ? "flex-none text-accent" : "flex-none text-relation"} />{(item.display_name || item.name)}
+    </Link>{actions && <ActionDefinitionTag />}</span>,
   }];
   columns.push({ title: "英文标识", key: "identifier", render: (_, item) => <code className="text-xs whitespace-nowrap">{item.name}</code> });
-  if (!objects && !metrics && !datasets) columns.push(
+  if (!objects && !metrics && !datasets && !actions) columns.push(
     { title: "关系含义", key: "reading", render: (_, item) => {
       if (!("source_type_id" in item)) return dash;
       const reading = item.verbalizes.find(isForwardReading);
@@ -146,6 +148,26 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
     { title: "数据集", key: "dataset", render: (_, item) => "kind" in item ? byId(draft.datasets, metricDatasetId(draft, item))?.name ?? "未指定" : dash },
   );
   else if (datasets) columns.push({ title: "来源", key: "source", render: (_, item) => "source_kind" in item && item.source_kind === "query" ? "表达式" : "数据表" }, { title: "列", key: "columns", render: (_, item) => "columns" in item ? item.columns?.length ?? "未探测" : "—" });
+  else if (actions) columns.push(
+    {
+      title: "作用对象",
+      key: "target",
+      render: (_, item) => {
+        if (!("parameters" in item)) return dash;
+        const target = item.target_type_id ? byId(draft.object_types, item.target_type_id) : undefined;
+        return target ? (
+          <Link to={detail.href({ kind: "object_type", id: target.id, sessionId })} className="whitespace-nowrap">
+            {target.display_name || target.name}
+          </Link>
+        ) : (
+          <Tag className="m-0">全局动作</Tag>
+        );
+      },
+    },
+    { title: "参数", key: "parameters", render: (_, item) => ("parameters" in item ? item.parameters.length : dash) },
+    { title: "效果", key: "effects", render: (_, item) => ("effects" in item ? item.effects.length : dash) },
+    { title: "标签", key: "tags", render: (_, item) => tagCell(item) },
+  );
   else columns.push({ title: "标签", key: "tags", render: (_, item) => tagCell(item) });
   // Auto layout keeps counts narrow; the description truncates within its own bound.
   columns.push({ title: "描述", key: "description", render: (_, item) => item.description
@@ -183,7 +205,7 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
             options={tags.map((label) => ({ value: label, label }))} onChange={setTag} />}
           <Input type="search" prefix={<Search size={14} />} allowClear aria-label="搜索目录" placeholder="名称、标识或描述" className="w-60" value={query} onChange={(event) => setQuery(event.target.value)} />
           </>}>
-          {canEdit && <Button type="primary" icon={<Plus size={15} />} onClick={() => tab === "values" ? setCreateValueType((n) => n + 1) : detail.open({ kind, id: "new", mode: "edit", sessionId })}>新建{LABELS[tab]}</Button>}
+          {canEdit && tab !== "actions" && <Button type="primary" icon={<Plus size={15} />} onClick={() => tab === "values" ? setCreateValueType((n) => n + 1) : detail.open({ kind, id: "new", mode: "edit", sessionId })}>新建{LABELS[tab]}</Button>}
           </PageToolbar>
           <Panel>{key === "values"
           ? <ValueTypeCatalog workspace={workspace} draft={draft} sessionId={sessionId} query={query} createRequest={createValueType} onSaved={(saved) => {

@@ -5,10 +5,12 @@ import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
+from uuid import UUID
 
 from ontofoundry_api.contracts.read_models import OntologySearchRead, OntologySearchRequest
 from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import CoreDraft
+from ontofoundry_api.domain.graph import draft_index
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 from ontofoundry_api.domain.snapshot import empty_snapshot
 from ontofoundry_api.services.access import (
@@ -195,6 +197,7 @@ SEARCHABLE_KINDS = (
     "metric",
     "dataset",
     "value_type",
+    "action",
 )
 
 
@@ -228,6 +231,8 @@ def visible_elements(draft: CoreDraft, *, mappings: bool) -> list[SearchElement]
                 allowed |= {"kind", "aggregation", "numerator_id", "denominator_id"}
                 if mappings:
                     allowed |= {"measure", "time_field", "filters", "expression"}
+            elif kind == "action":
+                allowed |= {"target_type_id"}
             elements.append(
                 SearchElement(
                     str(value.id), kind, {k: v for k, v in raw.items() if k in allowed}
@@ -255,11 +260,16 @@ def expansion_targets(element: SearchElement, draft: CoreDraft, *, mappings: boo
         for link in draft.link_types:
             if element.id in {str(link.source_type_id), str(link.target_type_id)}:
                 yield str(link.id), "object_link_type"
+        for action in draft_index(draft).effective_actions(UUID(element.id)):
+            yield str(action.id), "object_action"
     elif element.kind == "property":
         yield d["owner_type_id"], "property_owner"
     elif element.kind == "link_type":
         yield d["source_type_id"], "link_source_type"
         yield d["target_type_id"], "link_target_type"
+    elif element.kind == "action":
+        if d.get("target_type_id"):
+            yield d["target_type_id"], "action_target_type"
 
 
 def item_summary(
@@ -346,6 +356,13 @@ def item_summary(
             metric = next(m for m in draft.metrics if str(m.id) == element.id)
             dataset = dataset_for(draft, metric)
             item["dataset"] = {"id": str(dataset.id), "name": dataset.name}
+    elif element.kind == "action":
+        item["synonyms"] = d.get("synonyms", [])
+        if d.get("target_type_id"):
+            item["target_type_id"] = d["target_type_id"]
+            item["target"] = reference(d["target_type_id"])
+            item["owner_id"] = d["target_type_id"]
+            item["owner_kind"] = "object_type"
     return item
 
 

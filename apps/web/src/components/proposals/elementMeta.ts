@@ -11,6 +11,7 @@ export const KIND: Record<TargetKind, { label: string; color: string }> = {
   material_object: { label: "文档实例", color: "gold" },
   material_link: { label: "关系实例", color: "gold" },
   value_type: { label: "值类型", color: "lime" },
+  action: { label: "动作", color: "default" },
 };
 
 export const OPERATION: Record<ProposalItem["operation"], string> = {
@@ -106,6 +107,9 @@ export const FIELD_LABELS: Record<string, string> = {
   connection_id: "连接",
   source_kind: "来源方式",
   query_sql: "SQL",
+  value_type_id: "值类型",
+  parameters: "参数",
+  effects: "效果",
 };
 
 export function fieldLabel(path: string): string {

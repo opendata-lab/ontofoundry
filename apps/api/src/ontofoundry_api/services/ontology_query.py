@@ -74,6 +74,7 @@ def read_context(version):
             binding_readiness(draft, obj.id)
             index.effective_rules(obj.id)
             index.effective_links(obj.id)
+            index.effective_actions(obj.id)
             index.identifier(obj.id)
             index.children(obj.id)
         return VersionReadContext(snapshot, draft, index, snapshot_sha256(snapshot))
@@ -106,7 +107,7 @@ def envelope(version):
     }
 
 
-RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset")
+RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset", "action")
 RESOURCE_KIND_PATTERN = f"^({'|'.join(RESOURCE_KINDS)})$"
 # Published version summaries report core counts under stable external keys
 # ("attributes" maps to core collection "properties"; value_types is omitted).
@@ -116,6 +117,7 @@ VERSION_SUMMARY_COUNT_FIELDS = {
     "attributes": "properties",
     "rules": "rules",
     "metrics": "metrics",
+    "actions": "actions",
 }
 VERSION_SUMMARY_MAPPING_COUNT_FIELDS = {
     "datasets": "datasets",
@@ -271,6 +273,30 @@ def relationship_binding_status(
     return "bound" if statuses and all(s == "bound" for s in statuses) else "unbound"
 
 
+def object_action_summaries(
+    draft: CoreDraft, type_id, *, index: DraftIndex | None = None
+) -> list[dict]:
+    """Derive applicable action summaries for an object type, including inherited ones."""
+    index = index or draft_index(draft)
+    return [
+        {
+            "id": str(action.id),
+            "name": action.name,
+            "display_name": action.display_name,
+            "description": action.description,
+            "target_type_id": str(action.target_type_id)
+            if action.target_type_id is not None
+            else None,
+            "inherited_from": str(action.target_type_id)
+            if action.target_type_id != type_id
+            else None,
+            "parameter_count": len(action.parameters),
+            "effect_count": len(action.effects),
+        }
+        for action in index.effective_actions(type_id)
+    ]
+
+
 def resource_items(
     snapshot,
     *,
@@ -377,6 +403,7 @@ def resource_items(
                 }
                 for r in index.effective_rules(obj.id)
             ],
+            "actions": object_action_summaries(draft, obj.id, index=index),
             "child_types": [
                 {"id": str(o.id), "display_name": o.display_name, "name": o.name}
                 for o in index.children(obj.id)
@@ -430,6 +457,8 @@ def resource_items(
             else:
                 definition = {**dump(dataset), "binding_status": "unbound"}
             items.append({"kind": "dataset", "definition": definition})
+    for action in values("action", "actions"):
+        items.append({"kind": "action", "definition": dump(action)})
     return items
 
 

@@ -369,6 +369,18 @@ def walk_references(kind, value, resolve):
         refs(result, "type_id")
     elif kind == "material_link":
         refs(result, "type_id", "source_id", "target_id")
+    elif kind == "action":
+        refs(result, "target_type_id")
+        for param in result.get("parameters", []):
+            refs(param, "value_type_id")
+        for effect in result.get("effects", []):
+            effect_kind = effect.get("kind")
+            if effect_kind == "set_property":
+                refs(effect, "property_id")
+            elif effect_kind in ("add_link", "remove_link"):
+                refs(effect, "link_type_id")
+            elif effect_kind == "create_object":
+                refs(effect, "object_type_id")
     return result
 
 
@@ -383,6 +395,7 @@ NAMED_PROPOSAL_KINDS = frozenset(
         "rule",
         "metric",
         "dataset",
+        "action",
     }
 )
 
@@ -483,10 +496,25 @@ def group_items(draft, items, *, references_resolved=False):
             renamed = changed.after is not None and any(
                 previous.get(k) != changed.after.get(k) for k in ("name",) if k in previous
             )
-            if changed.operation == "delete" or renamed:
+            needs_kind_sync = (
+                changed.target_kind == "value_type"
+                and changed.after is not None
+                and previous.get("value_kind") != changed.after.get("value_kind")
+                and (
+                    reference.path == "value_type_id"
+                    or reference.path.endswith(".value_type_id")
+                )
+            )
+            if changed.operation == "delete" or renamed or needs_kind_sync:
                 dependent = by_target.get(str(owner))
                 if dependent and dependent.id != changed.id:
+                    if needs_kind_sync and dependent.target_kind not in {"property", "action"}:
+                        continue
                     deps[changed.id].add(dependent.id)
+                    if needs_kind_sync:
+                        # Group a value_type base-kind change with every referencing
+                        # property/action parameter update, rebind or deletion into one atomic decision.
+                        deps[dependent.id].add(changed.id)
     # Composite identity edits must be validated together: a prefix of a
     # multi-property identifier is not a valid single-property identifier.
     identity_edits = {}
@@ -902,7 +930,7 @@ def parse_result(
                     hashes.get(n),
                     befores.get(n),
                     after,
-                    raw_item.get("field_changes", []),
+                    [] if raw_item["target_kind"] == "action" else raw_item.get("field_changes", []),
                     evidence,
                     raw_item.get("reason", ""),
                     item_fingerprint(
