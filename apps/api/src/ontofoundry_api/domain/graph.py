@@ -75,20 +75,14 @@ class DraftIndex:
         self.incoming_by_owner = group(self.draft.link_types, "target_type_id")
         self.mappings_by_type = {m.type_id: m for m in self.draft.mappings}
         self.elements, self.names = {}, {}
-        for kind, collection in (
-            ("object_type", "object_types"),
-            ("link_type", "link_types"),
-            ("property", "properties"),
-            ("rule", "rules"),
-            ("metric", "metrics"),
-            ("dataset", "datasets"),
-            ("mapping", "mappings"),
-            ("value_type", "value_types"),
-        ):
+        # Lazy import: domain.models imports draft_index at module top level.
+        from ontofoundry_api.domain.models import COLLECTIONS
+
+        for kind, collection in COLLECTIONS.items():
             for item in getattr(self.draft, collection):
-                self.elements[item.id] = (kind, item)
+                self.elements[item.id] = (kind.value, item)
                 if hasattr(item, "name"):
-                    self.names.setdefault(item.name.casefold(), []).append((kind, item))
+                    self.names.setdefault(item.name.casefold(), []).append((kind.value, item))
 
     def grouped(self, groups, owners):
         return [

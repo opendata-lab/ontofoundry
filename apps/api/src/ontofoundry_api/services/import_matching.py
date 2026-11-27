@@ -24,6 +24,32 @@ from ontofoundry_api.domain.expressions import (
 from ontofoundry_api.domain.models import COLLECTIONS
 from ontofoundry_api.domain.validation import validate_core_graph
 
+# Natural-key matching order: objects and value_types first because properties,
+# links, rules and mappings reference their remapped owner/target UUIDs.
+NATURAL_KEY_ORDER = (
+    "object_type",
+    "value_type",
+    "property",
+    "link_type",
+    "rule",
+    "metric",
+    "dataset",
+    "mapping",
+    "material_object",
+    "material_link",
+)
+# Kinds grouped for simultaneous name-exchange detection during import pruning.
+RENAME_GROUP_KINDS = frozenset(
+    {
+        "object_type",
+        "property",
+        "link_type",
+        "rule",
+        "metric",
+        "dataset",
+    }
+)
+
 
 def elements(model):
     return {
@@ -61,19 +87,7 @@ def match_import(base: CoreDraft, source: CoreDraft, *, native: bool) -> dict[st
             return owner("type_id")
         return None
 
-    for kind in (
-        "object_type",
-        # Before properties and rules, which reference value types.
-        "value_type",
-        "property",
-        "link_type",
-        "rule",
-        "metric",
-        "dataset",
-        "mapping",
-        "material_object",
-        "material_link",
-    ):
+    for kind in NATURAL_KEY_ORDER:
         for ident, (found_kind, item) in incoming.items():
             if kind != found_kind or ident in matched:
                 continue
@@ -188,14 +202,7 @@ def build_candidate_graph(
         return (kind,)
 
     for ident, (kind, item) in incoming.items():
-        if kind not in {
-            "object_type",
-            "property",
-            "link_type",
-            "rule",
-            "metric",
-            "dataset",
-        }:
+        if kind not in RENAME_GROUP_KINDS:
             continue
         fields = ("name",)
         for other, (old_kind, previous) in original.items():

@@ -1,5 +1,6 @@
 import type { CoreElement, Draft, FieldChange, MaterialObject, ProposalItem, TargetKind } from "../../api/types";
 import { byId } from "../../lib/coreModel";
+import { NAMED_DRAFT_COLLECTIONS } from "../../lib/elementKinds";
 import { documentDisplayText } from "../../lib/instanceDisplay";
 import { FIELD_LABELS, KIND, STATUS } from "./elementMeta";
 
@@ -145,7 +146,7 @@ export function mergedFact(existing: MaterialObject, proposed: MaterialObject): 
 /** Names of draft elements and of elements created in the batch, by id. */
 export function elementNames(draft: Draft, items: ProposalItem[]) {
   const names = new Map<string, string>();
-  for (const key of ["object_types", "properties", "link_types", "rules", "metrics", "datasets"] as const)
+  for (const key of NAMED_DRAFT_COLLECTIONS)
     for (const element of draft[key] as { id: string; name: string; display_name?: string | null }[]) names.set(element.id, element.display_name || element.name);
   for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
   for (const item of items) names.set(item.target_id, item.display_name);

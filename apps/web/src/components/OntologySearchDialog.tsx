@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { OntologySearchHit, OntologySearchKind, OntologySearchResult } from "../api/types";
 import { elementHref } from "../lib/elementInspector";
+import { NAVIGABLE_SEARCH_KINDS, SEARCH_KIND_LABELS } from "../lib/elementKinds";
 
 const ICONS: Record<OntologySearchKind, typeof Box> = {
   object_type: Box,
@@ -15,15 +16,7 @@ const ICONS: Record<OntologySearchKind, typeof Box> = {
   dataset: Database,
   value_type: Shapes,
 };
-const KIND_LABELS: Record<OntologySearchKind, string> = {
-  object_type: "实体",
-  property: "属性",
-  link_type: "关系",
-  rule: "规则",
-  metric: "指标",
-  dataset: "数据集",
-  value_type: "值类型",
-};
+const KIND_LABELS = SEARCH_KIND_LABELS;
 const RELATION_LABELS: Record<string, string> = {
   metric_dataset_bound_type: "指标数据集绑定的实体",
   metric_numerator: "比率指标的分子",
@@ -35,7 +28,7 @@ const RELATION_LABELS: Record<string, string> = {
   link_target_type: "关系终点",
 };
 // Value types have no detail page of their own yet.
-const NAVIGABLE = new Set<OntologySearchKind>(["object_type", "property", "link_type", "rule", "metric", "dataset"]);
+const NAVIGABLE = NAVIGABLE_SEARCH_KINDS;
 const label = (hit: Pick<OntologySearchHit, "display_name" | "name">) => hit.display_name || hit.name;
 
 function matchText(hit: OntologySearchHit, names: Map<string, string>) {

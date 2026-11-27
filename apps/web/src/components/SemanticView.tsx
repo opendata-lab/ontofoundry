@@ -6,6 +6,7 @@ import type { Draft, TypeGraph } from "../api/types";
 import { usePageActive } from "../hooks/usePageTab";
 import type { ElementRequest } from "../lib/elementInspector";
 import {
+  RESOURCE_KINDS,
   RESOURCE_KIND_LABELS,
   semanticCanvas,
   semanticResources,
@@ -17,8 +18,8 @@ import { OntologyGraph, type SelectedGraphItem } from "./OntologyGraph";
 
 const { Text } = Typography;
 const STORAGE_KEY = "ontofoundry.semantic.explorer.collapsed";
-const KINDS: ResourceKind[] = ["object", "relation", "metric", "dataset"];
-const ICONS = { object: Box, relation: Workflow, metric: Sigma, dataset: Database };
+const KINDS: readonly ResourceKind[] = RESOURCE_KINDS;
+const ICONS: Record<ResourceKind, typeof Box> = { object: Box, relation: Workflow, metric: Sigma, dataset: Database };
 type Filter = "all" | ResourceKind;
 
 function storedCollapsed() {
@@ -59,7 +60,7 @@ export const SemanticView = memo(function SemanticView({
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<string[]>(KINDS);
+  const [expanded, setExpanded] = useState<string[]>([...KINDS]);
   const resources = useMemo(() => semanticResources(graph, model), [graph, model]);
   const canvas = useMemo(() => semanticCanvas(graph, resources), [graph, resources]);
   const selection = resources.find((r) => r.id === selected);

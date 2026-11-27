@@ -3,6 +3,16 @@
 from copy import deepcopy
 
 
+# Collections whose evidence arrays are stripped when instance reading is forbidden.
+EVIDENCE_CLEARED_COLLECTIONS = (
+    "object_types",
+    "properties",
+    "link_types",
+    "rules",
+    "metrics",
+)
+
+
 def public_projection(value):
     return deepcopy(value)
 
@@ -14,7 +24,7 @@ def authorized_snapshot(snapshot, *, mappings, instances):
         for link in result["link_types"]:
             link.pop("data_join", None)
     if not instances:
-        for collection in ("object_types", "properties", "link_types", "rules", "metrics"):
+        for collection in EVIDENCE_CLEARED_COLLECTIONS:
             for item in result[collection]:
                 item["evidence"] = []
     return result

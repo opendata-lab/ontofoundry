@@ -25,6 +25,12 @@ import { useErrorMessage } from "../../hooks/useErrorMessage";
 import { emptyDraft, byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
 import { branchProblem } from "../../lib/derivedEditing";
 import { ONTOLOGY_SAVED, notifyOntologySaved, type OntologySaved, type ElementRequest, type ElementTab } from "../../lib/elementInspector";
+import {
+  ELEMENT_INSPECTOR_KINDS,
+  INSPECTABLE_KINDS,
+  INSPECTABLE_NOUN,
+  type InspectableKind,
+} from "../../lib/elementKinds";
 import { useElementDetail } from "../../hooks/useElementDetail";
 import { relationsFor, rulesFor, type PanelProps } from "../../lib/elementModel";
 import { preservePropertyBindings, type PropertyBindingEdits } from "../../lib/propertyBindingEditing";
@@ -48,7 +54,7 @@ import { RelationsPanel } from "./RelationMappingTable";
 
 const { Text } = Typography;
 
-type InspectKind = "object_type" | "link_type" | "metric" | "dataset";
+type InspectKind = InspectableKind;
 type Element = ObjectType | LinkType | Metric | Dataset;
 type Loaded = { draft: Draft; session: ModelingSession | null; versionId: string | null; complete: boolean };
 type Resolved = { kind: InspectKind; element: Element | undefined; tab?: ElementTab; factId?: string };
@@ -59,20 +65,9 @@ type ImpactPreview = {
   items: SessionElementSaveImpact["affected_items"];
 };
 
-const KINDS = new Set([
-  "object_type",
-  "property",
-  "link_type",
-  "rule",
-  "metric",
-  "dataset",
-  "mapping",
-  "material_object",
-  "material_link",
-]);
-const NEW_KINDS: InspectKind[] = ["object_type", "link_type", "metric", "dataset"];
-const COLLECTION = { object_type: "object_types", link_type: "link_types", metric: "metrics", dataset: "datasets" } as const;
-const NOUN: Record<InspectKind, string> = { object_type: "对象", link_type: "关系", metric: "指标", dataset: "数据集" };
+const KINDS: Set<string> = ELEMENT_INSPECTOR_KINDS;
+const NEW_KINDS: readonly InspectKind[] = INSPECTABLE_KINDS;
+const NOUN = INSPECTABLE_NOUN;
 
 /** Opens the owning resource for a nested element (property, rule, mapping, fact). */
 function resolve(draft: Draft, kind: string, id: string): Resolved {
@@ -81,7 +76,7 @@ function resolve(draft: Draft, kind: string, id: string): Resolved {
     case "link_type":
     case "metric":
     case "dataset":
-      return { kind, element: byId(draft[COLLECTION[kind]] as Element[], id) };
+      return { kind, element: byId(draft[COLLECTION_BY_KIND[kind]] as Element[], id) };
     case "property":
       return {
         kind: "object_type",
@@ -392,7 +387,7 @@ export function ElementView({
         if (!canEdit) throw new Error("没有权限新建");
         if (!NEW_KINDS.includes(requestedKind as InspectKind)) throw new Error("请从所属对象或关系中新增");
         const kind = requestedKind as InspectKind;
-        value = upsert(value, COLLECTION[kind], blank(value, kind, effectiveId, owner) as never);
+        value = upsert(value, COLLECTION_BY_KIND[kind], blank(value, kind, effectiveId, owner) as never);
       }
       if (live) {
         pendingSave.current = null;

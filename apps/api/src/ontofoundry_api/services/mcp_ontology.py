@@ -7,11 +7,15 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ontofoundry_api.contracts.read_models import OntologySearchRequest
+from ontofoundry_api.contracts.read_models import (
+    OntologyKind as Kind,
+    OntologySearchRequest,
+)
 from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import CoreDraft, Strict
 from ontofoundry_api.domain.graph import draft_index
 from ontofoundry_api.domain.instance_display import document_display_text
+from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 from ontofoundry_api.domain.snapshot import empty_snapshot
 from ontofoundry_api.services.access import (
     authorization_fingerprint,
@@ -30,9 +34,11 @@ from ontofoundry_api.services.ontology_query import (
 from ontofoundry_api.services.ontology_search import search_ontology
 from ontofoundry_api.services.workspaces import get_workspace
 
-Kind = Literal[
-    "object_type", "property", "link_type", "rule", "metric", "dataset", "value_type"
-]
+# MCP get_ontology separates resource-projected kinds from direct definition kinds;
+# mappings are internal physical bindings and excluded from both.
+PHYSICAL_PROJECTION_KINDS = frozenset({"object_type", "link_type", "metric"})
+LIST_RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset")
+DIRECT_ELEMENT_KINDS = ("property", "rule", "value_type")
 
 
 class Paging(Strict):
@@ -224,7 +230,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             ]
 
         for resource in resources:
-            if resource["kind"] not in {"object_type", "link_type", "metric"}:
+            if resource["kind"] not in PHYSICAL_PROJECTION_KINDS:
                 continue
             definition = resource["definition"]
             definition.update(
@@ -239,12 +245,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
         r["definition"]["id"]: r for r in resources if mappings or r["kind"] != "dataset"
     }
     if name == "get_ontology" and wanted is None:
-        for kind, collection in (
-            ("object_type", "object_types"),
-            ("link_type", "link_types"),
-            ("metric", "metrics"),
-            ("dataset", "datasets"),
-        ):
+        for kind in LIST_RESOURCE_KINDS:
+            collection = COLLECTIONS[ElementKind(kind)]
             if kind == "dataset" and not mappings:
                 continue
             for element in snapshot[collection]:
@@ -254,11 +256,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                         key: element.get(key) for key in ("id", "name", "display_name")
                     },
                 }
-    for kind, collection in (
-        ("property", "properties"),
-        ("rule", "rules"),
-        ("value_type", "value_types"),
-    ):
+    for kind in DIRECT_ELEMENT_KINDS:
+        collection = COLLECTIONS[ElementKind(kind)]
         for e in snapshot.get(collection, []) if name == "get_ontology" else []:
             if wanted is not None and e["id"] not in wanted:
                 continue

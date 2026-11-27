@@ -5,9 +5,11 @@ import type { Draft, GraphEdge, GraphNode, TypeGraph } from "../api/types";
 import type { SelectedGraphItem } from "../components/OntologyGraph";
 import { AGGREGATIONS, byId, effectiveProperties, isExpression, isRatio, metricDatasetId } from "./coreModel";
 import type { ElementRequest } from "./elementInspector";
+import { SEMANTIC_RESOURCE_KINDS, type SemanticResourceKind } from "./elementKinds";
 import { shortObjectName } from "./objectMapping";
 
-export type ResourceKind = "object" | "relation" | "metric" | "dataset";
+export type ResourceKind = SemanticResourceKind;
+export const RESOURCE_KINDS = SEMANTIC_RESOURCE_KINDS;
 
 export const RESOURCE_KIND_LABELS: Record<ResourceKind, string> = {
   object: "对象",
