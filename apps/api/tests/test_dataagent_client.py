@@ -58,7 +58,6 @@ async def test_runtime_paths_and_auth_headers(monkeypatch):
         topic_id="topic-1",
         content="hello",
         agent_id="agent-1",
-        execution_mode="auto",
     )
     await client.task("task-1")
     await client.task_message("task-1")

@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     dataagent_website_id: str = "ontofoundry"
     dataagent_agent_id: str = "agent_ontofoundry"
     dataagent_request_timeout_seconds: int = Field(default=30, gt=0)
-    dataagent_execution_mode: Literal["interactive", "background", "auto"] = "auto"
     modeling_result_contract: Literal["proposals"] = "proposals"
     # Base URL the DataAgent uses to reach this API's MCP endpoint. Empty means
     # "the URL the browser used", which is right when both share a network.
