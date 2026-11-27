@@ -16,6 +16,7 @@
 - 代码注释和提交信息用英文；文档和界面文案用中文。文档、示例和测试只用虚构的工作空间名和业务表名。
 - 一个任务的全部编辑完成后再统一跑测试，不要每改一处就跑。
 - 只在用户明确要求时 commit 或 push。不提交 `.claude/`、`docs/design/prototypes/`、评审报告和 `integrations/dataagent/dist/`；文档不链接原型。
+- 能机械检查的约定由 `scripts/check_conventions.py` 在 CI 中检查，新增约定时同步加检查。
 
 ## 代码约定
 

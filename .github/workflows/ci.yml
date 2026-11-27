@@ -39,6 +39,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+      - name: Check repository conventions
+        run: python3 scripts/check_conventions.py
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -69,6 +71,8 @@ jobs:
           cache: npm
       # The audit request alone once took five minutes; CI does not act on it.
       - run: npm ci --no-audit --no-fund
+      - name: Check generated core-1 TypeScript types
+        run: npm run check:core-types -w ontofoundry-web
       - run: npm test -w ontofoundry-web -- --run
       - run: npm run build -w ontofoundry-web
 
