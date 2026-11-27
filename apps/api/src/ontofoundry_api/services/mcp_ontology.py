@@ -84,7 +84,9 @@ INPUTS = {
     "search_objects": SearchObjects,
     "get_object": GetObject,
 }
-BUDGET = 110_000  # Both text and structuredContent count toward the 256 KiB wire limit.
+BUDGET = 110_000  # Structured payload target; wire size is bounded separately below 256 KiB.
+WIRE_BUDGET = 220_000  # Target JSON-RPC wire bytes (content[].text + structuredContent) under 256 KiB.
+WIRE_LIMIT = 248_000  # Hard cap on tool_result wire bytes so full HTTP JSON-RPC body stays <= 256 KiB.
 
 
 def size(value):
@@ -95,6 +97,35 @@ def size(value):
             jsonable_encoder(value), ensure_ascii=False, separators=(",", ":")
         ).encode()
     )
+
+
+def wire_size(value):
+    """Exact UTF-8 byte size of tool_result(value) as serialized by FastAPI/Starlette."""
+    from fastapi.encoders import jsonable_encoder
+
+    structured = jsonable_encoder(value)
+    text = json.dumps(structured, ensure_ascii=False)
+    return len(
+        json.dumps(
+            {"content": [{"type": "text", "text": text}], "structuredContent": structured},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode()
+    )
+
+
+def _wire_item_delta(value):
+    """Incremental JSON-RPC wire bytes contributed by one list item (structuredContent + escaped text)."""
+    from fastapi.encoders import jsonable_encoder
+
+    structured = jsonable_encoder(value)
+    compact_bytes = len(
+        json.dumps(structured, ensure_ascii=False, separators=(",", ":")).encode()
+    )
+    text = json.dumps(structured, ensure_ascii=False)
+    # json.dumps(text) adds 2 bytes for quotes, matching the ", " separator inside content[0].text.
+    escaped_text_bytes = len(json.dumps(text, ensure_ascii=False).encode())
+    return compact_bytes + 1 + escaped_text_bytes
 
 
 def _invoke(db, workspace_id, principal, name, arguments, settings):
@@ -138,12 +169,15 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     )
     index = draft_index(draft)
 
-    def page(values, path, start=0, *, budget=BUDGET // 2):
+    def page(values, path, start=0, *, budget=WIRE_BUDGET // 2):
         items, cursor = [], None
+        used = 0
         for n in range(start, min(len(values), start + args.limit)):
-            if items and size(items + [values[n]]) > budget:
+            delta = _wire_item_delta(values[n])
+            if items and used + delta > budget:
                 break
             items.append(values[n])
+            used += delta
         end = start + len(items)
         if end < len(values):
             cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
@@ -332,7 +366,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     element["definition"] = definition
                     if action_evidence is not None and instances:
                         d["evidence"] = action_evidence
-                        ev_budget = max(4_000, BUDGET - size(element) - 4_000)
+                        ev_budget = max(8_000, WIRE_BUDGET - wire_size(element) - 8_000)
                         element["evidence"] = page(
                             action_evidence, [len(values), "evidence"], budget=ev_budget
                         )
@@ -366,13 +400,13 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             raw = d.get(key)
             list_budget = (
                 max(
-                    4_000,
-                    BUDGET
-                    - size({k: v for k, v in values[n].items() if k != "evidence"})
-                    - 4_000,
+                    8_000,
+                    WIRE_BUDGET
+                    - wire_size({k: v for k, v in values[n].items() if k != "evidence"})
+                    - 8_000,
                 )
                 if key == "evidence" and values[n]["kind"] == "action"
-                else BUDGET // 2
+                else WIRE_BUDGET // 2
             )
             values[n][key] = page(raw, path, offset, budget=list_budget)
             return {
@@ -642,7 +676,7 @@ def invoke(db, workspace_id, principal, name, arguments, settings):
     result = bounded(result)
     if segments:
         result.setdefault("field_segments", []).extend(segments)
-    if size(result) > 120000:
+    if wire_size(result) > WIRE_LIMIT:
         raise ServiceError(
             "当前投影超过单页预算，请缩小 limit 或 include",
             code="response_too_large",

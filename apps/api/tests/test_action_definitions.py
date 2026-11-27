@@ -1315,3 +1315,220 @@ def test_action_proposal_drops_submitter_field_changes_for_create_update_delete(
         ],
     )
     assert del_batch["items"][0]["field_changes"] == []
+
+
+def test_mcp_action_backslash_heavy_evidence_stays_under_256kib_wire_cap(client):
+    """Reproduces Codex round-2 A: 40 backslash-heavy evidence entries at limit=100 must keep HTTP JSON-RPC <= 256 KiB."""
+    from test_modeling import mcp_request
+
+    lines = [f"L{i:02d}:" + ("\\" * 950) for i in range(1, 41)]
+    upload = client.post(
+        ROOT + "/materials",
+        params={"name": "backslash-policy.md"},
+        content=("\n".join(lines) + "\n").encode("utf-8"),
+    )
+    assert upload.status_code in (200, 201), upload.text
+    material_id = upload.json()["id"]
+
+    session = create_session(client)
+    evidences = [
+        {
+            "kind": "material",
+            "material_id": material_id,
+            "locator": {"heading": f"条款 {i}", "line_start": i, "line_end": i},
+            "quote": lines[i - 1],
+        }
+        for i in range(1, 41)
+    ]
+    batch = seed_batch(
+        client,
+        session,
+        [
+            create(
+                "act_bs",
+                "action",
+                {
+                    "name": "backslash_heavy_action",
+                    "display_name": "反斜杠证据动作",
+                    "parameters": [],
+                    "effects": [],
+                    "evidence": evidences,
+                },
+            )
+        ],
+    )
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-backslash-action",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    session = dec.json()["session"]
+    act_id = next(a["id"] for a in session["draft"]["actions"] if a["name"] == "backslash_heavy_action")
+    pub = publish(client, session)
+    assert pub.status_code == 200, pub.text
+
+    collected = []
+    cursor = None
+    pages = 0
+    while True:
+        args = {"ids": [act_id], "limit": 100}
+        if cursor is not None:
+            args["cursor"] = cursor
+        resp = mcp_request(client, "tools/call", {"name": "get_ontology", "arguments": args})
+        assert resp.status_code == 200, resp.text
+        assert len(resp.content) <= 262_144, f"JSON-RPC HTTP body exceeded 256 KiB: {len(resp.content)}"
+        result = resp.json()["result"]
+        assert not result["isError"], result
+        ev_page = result["structuredContent"]["elements"][0]["evidence"]
+        assert ev_page["total"] == 40
+        assert len(ev_page["items"]) >= 1
+        collected.extend(ev_page["items"])
+        pages += 1
+        cursor = ev_page["next_cursor"]
+        if cursor is None:
+            break
+    assert pages >= 2
+    assert len(collected) == 40
+
+
+def test_ossie_import_rejects_multiway_duplicate_and_absent_source_paths():
+    """Reproduces Codex round-2 B: multi-way relation, duplicate relation, or absent source path must never fall back to normalized property."""
+    ext_doc = {
+        "version": "core-1",
+        "actions": {
+            "bad_ref": {
+                "display_name": "误绑动作",
+                "target_type": "work_order",
+                "parameters": [],
+                "effects": [
+                    {
+                        "kind": "set_property",
+                        "property": "work_order.status_code",
+                        "description": "引用不存在或未承载为属性的源路径",
+                    }
+                ],
+            }
+        },
+    }
+
+    def run_zip(relationships):
+        ossie_doc = {
+            "version": "0.2.0.dev0",
+            "name": "ops_demo",
+            "ontology": [
+                {"concept": "maintenance_team", "type": "EntityType"},
+                {"concept": "dispatch_zone", "type": "EntityType"},
+                {
+                    "concept": "work_order",
+                    "type": "EntityType",
+                    "relationships": relationships,
+                },
+            ],
+        }
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("model.ossie.json", json.dumps(ossie_doc, ensure_ascii=False))
+            zf.writestr("ontofoundry-extension.json", json.dumps(ext_doc, ensure_ascii=False))
+        return OssieAdapter().import_document(buf.getvalue(), ImportContext(workspace_id=uuid4()))
+
+    base_prop = {
+        "name": "status-code",
+        "verbalizes": ["{work_order} status-code {String}"],
+        "roles": [{"concept": "String"}],
+    }
+
+    # Variant 1: work_order.status_code is a multi-way relation (not carried into members).
+    r_multi = run_zip(
+        [
+            base_prop,
+            {
+                "name": "status_code",
+                "verbalizes": ["{work_order} status_code {maintenance_team} {dispatch_zone}"],
+                "roles": [{"concept": "maintenance_team"}, {"concept": "dispatch_zone"}],
+            },
+        ]
+    )
+    assert r_multi.model.actions == []
+    dropped_multi = [i for i in r_multi.report.issues if i.construct == "Action" and i.outcome == "dropped"]
+    assert len(dropped_multi) == 1
+    assert "未承载" in dropped_multi[0].message
+    assert dropped_multi[0].original is not None
+
+    # Variant 2: work_order.status_code appears twice (ambiguous duplicate relation name).
+    r_dup = run_zip(
+        [
+            base_prop,
+            {
+                "name": "status_code",
+                "verbalizes": ["{work_order} status_code {maintenance_team}"],
+                "roles": [{"concept": "maintenance_team"}],
+            },
+            {
+                "name": "status_code",
+                "verbalizes": ["{work_order} status_code {dispatch_zone}"],
+                "roles": [{"concept": "dispatch_zone"}],
+            },
+        ]
+    )
+    assert r_dup.model.actions == []
+    dropped_dup = [i for i in r_dup.report.issues if i.construct == "Action" and i.outcome == "dropped"]
+    assert len(dropped_dup) == 1
+    assert "歧义" in dropped_dup[0].message
+    assert dropped_dup[0].original is not None
+
+    # Variant 3: work_order.status_code is completely absent from source document (only status-code exists).
+    r_absent = run_zip([base_prop])
+    assert r_absent.model.actions == []
+    dropped_absent = [i for i in r_absent.report.issues if i.construct == "Action" and i.outcome == "dropped"]
+    assert len(dropped_absent) == 1
+    assert "不存在" in dropped_absent[0].message
+    assert dropped_absent[0].original is not None
+
+
+def test_version_diff_skips_action_helper_without_actions_and_stays_linear(monkeypatch):
+    """Reproduces Codex round-2 D: no-action diff must not call _action_references and must stay O(N)."""
+    import time
+    from ontofoundry_api.services import version_diff
+
+    def _forbid(*args, **kwargs):
+        raise AssertionError("_action_references must not be called when neither snapshot has actions")
+
+    monkeypatch.setattr(version_diff, "_action_references", _forbid)
+
+    ws_id = uuid4()
+    obj_id = str(uuid4())
+    left = empty_snapshot(ws_id)
+    left["object_types"] = [
+        {"id": obj_id, "name": "work_order", "display_name": "工单", "description": "", "synonyms": [], "tags": [], "extends": None, "derived_by": [], "title_property_id": None}
+    ]
+    left["properties"] = [
+        {
+            "id": str(uuid4()),
+            "owner_type_id": obj_id,
+            "name": f"prop_{i}",
+            "display_name": f"属性{i}",
+            "description": "旧说明",
+            "value_kind": "string",
+            "value_type_id": None,
+            "required": False,
+            "identifier": False,
+            "unique": False,
+            "synonyms": [],
+            "tags": [],
+        }
+        for i in range(2000)
+    ]
+    right = deepcopy(left)
+    for prop in right["properties"]:
+        prop["description"] = "新说明"
+
+    t0 = time.perf_counter()
+    diff = version_diff.compare_snapshots(left, right)
+    elapsed = time.perf_counter() - t0
+    assert len(diff["changes"]) == 2000
+    assert diff["impacts"] == []
+    assert elapsed < 1.0, f"no-action 2000-property diff took too long: {elapsed:.3f}s"

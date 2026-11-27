@@ -45,7 +45,12 @@ test("builder proposals retain session and material controls", async ({ page }) 
   await expect(page.getByRole("tablist", { name: "已打开的页面" }).locator("[role=tab][aria-selected]")).toHaveCount(1);
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("builder-with-proposals.png", { fullPage: true });
+});
 
+test("builder draft opens element modal from model results", async ({ page }) => {
+  await mockCanvasApi(page);
+  await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
+  await expect(page.getByRole("heading", { name: "供应商范围修订", exact: true })).toBeVisible();
   await page.getByRole("tab", { name: /^本体草稿/ }).click();
   await expect(page.getByRole("button", { name: "发布本体", exact: true })).toBeEnabled();
   await expect(page.getByLabel("模型分类", { exact: true }).getByRole("button")).toHaveCount(10);
@@ -54,6 +59,7 @@ test("builder proposals retain session and material controls", async ({ page }) 
   await expect(dialog.getByText("提供商品或服务的组织", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "打开详情", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "复制链接", exact: true })).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("builder-result-modal.png", { fullPage: true });
 });
 

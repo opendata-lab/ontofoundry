@@ -108,6 +108,7 @@ def export_document(model, ctx):
             value_names[prop.id] = shared[prop.value_type_id]["concept"]
     extension = {
         "version": "core-1",
+        "action_ref_names": "core",
         "display_names": {},
         "link_role_names": {},
         "generated_link_readings": [],
