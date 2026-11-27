@@ -1,6 +1,6 @@
 {
   "name": "ontofoundry",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Ground data questions in published OntoFoundry ontology definitions over MCP; no local tool code.",
   "author": { "name": "opendata-lab" },
   "userConfig": {

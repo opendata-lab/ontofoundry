@@ -31,6 +31,7 @@ COLLECTIONS = {
     "dataset": "datasets",
     "mapping": "mappings",
     "value_type": "value_types",
+    "action": "actions",
 }
 INSTANCE_KINDS = frozenset({"material_object", "material_link"})
 TARGET_KINDS = COLLECTIONS.keys() | INSTANCE_KINDS

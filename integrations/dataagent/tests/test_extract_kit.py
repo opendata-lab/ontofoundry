@@ -112,6 +112,7 @@ def test_values_are_exactly_derived_from_current_contract():
         "binding_kind": ["AfterColumnBinding", "AfterExpressionBinding"],
         "data_join_kind": ["AfterDirectJoin", "AfterMappingTableJoin"],
         "metric_kind": ["AfterSimpleMetric", "AfterRatioMetric", "AfterExpressionMetric"],
+        "effect_kind": ["AfterSetPropertyEffect", "AfterAddLinkEffect", "AfterRemoveLinkEffect", "AfterCreateObjectEffect"],
     }.items():
         expected[key] = [definitions[name]["properties"]["kind"]["const"] for name in names]
     expected["source_kind"] = definitions["dataset_after"]["properties"]["source_kind"]["enum"]
@@ -182,6 +183,10 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
                     assert "measure" not in after
             else:
                 assert by_ref[after["numerator_id"]["client_ref"]]["dataset_id"] == by_ref[after["denominator_id"]["client_ref"]]["dataset_id"]
+        if kind == "action":
+            shapes.add("动作/实例" if after.get("target_type_id") is not None else "动作/全局")
+            for effect in after.get("effects", []):
+                shapes.add("动作效果/" + effect["kind"])
         if after.get("evidence"):
             shapes.add("材料证据")
     for group in identifiers.values():
@@ -199,6 +204,7 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
         "单标识", "复合标识", "值类型引用属性", "规则/value_type", "规则/property", "规则/link_type",
         "跨关系约束", "direct与正反读法", "表列", "UNION各带日期", "普通映射", "复合键映射",
         "指标/simple", "指标/ratio", "sum", "count", "过滤与时间", "材料证据", "文档实例与关系实例",
+        "动作/实例", "动作/全局", "动作效果/set_property", "动作效果/create_object", "动作效果/add_link",
     }
     covered = set().union(*(atoms(i) for i in items))
     for version in ("conservative", "supplemented"):
@@ -243,7 +249,7 @@ def test_sync_refunds_then_incrementally_complete_existing_graph(tmp_path, monke
     existing = {i.client_ref: i.target_id for i in conservative.items}
     ctx["draft"] = apply_items(ctx["draft"], conservative.items)
     ctx["run"].update(run_token="offline-refunds-increment", source_session_revision=2, source_draft_sha256=snapshot_sha256(ctx["draft"]))
-    ctx["element_hashes"] = {e["id"]: element_sha256(e, collection=collection) for collection in COLLECTIONS.values() for e in ctx["draft"][collection]}
+    ctx["element_hashes"] = {e["id"]: element_sha256(e, collection=collection) for collection in COLLECTIONS.values() for e in ctx["draft"].get(collection, [])}
 
     def resolve(value):
         if isinstance(value, dict):
@@ -285,7 +291,7 @@ def test_sync_refunds_then_incrementally_complete_existing_graph(tmp_path, monke
             if isinstance(value, list):
                 return [normalize(v) for v in value]
             return ids.get(value, value) if isinstance(value, str) else value
-        return {c: sorted((normalize(e) for e in graph[c]), key=lambda e: e["id"]) for c in COLLECTIONS.values()}
+        return {c: sorted((normalize(e) for e in graph.get(c, [])), key=lambda e: e["id"]) for c in COLLECTIONS.values()}
     final_refs = {**existing, **{i.client_ref: i.target_id for i in parsed.items if i.client_ref}}
     assert logical_graph(final, final_refs) == logical_graph(apply_items(full_ctx["draft"], full.items), {i.client_ref: i.target_id for i in full.items})
 

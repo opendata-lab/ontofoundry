@@ -33,7 +33,7 @@ def extract_page(page):
 # Where each kind is shown in the fixed kit (create), for lookups by kind.
 PARTS_BY_KIND = {
     "object_type": "01", "property": "01", "value_type": "01", "link_type": "02",
-    "dataset": "03", "mapping": "03", "metric": "04", "rule": "04",
+    "dataset": "03", "mapping": "03", "metric": "04", "rule": "04", "action": "04",
     "material_object": "05", "material_link": "05",
 }
 
