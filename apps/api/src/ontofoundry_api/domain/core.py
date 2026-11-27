@@ -11,6 +11,7 @@ Design: docs/design/2026-10-14-core-model-and-format-adapters.md §3.
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from datetime import datetime
@@ -462,6 +463,9 @@ def _effect_target_id(effect: ActionEffect) -> UUID:
     return effect.object_type_id
 
 
+ACTION_MAX_JSON_BYTES = 65_536
+
+
 class Action(Strict):
     """Declarative business action definition (not executed by the platform)."""
 
@@ -484,6 +488,12 @@ class Action(Strict):
         effect_keys = [(effect.kind, _effect_target_id(effect)) for effect in self.effects]
         if len(effect_keys) != len(set(effect_keys)):
             raise ValueError("同一动作不能包含重复的效果")
+        payload = self.model_dump(mode="json", exclude={"evidence"})
+        encoded_size = len(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+        if encoded_size > ACTION_MAX_JSON_BYTES:
+            raise ValueError("动作定义（不含证据）序列化后的 JSON 不能超过 64 KB（65536 字节）")
         return self
 
 

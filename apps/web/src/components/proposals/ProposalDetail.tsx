@@ -11,7 +11,7 @@ import { OPERATION } from "./elementMeta";
 import { FieldDiff } from "./FieldDiff";
 import { useSourceIssues } from "./ProposalSourceIssues";
 import { useConnectionNames } from "../../hooks/useConnectionNames";
-import { acceptanceBlock, elementNames, mergedFact, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
+import { acceptanceBlock, elementNames, mergedFact, qualifiedProposalNames, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
 const { Text } = Typography;
 const SIMILAR_MATCH: Record<string, string> = { name_in_query: "名称包含", query_in_name: "名称相近", description: "描述提到" };
@@ -202,6 +202,8 @@ export function ProposalDetail({
             changes={changes}
             beforeLabel="修改前"
             names={new Map([...connectionNames, ...elementNames(draft, items)])}
+            beforeActionNames={new Map([...connectionNames, ...qualifiedProposalNames(draft, items, "before")])}
+            actionNames={new Map([...connectionNames, ...qualifiedProposalNames(draft, items, "after")])}
             annotations={{ ...source.marks, ...physicalMarks }}
             editDisabled={busy}
             onEdit={

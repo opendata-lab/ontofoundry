@@ -1092,6 +1092,7 @@ export type MCPElement = {
   rules?: Page<Effective<Rule>>;
   links?: Page<LinkRead>;
   actions?: Page<ActionSummaryRead>;
+  evidence?: Page<EvidenceView>;
   child_types?: Page<Pick<ObjectType, "id" | "display_name" | "name">>;
   datasets?: Page<DatasetRead>;
   sources?: Page<MappingSource>;

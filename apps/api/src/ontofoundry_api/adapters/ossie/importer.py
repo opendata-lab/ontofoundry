@@ -911,36 +911,50 @@ class OntologyImporter:
         if not raw_actions:
             return
         index = DraftIndex(self.t.model)
-        objects_by_name = {
-            **{o.name: o for o in self.t.model.object_types},
-            **self.t.objects,
-        }
-        value_types_by_name = {
-            **{v.name: v for v in self.t.model.value_types},
-            **self.value_types,
-        }
-        properties_by_path = {
-            **{
-                f"{index.objects[p.owner_type_id].name}.{p.name}": p
-                for p in self.t.model.properties
-            },
-            **{
-                f"{owner}.{member_name}": member
-                for (owner, member_name), member in self.t.members.items()
-                if isinstance(member, Property)
-            },
-        }
-        links_by_path = {
-            **{
-                f"{index.objects[link.source_type_id].name}.{link.name}": link
-                for link in self.t.model.link_types
-            },
-            **{
-                f"{owner}.{member_name}": member
-                for (owner, member_name), member in self.t.members.items()
-                if isinstance(member, LinkType)
-            },
-        }
+        # Resolve references against full Ossie source paths first (across all kinds)
+        # so normalized core identifiers can never shadow a different-kind source path.
+        source_concepts: dict[str, list[ObjectType | ValueType]] = {}
+        for name, obj in self.t.objects.items():
+            source_concepts.setdefault(name, []).append(obj)
+        for name, vt in self.value_types.items():
+            source_concepts.setdefault(name, []).append(vt)
+
+        core_concepts: dict[str, list[ObjectType | ValueType]] = {}
+        for obj in self.t.model.object_types:
+            core_concepts.setdefault(obj.name, []).append(obj)
+        for vt in self.t.model.value_types:
+            core_concepts.setdefault(vt.name, []).append(vt)
+
+        source_members: dict[str, list[Property | LinkType]] = {}
+        for (owner, member_name), member in self.t.members.items():
+            source_members.setdefault(f"{owner}.{member_name}", []).append(member)
+
+        core_members: dict[str, list[Property | LinkType]] = {}
+        for prop in self.t.model.properties:
+            core_members.setdefault(
+                f"{index.objects[prop.owner_type_id].name}.{prop.name}", []
+            ).append(prop)
+        for link in self.t.model.link_types:
+            core_members.setdefault(
+                f"{index.objects[link.source_type_id].name}.{link.name}", []
+            ).append(link)
+
+        def resolve_ref(ref, source_map, core_map, expected_cls, label):
+            if not isinstance(ref, str) or not ref:
+                return None, f"{label} {ref!r} 未解析到有效元素"
+            if ref in source_map:
+                matches = source_map[ref]
+            elif ref in core_map:
+                matches = core_map[ref]
+            else:
+                return None, f"{label} {ref!r} 未解析到有效元素"
+            if len(matches) != 1:
+                return None, f"{label} {ref!r} 路径存在歧义"
+            target = matches[0]
+            if not isinstance(target, expected_cls):
+                return None, f"{label} {ref!r} 解析到的元素种类不符"
+            return target, None
+
         for raw_name, entry in raw_actions.items():
             path = f"{self.extension.source_path}/actions/{escape_pointer(str(raw_name))}"
             if not isinstance(raw_name, str) or not isinstance(entry, dict):
@@ -956,17 +970,20 @@ class OntologyImporter:
             target_type_id = None
             target_type_name = entry.get("target_type")
             if target_type_name is not None:
-                if not isinstance(target_type_name, str) or target_type_name not in objects_by_name:
+                target_obj, err = resolve_ref(
+                    target_type_name, source_concepts, core_concepts, ObjectType, "目标对象"
+                )
+                if err is not None:
                     self.issue(
                         path,
                         "dropped",
                         "Action",
                         None,
-                        f"动作 {raw_name} 的目标对象 {target_type_name!r} 未解析到有效对象类型，整条未导入，原文保留待补全",
+                        f"动作 {raw_name} 解析失败（{err}），整条未导入，原文保留待补全",
                         completion=True,
                     )
                     continue
-                target_type_id = objects_by_name[target_type_name].id
+                target_type_id = target_obj.id
             raw_params = entry.get("parameters", [])
             raw_effects = entry.get("effects", [])
             if not isinstance(raw_params, list) or not isinstance(raw_effects, list):
@@ -988,10 +1005,12 @@ class OntologyImporter:
                 vt_id = None
                 vt_name = raw_param.get("value_type")
                 if vt_name is not None:
-                    if not isinstance(vt_name, str) or vt_name not in value_types_by_name:
-                        unresolved = f"参数值类型 {vt_name!r} 未解析到有效值类型"
+                    vt, err = resolve_ref(
+                        vt_name, source_concepts, core_concepts, ValueType, "参数值类型"
+                    )
+                    if err is not None:
+                        unresolved = err
                         break
-                    vt = value_types_by_name[vt_name]
                     vt_id = vt.id
                     if raw_param.get("value_kind") != str(vt.value_kind):
                         unresolved = f"参数 {raw_param.get('name')} 的基础类型与值类型 {vt_name} 不一致"
@@ -1029,39 +1048,57 @@ class OntologyImporter:
                 desc = raw_effect.get("description", "")
                 try:
                     if effect_kind == "set_property":
-                        prop_path = raw_effect.get("property")
-                        if not isinstance(prop_path, str) or prop_path not in properties_by_path:
-                            unresolved = f"效果属性 {prop_path!r} 未解析到有效属性"
+                        prop, err = resolve_ref(
+                            raw_effect.get("property"),
+                            source_members,
+                            core_members,
+                            Property,
+                            "效果属性",
+                        )
+                        if err is not None:
+                            unresolved = err
                             break
                         effects.append(
                             SetPropertyEffect(
                                 kind="set_property",
-                                property_id=properties_by_path[prop_path].id,
+                                property_id=prop.id,
                                 description=desc,
                             )
                         )
                     elif effect_kind in ("add_link", "remove_link"):
-                        link_path = raw_effect.get("link_type")
-                        if not isinstance(link_path, str) or link_path not in links_by_path:
-                            unresolved = f"效果关系 {link_path!r} 未解析到有效关系"
+                        link, err = resolve_ref(
+                            raw_effect.get("link_type"),
+                            source_members,
+                            core_members,
+                            LinkType,
+                            "效果关系",
+                        )
+                        if err is not None:
+                            unresolved = err
                             break
                         cls = AddLinkEffect if effect_kind == "add_link" else RemoveLinkEffect
                         effects.append(
                             cls(
                                 kind=effect_kind,
-                                link_type_id=links_by_path[link_path].id,
+                                link_type_id=link.id,
                                 description=desc,
                             )
                         )
                     elif effect_kind == "create_object":
-                        obj_name = raw_effect.get("object_type")
-                        if not isinstance(obj_name, str) or obj_name not in objects_by_name:
-                            unresolved = f"效果对象 {obj_name!r} 未解析到有效对象类型"
+                        obj, err = resolve_ref(
+                            raw_effect.get("object_type"),
+                            source_concepts,
+                            core_concepts,
+                            ObjectType,
+                            "效果对象",
+                        )
+                        if err is not None:
+                            unresolved = err
                             break
                         effects.append(
                             CreateObjectEffect(
                                 kind="create_object",
-                                object_type_id=objects_by_name[obj_name].id,
+                                object_type_id=obj.id,
                                 description=desc,
                             )
                         )

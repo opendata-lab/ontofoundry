@@ -138,10 +138,10 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     )
     index = draft_index(draft)
 
-    def page(values, path, start=0):
+    def page(values, path, start=0, *, budget=BUDGET // 2):
         items, cursor = [], None
         for n in range(start, min(len(values), start + args.limit)):
-            if items and size(items + [values[n]]) > BUDGET // 2:
+            if items and size(items + [values[n]]) > budget:
                 break
             items.append(values[n])
         end = start + len(items)
@@ -308,6 +308,9 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     definition["used_by_property_ids"] = d["used_by_property_ids"]
                 if definition is not None:
                     definition.pop("connection_id", None)
+                    action_evidence = None
+                    if r["kind"] == "action":
+                        action_evidence = definition.pop("evidence", None) or []
                     if r["kind"] == "dataset":
                         columns = definition.pop("columns", None) or []
                         d["columns"] = columns
@@ -327,6 +330,12 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                                 d["referenced_by"], [len(values), "referenced_by"]
                             )
                     element["definition"] = definition
+                    if action_evidence is not None and instances:
+                        d["evidence"] = action_evidence
+                        ev_budget = max(4_000, BUDGET - size(element) - 4_000)
+                        element["evidence"] = page(
+                            action_evidence, [len(values), "evidence"], budget=ev_budget
+                        )
                 for key in ("properties", "child_types", "actions"):
                     if key in d:
                         element[key] = page(d[key], [len(values), key])
@@ -355,7 +364,17 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             n, key = path
             d = lookup[values[n]["id"]]["definition"]
             raw = d.get(key)
-            values[n][key] = page(raw, path, offset)
+            list_budget = (
+                max(
+                    4_000,
+                    BUDGET
+                    - size({k: v for k, v in values[n].items() if k != "evidence"})
+                    - 4_000,
+                )
+                if key == "evidence" and values[n]["kind"] == "action"
+                else BUDGET // 2
+            )
+            values[n][key] = page(raw, path, offset, budget=list_budget)
             return {
                 **envelope,
                 "total": len(values),

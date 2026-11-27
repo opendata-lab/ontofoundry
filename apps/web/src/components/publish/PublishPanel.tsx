@@ -2,14 +2,14 @@ import { Alert, Button, Collapse, Descriptions, Drawer, Empty, Form, Input, List
 import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
-import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, VersionSummary } from "../../api/types";
-import { formatActionField } from "../../lib/actionFormat";
+import type { ElementChange, LinkType, MergeConflict, ModelingSession, ObjectType, Property, PublishPreview, VersionSummary } from "../../api/types";
+import { buildQualifiedReferenceNames, parseActionField, type ReferenceNameSource } from "../../lib/actionFormat";
 import type { ElementRequest } from "../../lib/elementInspector";
 import { NAMED_DRAFT_COLLECTIONS, PUBLISH_KIND_ORDER } from "../../lib/elementKinds";
 import { documentDisplayText } from "../../lib/instanceDisplay";
 import { lineDiff } from "../../lib/lineDiff";
 import { fieldLabel, KIND } from "../proposals/elementMeta";
-import { FieldDiff } from "../proposals/FieldDiff";
+import { ActionFieldLines, FieldDiff } from "../proposals/FieldDiff";
 import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "../layout";
 import { ActionDefinitionTag } from "../elements/ActionPanel";
 import { ElementModal } from "../elements/ElementInspector";
@@ -50,10 +50,8 @@ function show(value: unknown) {
 }
 
 /** A field value as a reader would want it, not as stored. */
-function readable(key: string, value: unknown, names?: Map<string, string>): string {
+function readable(key: string, value: unknown): string {
   if (typeof value === "boolean") return value ? "是" : "否";
-  const actionFormatted = formatActionField(key, value, names);
-  if (actionFormatted !== null) return actionFormatted;
   if (key === "evidence" && Array.isArray(value)) {
     const quotes = value
       .map((e) => (e as { quote?: string }).quote)
@@ -97,9 +95,20 @@ function JsonSplit({ before, after }: { before: unknown; after: unknown }) {
 }
 
 /** The fields of a created or deleted element, minus identity and empty values. */
-function FieldList({ value, names }: { value: Record<string, unknown>; names: Map<string, string> }) {
-  const named = (key: string, v: unknown) =>
-    !REFERENCE_FIELDS.has(key) ? v : Array.isArray(v) ? v.map((id) => names.get(String(id)) ?? id) : (names.get(String(v)) ?? v);
+function FieldList({ value, names, actionNames }: { value: Record<string, unknown>; names: Map<string, string>; actionNames: Map<string, string> }) {
+  const renderValue = (key: string, v: unknown): ReactNode => {
+    const actionLines = parseActionField(key, v, actionNames);
+    if (actionLines !== null) return <ActionFieldLines lines={actionLines} />;
+    if (REFERENCE_FIELDS.has(key)) {
+      if (typeof v === "string" && names.has(v)) {
+        return <Tooltip title={v}><span>{names.get(v)}</span></Tooltip>;
+      }
+      if (Array.isArray(v)) {
+        return v.map((id) => names.get(String(id)) ?? id).join("、");
+      }
+    }
+    return readable(key, v);
+  };
   const rows = Object.entries(value).filter(
     ([key, v]) => key !== "id" && v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
   );
@@ -111,13 +120,23 @@ function FieldList({ value, names }: { value: Record<string, unknown>; names: Ma
       items={rows.map(([key, v]) => ({
         key,
         label: fieldLabel(key),
-        children: <span className="text-xs whitespace-pre-wrap break-all">{readable(key, named(key, v), names)}</span>,
+        children: <span className="text-xs whitespace-pre-wrap break-all">{renderValue(key, v)}</span>,
       }))}
     />
   );
 }
 
-function ChangeBody({ change, names }: { change: ElementChange; names: Map<string, string> }) {
+function ChangeBody({
+  change,
+  names,
+  beforeActionNames,
+  afterActionNames,
+}: {
+  change: ElementChange;
+  names: Map<string, string>;
+  beforeActionNames: Map<string, string>;
+  afterActionNames: Map<string, string>;
+}) {
   const [mode, setMode] = useState<"object" | "json">("object");
   return (
     <div className="flex flex-col gap-2">
@@ -141,12 +160,23 @@ function ChangeBody({ change, names }: { change: ElementChange; names: Map<strin
         )
       ) : change.change === "updated" ? (
         change.field_changes.length ? (
-          <FieldDiff changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" names={names} />
+          <FieldDiff
+            changes={change.field_changes}
+            beforeLabel="当前发布版本"
+            afterLabel="发布后"
+            names={names}
+            beforeActionNames={beforeActionNames}
+            actionNames={afterActionNames}
+          />
         ) : (
           <Text type="secondary">无字段级变化</Text>
         )
       ) : (
-        <FieldList value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>} names={names} />
+        <FieldList
+          value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>}
+          names={names}
+          actionNames={change.change === "deleted" ? beforeActionNames : afterActionNames}
+        />
       )}
     </div>
   );
@@ -159,11 +189,15 @@ function changeLabel(change: ElementChange) {
 function ChangeList({
   changes,
   names,
+  beforeActionNames,
+  afterActionNames,
   open,
   onInspect,
 }: {
   changes: ElementChange[];
   names: Map<string, string>;
+  beforeActionNames: Map<string, string>;
+  afterActionNames: Map<string, string>;
   open: string[];
   onInspect?: (change: ElementChange) => void;
 }) {
@@ -205,7 +239,7 @@ function ChangeList({
               查看发布后的元素
             </Button>
           ) : undefined,
-        children: <ChangeBody change={c} names={names} />,
+        children: <ChangeBody change={c} names={names} beforeActionNames={beforeActionNames} afterActionNames={afterActionNames} />,
       }))}
     />
   );
@@ -213,6 +247,20 @@ function ChangeList({
 
 function sortChanges<T extends ElementChange>(changes: T[]) {
   return [...changes].sort((a, b) => KIND_ORDER.indexOf(a.element_kind) - KIND_ORDER.indexOf(b.element_kind));
+}
+
+function changeReferenceSource(changes: ElementChange[], pick: (change: ElementChange) => ElementChange["before"]): ReferenceNameSource {
+  const object_types: ObjectType[] = [];
+  const properties: Property[] = [];
+  const link_types: LinkType[] = [];
+  for (const c of changes) {
+    const element = pick(c);
+    if (!element) continue;
+    if (c.element_kind === "object_type") object_types.push(element as ObjectType);
+    else if (c.element_kind === "property") properties.push(element as Property);
+    else if (c.element_kind === "link_type") link_types.push(element as LinkType);
+  }
+  return { object_types, properties, link_types };
 }
 
 /** Element names by id: the preview's labels first, the session's draft as fallback. */
@@ -227,6 +275,37 @@ function elementNames(preview: PublishPreview | null, draft: ModelingSession["dr
   }
   for (const [id, label] of Object.entries(preview?.labels ?? {})) names.set(id, label);
   return names;
+}
+
+function publishQualifiedNames(preview: PublishPreview | null, draft: ModelingSession["draft"], side: "before" | "after"): Map<string, string> {
+  const base = elementNames(preview, draft);
+  const allChanges = [...(preview?.changes ?? []), ...(preview?.auto_merged ?? [])];
+  if (side === "before") {
+    for (const change of allChanges) {
+      const before = change.before as { name?: string; display_name?: string | null } | null;
+      if (before && (before.display_name || before.name)) {
+        base.set(change.element_id, before.display_name || before.name || change.label);
+      }
+    }
+    return buildQualifiedReferenceNames(
+      [
+        draft,
+        ...(preview?.merged_model ? [preview.merged_model] : []),
+        changeReferenceSource(allChanges, (c) => c.after),
+        changeReferenceSource(allChanges, (c) => c.before),
+      ],
+      base,
+    );
+  }
+  return buildQualifiedReferenceNames(
+    [
+      changeReferenceSource(allChanges, (c) => c.before),
+      draft,
+      ...(preview?.merged_model ? [preview.merged_model] : []),
+      changeReferenceSource(allChanges, (c) => c.after),
+    ],
+    base,
+  );
 }
 
 const versionLabel = (n: number | null | undefined) => (n ? `v${n}` : "尚未发布");
@@ -380,6 +459,8 @@ export function PublishPanel({
           : { state: "mapped", text: "可发布" };
   const shown = filter === "all" ? changes : changes.filter((c) => c.change === filter);
   const names = elementNames(preview, session.draft);
+  const beforeActionNames = publishQualifiedNames(preview, session.draft, "before");
+  const afterActionNames = publishQualifiedNames(preview, session.draft, "after");
   return (
     <div className="flex flex-col gap-3">
       <section className="border-b border-rule pb-4">
@@ -481,6 +562,8 @@ export function PublishPanel({
                   <ChangeList
                     changes={shown}
                     names={names}
+                    beforeActionNames={beforeActionNames}
+                    afterActionNames={afterActionNames}
                     open={open}
                     onInspect={(c) =>
                       setInspected({
@@ -504,7 +587,7 @@ export function PublishPanel({
                             {
                               key: "auto",
                               label: `会话开始后已发布的变化 ${preview.auto_merged.length} · 已在线，仅用于解释合并结果`,
-                              children: <ChangeList changes={sortChanges(preview.auto_merged)} names={names} open={[]} />,
+                              children: <ChangeList changes={sortChanges(preview.auto_merged)} names={names} beforeActionNames={beforeActionNames} afterActionNames={afterActionNames} open={[]} />,
                             },
                           ]
                         : []),

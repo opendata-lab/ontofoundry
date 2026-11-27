@@ -69,6 +69,9 @@ def _check_member_boundaries(before, after, kind, element_id):
             ):
                 _scope_error()
 
+        if start["actions"] != end["actions"]:
+            _scope_error()
+
         def action_without_param_kind(action):
             return {
                 **action,

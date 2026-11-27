@@ -140,11 +140,11 @@ def _item_view(item, statuses, dependencies, elements, context) -> dict[str, Any
         "owner_label": owner_label(item.target_kind, element, elements),
         "before": before,
         "after": after,
-        # Action diffs are always computed server-side from normalized before/after;
-        # other kinds fall back to server-side diff when omitted by agents.
+        # Action diffs are always derived on read from normalized before/after;
+        # submitter field_changes are ignored for create/update/delete.
         "field_changes": (
-            field_changes(before, after)
-            if item.target_kind == "action" and before and after
+            (field_changes(before, after) if before and after else [])
+            if item.target_kind == "action"
             else item.field_changes_json
             or (field_changes(before, after) if before and after else [])
         ),

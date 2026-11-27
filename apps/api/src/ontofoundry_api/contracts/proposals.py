@@ -496,18 +496,24 @@ def group_items(draft, items, *, references_resolved=False):
             renamed = changed.after is not None and any(
                 previous.get(k) != changed.after.get(k) for k in ("name",) if k in previous
             )
-            value_kind_changed = (
+            needs_kind_sync = (
                 changed.target_kind == "value_type"
                 and changed.after is not None
                 and previous.get("value_kind") != changed.after.get("value_kind")
+                and (
+                    reference.path == "value_type_id"
+                    or reference.path.endswith(".value_type_id")
+                )
             )
-            if changed.operation == "delete" or renamed or value_kind_changed:
+            if changed.operation == "delete" or renamed or needs_kind_sync:
                 dependent = by_target.get(str(owner))
                 if dependent and dependent.id != changed.id:
+                    if needs_kind_sync and dependent.target_kind not in {"property", "action"}:
+                        continue
                     deps[changed.id].add(dependent.id)
-                    if value_kind_changed:
+                    if needs_kind_sync:
                         # Group a value_type base-kind change with every referencing
-                        # property/action update, rebind or deletion into one atomic decision.
+                        # property/action parameter update, rebind or deletion into one atomic decision.
                         deps[dependent.id].add(changed.id)
     # Composite identity edits must be validated together: a prefix of a
     # multi-property identifier is not a valid single-property identifier.
@@ -913,8 +919,6 @@ def parse_result(
                         raw_item,
                     ),
                 ) from exc
-            from ontofoundry_api.services.element_diff import field_changes as compute_field_changes
-
             parsed.append(
                 ParsedItem(
                     ids[n],
@@ -926,9 +930,7 @@ def parse_result(
                     hashes.get(n),
                     befores.get(n),
                     after,
-                    compute_field_changes(befores[n], after)
-                    if raw_item["target_kind"] == "action" and n in befores and after is not None
-                    else raw_item.get("field_changes", []),
+                    [] if raw_item["target_kind"] == "action" else raw_item.get("field_changes", []),
                     evidence,
                     raw_item.get("reason", ""),
                     item_fingerprint(

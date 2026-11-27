@@ -631,11 +631,13 @@ def test_end_to_end_acceptance_fixture_reads_mcp_ossie_and_native_package(client
     assert got_insp["actions"]["items"][0]["name"] == "dispatch_work_order"
     assert got_insp["actions"]["items"][0]["inherited_from"] == wo["id"]
 
-    # get_ontology for single action returns full definition (parameters, effects, evidence).
+    # get_ontology for single action returns full definition (parameters, effects) and paginated evidence.
     got_act = _mcp(client, "get_ontology", {"ids": [dispatch["id"]]})["structuredContent"]["elements"][0]
     assert len(got_act["definition"]["parameters"]) == 1
     assert len(got_act["definition"]["effects"]) == 3
-    assert len(got_act["definition"]["evidence"]) == 1
+    assert "evidence" not in got_act["definition"]
+    assert got_act["evidence"]["total"] == 1
+    assert len(got_act["evidence"]["items"]) == 1
 
     # 4. Ossie ZIP export & re-import.
     model = CoreDraft.model_validate(session["draft"])
@@ -883,9 +885,433 @@ def test_public_mcp_get_ontology_strips_action_evidence(client):
     try:
         got = _mcp(client, "get_ontology", {"ids": [dispatch["id"]]})["structuredContent"]["elements"][0]
         assert got["kind"] == "action"
-        assert not got["definition"].get("evidence")
+        assert "evidence" not in got["definition"]
+        assert "evidence" not in got
     finally:
         if previous is None:
             client.app.dependency_overrides.pop(mcp_principal, None)
         else:
             client.app.dependency_overrides[mcp_principal] = previous
+
+
+def test_value_type_element_save_rejects_adding_or_deleting_actions(client):
+    session = create_session(client)
+    batch = seed_batch(client, session, _work_order_proposal_fixture())
+    accept = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-for-vt-save-boundary",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert accept.status_code == 200, accept.text
+    session = accept.json()["session"]
+    vt = next(v for v in session["draft"]["value_types"] if v["name"] == "team_code")
+    act = next(a for a in session["draft"]["actions"] if a["name"] == "dispatch_work_order")
+
+    # Adding a new action referencing the value_type via element-saves must be rejected.
+    added_draft = deepcopy(session["draft"])
+    added_draft["actions"].append(
+        {
+            "id": str(uuid4()),
+            "name": "sneaky_new_action",
+            "display_name": "绕过审阅的新动作",
+            "description": "",
+            "synonyms": [],
+            "tags": [],
+            "target_type_id": None,
+            "parameters": [
+                {
+                    "name": "code",
+                    "display_name": "编码",
+                    "description": "",
+                    "value_kind": "string",
+                    "value_type_id": vt["id"],
+                    "required": True,
+                }
+            ],
+            "effects": [],
+            "evidence": [],
+        }
+    )
+    resp_add = client.post(
+        ROOT + f"/sessions/{session['id']}/element-saves",
+        json={
+            "target_kind": "value_type",
+            "target_id": vt["id"],
+            "expected_session_revision": session["revision"],
+            "idempotency_key": "vt-save-add-action",
+            "draft": added_draft,
+        },
+    )
+    assert resp_add.status_code == 422, resp_add.text
+    assert resp_add.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"
+
+    # Deleting an existing action referencing the value_type via element-saves must be rejected.
+    deleted_draft = deepcopy(session["draft"])
+    deleted_draft["actions"] = [a for a in deleted_draft["actions"] if a["id"] != act["id"]]
+    resp_del = client.post(
+        ROOT + f"/sessions/{session['id']}/element-saves",
+        json={
+            "target_kind": "value_type",
+            "target_id": vt["id"],
+            "expected_session_revision": session["revision"],
+            "idempotency_key": "vt-save-del-action",
+            "draft": deleted_draft,
+        },
+    )
+    assert resp_del.status_code == 422, resp_del.text
+    assert resp_del.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"
+
+
+def test_action_json_size_limit_and_mcp_evidence_paging(client):
+    # 1. 50 max-length params + 50 max-length effects (~150 KB) rejected with Chinese 64 KB message.
+    huge_params = [
+        ActionParameter(
+            name=f"param_{i:02d}_" + "a" * 80,
+            display_name="参数显示名" * 20,
+            description="说明" * 100,
+            value_kind=ValueKind.STRING,
+            required=True,
+        )
+        for i in range(50)
+    ]
+    huge_effects = [
+        CreateObjectEffect(
+            kind="create_object",
+            object_type_id=uuid4(),
+            description="效果说明" * 50,
+        )
+        for _ in range(50)
+    ]
+    with pytest.raises(ValidationError, match="64 KB"):
+        Action(
+            id=uuid4(),
+            name="oversized_action",
+            display_name="超大动作",
+            parameters=huge_params,
+            effects=huge_effects,
+        )
+
+    # 2. A ~60 KB action (excluding evidence) with many long evidence entries publishes and
+    #    reads back cleanly via MCP get_ontology with limit=1 (evidence paginated via cursor).
+    policy_lines = [f"制度条款第 {i} 行：" + "工单派发要求" * 20 for i in range(1, 35)]
+    policy_text = "\n".join(policy_lines) + "\n"
+    upload = client.post(
+        ROOT + "/materials",
+        params={"name": "large-action-policy.md"},
+        content=policy_text.encode("utf-8"),
+    )
+    assert upload.status_code in (200, 201), upload.text
+    material_id = upload.json()["id"]
+
+    session = create_session(client)
+    wo_ref = "obj_wo_big"
+    params_60k = [
+        {
+            "name": f"param_{i:02d}",
+            "display_name": f"参数{i:02d}" + "甲" * 30,
+            "description": "规" * 165,
+            "value_kind": "string",
+            "required": True,
+        }
+        for i in range(50)
+    ]
+    effects_60k = [
+        {
+            "kind": "set_property",
+            "property_id": {"client_ref": f"prop_wo_{i:02d}"},
+            "description": "效" * 165,
+        }
+        for i in range(50)
+    ]
+    evidences = [
+        {
+            "kind": "material",
+            "material_id": material_id,
+            "locator": {"heading": f"章节 {i}", "line_start": i, "line_end": i},
+            "quote": policy_lines[i - 1],
+        }
+        for i in range(1, 31)
+    ]
+    items = [
+        create(wo_ref, "object_type", {"name": "big_work_order", "display_name": "大型工单"}),
+        *[
+            create(
+                f"prop_wo_{i:02d}",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": wo_ref},
+                    "name": f"field_{i:02d}",
+                    "display_name": f"字段{i:02d}",
+                    "value_kind": "string",
+                },
+            )
+            for i in range(50)
+        ],
+        create(
+            "act_big",
+            "action",
+            {
+                "name": "large_valid_action",
+                "display_name": "接近上限的合法动作",
+                "target_type_id": {"client_ref": wo_ref},
+                "parameters": params_60k,
+                "effects": effects_60k,
+                "evidence": evidences,
+            },
+        ),
+    ]
+    batch = seed_batch(client, session, items)
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-large-action",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    session = dec.json()["session"]
+    big_act = next(a for a in session["draft"]["actions"] if a["name"] == "large_valid_action")
+    def_size = len(
+        json.dumps(
+            {k: v for k, v in big_act.items() if k != "evidence"},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    assert 55_000 <= def_size <= 65_536
+
+    pub = publish(client, session)
+    assert pub.status_code == 200, pub.text
+
+    first = _mcp(client, "get_ontology", {"ids": [big_act["id"]], "limit": 1})["structuredContent"]
+    el = first["elements"][0]
+    assert el["definition"]["name"] == "large_valid_action"
+    assert len(el["definition"]["parameters"]) == 50
+    assert len(el["definition"]["effects"]) == 50
+    assert el["evidence"]["total"] == 30
+    assert len(el["evidence"]["items"]) == 1
+    assert el["evidence"]["next_cursor"] is not None
+
+    second = _mcp(
+        client,
+        "get_ontology",
+        {"ids": [big_act["id"]], "limit": 1, "cursor": el["evidence"]["next_cursor"]},
+    )["structuredContent"]
+    assert len(second["elements"][0]["evidence"]["items"]) == 1
+
+
+def test_ossie_import_resolves_source_path_before_kind_and_drops_wrong_kind():
+    """Reproduces Codex P1 #3: work_order.status-code (property) vs work_order.status_code (link)."""
+    ossie_doc = {
+        "version": "0.2.0.dev0",
+        "name": "ops_demo",
+        "ontology": [
+            {"concept": "maintenance_team", "type": "EntityType", "description": "受理班组"},
+            {
+                "concept": "work_order",
+                "type": "EntityType",
+                "description": "工单",
+                "relationships": [
+                    {
+                        "name": "status-code",
+                        "verbalizes": ["{work_order} status-code {String}"],
+                        "roles": [{"concept": "String"}],
+                    },
+                    {
+                        "name": "status_code",
+                        "verbalizes": ["{work_order} status_code {maintenance_team}"],
+                        "roles": [{"concept": "maintenance_team"}],
+                    },
+                ],
+            },
+        ],
+    }
+    ext_doc = {
+        "version": "core-1",
+        "actions": {
+            "bad_wrong_kind": {
+                "display_name": "误绑关系为属性",
+                "target_type": "work_order",
+                "parameters": [],
+                "effects": [
+                    {
+                        "kind": "set_property",
+                        "property": "work_order.status_code",
+                        "description": "指向同名关系而非属性",
+                    }
+                ],
+            },
+            "good_exact_source": {
+                "display_name": "正确源路径引用",
+                "target_type": "work_order",
+                "parameters": [],
+                "effects": [
+                    {
+                        "kind": "set_property",
+                        "property": "work_order.status-code",
+                        "description": "修改属性",
+                    },
+                    {
+                        "kind": "add_link",
+                        "link_type": "work_order.status_code",
+                        "description": "建立关系",
+                    },
+                ],
+            },
+        },
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("model.ossie.json", json.dumps(ossie_doc, ensure_ascii=False))
+        zf.writestr("ontofoundry-extension.json", json.dumps(ext_doc, ensure_ascii=False))
+
+    result = OssieAdapter().import_document(buf.getvalue(), ImportContext(workspace_id=uuid4()))
+    assert [a.name for a in result.model.actions] == ["good_exact_source"]
+    dropped = [
+        i for i in result.report.issues if i.construct == "Action" and i.outcome == "dropped"
+    ]
+    assert len(dropped) == 1
+    assert "种类不符" in dropped[0].message
+    assert dropped[0].completion_status == "available"
+    assert dropped[0].original is not None
+
+
+def test_value_type_kind_change_does_not_group_unrelated_rule_edit():
+    """Reproduces Codex P2 #4: changing value_type kind must not force rule display_name edits into an atomic group."""
+    from ontofoundry_api.domain.core import Rule, RuleKind, RuleOwnerKind
+
+    ws_id = uuid4()
+    vt_id = uuid4()
+    rule_id = uuid4()
+    draft = empty_snapshot(ws_id)
+    draft["value_types"] = [
+        ValueType(
+            id=vt_id, name="work_weight", display_name="工单权重", value_kind=ValueKind.DECIMAL
+        ).model_dump(mode="json")
+    ]
+    draft["rules"] = [
+        Rule(
+            id=rule_id,
+            name="weight_non_negative",
+            display_name="权重非负",
+            owner_kind=RuleOwnerKind.VALUE_TYPE,
+            owner_id=vt_id,
+            rule_kind=RuleKind.CONSTRAINT,
+            expression="work_weight >= 0",
+        ).model_dump(mode="json")
+    ]
+    ctx = RunContext(
+        workspace_id=str(ws_id),
+        session_id=str(uuid4()),
+        run_token="tok-vt-rule",
+        base_version_id=None,
+        base_version_sha256="0" * 64,
+        source_session_revision=1,
+        source_draft_sha256="0" * 64,
+        draft=draft,
+    )
+    payload = {
+        "items": [
+            {
+                "operation": "update",
+                "target_kind": "value_type",
+                "target_id": str(vt_id),
+                "after": {
+                    **{k: v for k, v in draft["value_types"][0].items() if k != "id"},
+                    "value_kind": "float",
+                },
+            },
+            {
+                "operation": "update",
+                "target_kind": "rule",
+                "target_id": str(rule_id),
+                "after": {
+                    **{k: v for k, v in draft["rules"][0].items() if k != "id"},
+                    "display_name": "工单权重不可为负",
+                },
+            },
+        ]
+    }
+    parsed = parse_result(json.dumps(payload).encode(), ctx, lambda _: None)
+    assert all(item.atomic_group_id is None for item in parsed.items)
+
+
+def test_version_diff_impacts_action_on_referenced_property_link_and_value_type(client):
+    """Reproduces Codex P2 #6: version_diff reports actions referencing changed property/link/value_type."""
+    from ontofoundry_api.services.version_diff import compare_snapshots
+
+    session = create_session(client)
+    batch = seed_batch(client, session, _work_order_proposal_fixture())
+    accept = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-for-version-diff-action",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert accept.status_code == 200, accept.text
+    left = accept.json()["session"]["draft"]
+    dispatch = next(a for a in left["actions"] if a["name"] == "dispatch_work_order")
+
+    # 1. Changing referenced property on another object (maintenance_team.pending_count)
+    right_prop = deepcopy(left)
+    next(p for p in right_prop["properties"] if p["name"] == "pending_count")["description"] = "班组当前待处理工单数"
+    diff_prop = compare_snapshots(left, right_prop)
+    assert any(i["kind"] == "action" and i["id"] == dispatch["id"] for i in diff_prop["impacts"])
+
+    # 2. Changing referenced link_type
+    right_link = deepcopy(left)
+    next(l for l in right_link["link_types"] if l["name"] == "handled_by")["description"] = "新关系说明"
+    diff_link = compare_snapshots(left, right_link)
+    assert any(i["kind"] == "action" and i["id"] == dispatch["id"] for i in diff_link["impacts"])
+
+    # 3. Changing referenced value_type
+    right_vt = deepcopy(left)
+    next(v for v in right_vt["value_types"] if v["name"] == "team_code")["description"] = "新编码规范"
+    diff_vt = compare_snapshots(left, right_vt)
+    assert any(i["kind"] == "action" and i["id"] == dispatch["id"] for i in diff_vt["impacts"])
+
+
+def test_action_proposal_drops_submitter_field_changes_for_create_update_delete(client):
+    """Reproduces Codex P3 #8: create/update/delete action proposals drop submitter field_changes at parse time."""
+    session = create_session(client)
+    fixture = _work_order_proposal_fixture()
+    # Attach bogus submitter field_changes onto the create action proposal.
+    for item in fixture:
+        if item.get("client_ref") == "act_dispatch":
+            item["field_changes"] = [{"path": "effects", "before": None, "after": []}]
+    batch = seed_batch(client, session, fixture)
+    create_item = next(i for i in batch["items"] if i["target_kind"] == "action" and i["display_name"] == "派单")
+    assert create_item["field_changes"] == []
+
+    # Accept all, then submit a delete action proposal with bogus submitter field_changes.
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-for-drop-fc",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    session = dec.json()["session"]
+    dispatch = next(a for a in session["draft"]["actions"] if a["name"] == "dispatch_work_order")
+
+    del_batch = seed_batch(
+        client,
+        session,
+        [
+            {
+                "operation": "delete",
+                "target_kind": "action",
+                "target_id": dispatch["id"],
+                "field_changes": [{"path": "description", "before": "伪造", "after": None}],
+            }
+        ],
+    )
+    assert del_batch["items"][0]["field_changes"] == []
