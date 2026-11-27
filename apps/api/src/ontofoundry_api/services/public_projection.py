@@ -10,6 +10,7 @@ EVIDENCE_CLEARED_COLLECTIONS = (
     "link_types",
     "rules",
     "metrics",
+    "actions",
 )
 
 

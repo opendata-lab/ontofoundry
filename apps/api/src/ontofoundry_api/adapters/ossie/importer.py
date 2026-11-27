@@ -15,10 +15,16 @@ from ontofoundry_api.adapters.documents import (
     parse_document,
 )
 from ontofoundry_api.domain.core import (
+    Action,
+    ActionParameter,
+    AddLinkEffect,
+    CreateObjectEffect,
     DirectJoin,
     LinkType,
     ObjectType,
     Property,
+    RemoveLinkEffect,
+    SetPropertyEffect,
     ValueKind,
     ValueType,
     empty_draft,
@@ -900,6 +906,205 @@ class OntologyImporter:
                 "重化对象不保留多元读法结构",
             )
 
+    def import_actions(self):
+        raw_actions = self.extension.data.get("actions") or {}
+        if not raw_actions:
+            return
+        index = DraftIndex(self.t.model)
+        objects_by_name = {
+            **{o.name: o for o in self.t.model.object_types},
+            **self.t.objects,
+        }
+        value_types_by_name = {
+            **{v.name: v for v in self.t.model.value_types},
+            **self.value_types,
+        }
+        properties_by_path = {
+            **{
+                f"{index.objects[p.owner_type_id].name}.{p.name}": p
+                for p in self.t.model.properties
+            },
+            **{
+                f"{owner}.{member_name}": member
+                for (owner, member_name), member in self.t.members.items()
+                if isinstance(member, Property)
+            },
+        }
+        links_by_path = {
+            **{
+                f"{index.objects[link.source_type_id].name}.{link.name}": link
+                for link in self.t.model.link_types
+            },
+            **{
+                f"{owner}.{member_name}": member
+                for (owner, member_name), member in self.t.members.items()
+                if isinstance(member, LinkType)
+            },
+        }
+        for raw_name, entry in raw_actions.items():
+            path = f"{self.extension.source_path}/actions/{escape_pointer(str(raw_name))}"
+            if not isinstance(raw_name, str) or not isinstance(entry, dict):
+                self.issue(
+                    path,
+                    "dropped",
+                    "Action",
+                    None,
+                    "扩展动作条目格式无效，未导入，原文保留待补全",
+                    completion=True,
+                )
+                continue
+            target_type_id = None
+            target_type_name = entry.get("target_type")
+            if target_type_name is not None:
+                if not isinstance(target_type_name, str) or target_type_name not in objects_by_name:
+                    self.issue(
+                        path,
+                        "dropped",
+                        "Action",
+                        None,
+                        f"动作 {raw_name} 的目标对象 {target_type_name!r} 未解析到有效对象类型，整条未导入，原文保留待补全",
+                        completion=True,
+                    )
+                    continue
+                target_type_id = objects_by_name[target_type_name].id
+            raw_params = entry.get("parameters", [])
+            raw_effects = entry.get("effects", [])
+            if not isinstance(raw_params, list) or not isinstance(raw_effects, list):
+                self.issue(
+                    path,
+                    "dropped",
+                    "Action",
+                    None,
+                    f"动作 {raw_name} 的 parameters 或 effects 不是数组，整条未导入，原文保留待补全",
+                    completion=True,
+                )
+                continue
+            parameters = []
+            unresolved = None
+            for raw_param in raw_params:
+                if not isinstance(raw_param, dict):
+                    unresolved = "参数条目格式无效"
+                    break
+                vt_id = None
+                vt_name = raw_param.get("value_type")
+                if vt_name is not None:
+                    if not isinstance(vt_name, str) or vt_name not in value_types_by_name:
+                        unresolved = f"参数值类型 {vt_name!r} 未解析到有效值类型"
+                        break
+                    vt = value_types_by_name[vt_name]
+                    vt_id = vt.id
+                    if raw_param.get("value_kind") != str(vt.value_kind):
+                        unresolved = f"参数 {raw_param.get('name')} 的基础类型与值类型 {vt_name} 不一致"
+                        break
+                try:
+                    parameters.append(
+                        ActionParameter(
+                            name=raw_param["name"],
+                            display_name=raw_param.get("display_name"),
+                            description=raw_param.get("description", ""),
+                            value_kind=raw_param["value_kind"],
+                            value_type_id=vt_id,
+                            required=raw_param.get("required", False),
+                        )
+                    )
+                except (KeyError, ValueError, TypeError) as error:
+                    unresolved = f"参数校验失败：{error}"
+                    break
+            if unresolved is not None:
+                self.issue(
+                    path,
+                    "dropped",
+                    "Action",
+                    None,
+                    f"动作 {raw_name} 解析失败（{unresolved}），整条未导入，原文保留待补全",
+                    completion=True,
+                )
+                continue
+            effects = []
+            for raw_effect in raw_effects:
+                if not isinstance(raw_effect, dict):
+                    unresolved = "效果条目格式无效"
+                    break
+                effect_kind = raw_effect.get("kind")
+                desc = raw_effect.get("description", "")
+                try:
+                    if effect_kind == "set_property":
+                        prop_path = raw_effect.get("property")
+                        if not isinstance(prop_path, str) or prop_path not in properties_by_path:
+                            unresolved = f"效果属性 {prop_path!r} 未解析到有效属性"
+                            break
+                        effects.append(
+                            SetPropertyEffect(
+                                kind="set_property",
+                                property_id=properties_by_path[prop_path].id,
+                                description=desc,
+                            )
+                        )
+                    elif effect_kind in ("add_link", "remove_link"):
+                        link_path = raw_effect.get("link_type")
+                        if not isinstance(link_path, str) or link_path not in links_by_path:
+                            unresolved = f"效果关系 {link_path!r} 未解析到有效关系"
+                            break
+                        cls = AddLinkEffect if effect_kind == "add_link" else RemoveLinkEffect
+                        effects.append(
+                            cls(
+                                kind=effect_kind,
+                                link_type_id=links_by_path[link_path].id,
+                                description=desc,
+                            )
+                        )
+                    elif effect_kind == "create_object":
+                        obj_name = raw_effect.get("object_type")
+                        if not isinstance(obj_name, str) or obj_name not in objects_by_name:
+                            unresolved = f"效果对象 {obj_name!r} 未解析到有效对象类型"
+                            break
+                        effects.append(
+                            CreateObjectEffect(
+                                kind="create_object",
+                                object_type_id=objects_by_name[obj_name].id,
+                                description=desc,
+                            )
+                        )
+                    else:
+                        unresolved = f"不支持的效果种类 {effect_kind!r}"
+                        break
+                except (ValueError, TypeError) as error:
+                    unresolved = f"效果校验失败：{error}"
+                    break
+            if unresolved is not None:
+                self.issue(
+                    path,
+                    "dropped",
+                    "Action",
+                    None,
+                    f"动作 {raw_name} 解析失败（{unresolved}），整条未导入，原文保留待补全",
+                    completion=True,
+                )
+                continue
+            try:
+                action = Action(
+                    id=self.t.id("action:" + raw_name),
+                    name=raw_name,
+                    display_name=entry.get("display_name"),
+                    description=entry.get("description", ""),
+                    synonyms=entry.get("synonyms", []),
+                    tags=entry.get("tags", []),
+                    target_type_id=target_type_id,
+                    parameters=parameters,
+                    effects=effects,
+                )
+            except (ValueError, TypeError) as error:
+                self.issue(
+                    path,
+                    "dropped",
+                    "Action",
+                    None,
+                    f"动作 {raw_name} 不能形成合法核心定义（{error}），整条未导入，原文保留待补全",
+                    completion=True,
+                )
+                continue
+            self.t.accept("actions", action, path, message="从平台扩展文件导入业务动作")
+
     def run(self):
         self.import_objects()
         self.import_relationships()
@@ -938,6 +1143,7 @@ class OntologyImporter:
 
         for scope in scopes:
             import_metrics(self, scope)
+        self.import_actions()
         for field, rule in [
             ("name", "RT-01"),
             ("description", "RT-01"),

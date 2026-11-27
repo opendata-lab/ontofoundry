@@ -37,7 +37,7 @@ from ontofoundry_api.services.workspaces import get_workspace
 # MCP get_ontology separates resource-projected kinds from direct definition kinds;
 # mappings are internal physical bindings and excluded from both.
 PHYSICAL_PROJECTION_KINDS = frozenset({"object_type", "link_type", "metric"})
-LIST_RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset")
+LIST_RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset", "action")
 DIRECT_ELEMENT_KINDS = ("property", "rule", "value_type")
 
 
@@ -327,7 +327,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                                 d["referenced_by"], [len(values), "referenced_by"]
                             )
                     element["definition"] = definition
-                for key in ("properties", "child_types"):
+                for key in ("properties", "child_types", "actions"):
                     if key in d:
                         element[key] = page(d[key], [len(values), key])
                 if "rules" in args.include and "rules" in d:

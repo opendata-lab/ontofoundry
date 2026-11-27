@@ -99,6 +99,7 @@ def build_work_pack(
                         "extends",
                         "owner_type_id",
                         "type_id",
+                        "target_type_id",
                     )
                     if key in element
                 }
@@ -234,6 +235,7 @@ DRAFT_EMPTY_COLLECTIONS = (
     "metrics",
     "datasets",
     "value_types",
+    "actions",
 )
 
 

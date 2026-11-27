@@ -12,6 +12,7 @@ from functools import wraps
 from uuid import UUID
 
 from ontofoundry_api.domain.core import (
+    Action,
     CoreDraft,
     Dataset,
     LinkType,
@@ -32,6 +33,7 @@ INDEX_KIND_ORDER = (
     "dataset",
     "mapping",
     "value_type",
+    "action",
 )
 
 
@@ -58,9 +60,11 @@ class DraftIndex:
     links: dict[UUID, LinkType] = field(init=False)
     datasets: dict[UUID, Dataset] = field(init=False)
     value_types: dict[UUID, ValueType] = field(init=False)
+    actions: dict[UUID, Action] = field(init=False)
 
     properties_by_owner: dict = field(init=False)
     rules_by_owner: dict = field(init=False)
+    actions_by_target: dict = field(init=False)
     children_by_parent: dict = field(init=False)
     outgoing_by_owner: dict = field(init=False)
     incoming_by_owner: dict = field(init=False)
@@ -75,6 +79,7 @@ class DraftIndex:
         self.links = {link.id: link for link in self.draft.link_types}
         self.datasets = {d.id: d for d in self.draft.datasets}
         self.value_types = {v.id: v for v in self.draft.value_types}
+        self.actions = {a.id: a for a in self.draft.actions}
 
         def group(items, key):
             result = {}
@@ -84,6 +89,7 @@ class DraftIndex:
 
         self.properties_by_owner = group(self.draft.properties, "owner_type_id")
         self.rules_by_owner = group(self.draft.rules, "owner_id")
+        self.actions_by_target = group(self.draft.actions, "target_type_id")
         self.children_by_parent = group(self.draft.object_types, "extends")
         self.outgoing_by_owner = group(self.draft.link_types, "source_type_id")
         self.incoming_by_owner = group(self.draft.link_types, "target_type_id")
@@ -182,6 +188,14 @@ class DraftIndex:
             *(link.id for link in self.outgoing_links(type_id)),
         }
         return self.grouped(self.rules_by_owner, owners)
+
+    @_memoized
+    def effective_actions(self, type_id: UUID) -> list[Action]:
+        """Own actions, then inherited ones, nearest ancestor first."""
+        owners = self.lineage(type_id)
+        rank = {owner: i for i, owner in enumerate(owners)}
+        found = self.grouped(self.actions_by_target, owners)
+        return sorted(found, key=lambda a: rank[a.target_type_id])
 
     def title_property(self, type_id: UUID) -> Property | None:
         for ancestor_id in self.lineage(type_id):

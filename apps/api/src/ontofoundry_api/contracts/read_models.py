@@ -70,7 +70,14 @@ class TableRowsRead(Strict):
 
 
 OntologyKind = Literal[
-    "object_type", "property", "link_type", "rule", "metric", "dataset", "value_type"
+    "object_type",
+    "property",
+    "link_type",
+    "rule",
+    "metric",
+    "dataset",
+    "value_type",
+    "action",
 ]
 
 
@@ -95,9 +102,11 @@ class SearchViaRead(Strict):
         "metric_denominator",
         "object_title_property",
         "object_link_type",
+        "object_action",
         "property_owner",
         "link_source_type",
         "link_target_type",
+        "action_target_type",
     ]
 
 
@@ -180,7 +189,7 @@ class CatalogReferenceRead(Strict):
 
 class CatalogItemRead(Strict):
     id: UUID
-    kind: Literal["object_type", "link_type", "metric", "dataset"]
+    kind: Literal["object_type", "link_type", "metric", "dataset", "action"]
     name: str
     display_name: str | None
     description: str
@@ -188,6 +197,7 @@ class CatalogItemRead(Strict):
     parent: CatalogReferenceRead | None = None
     property_count: int | None = None
     link_count: int | None = None
+    action_count: int | None = None
     document_instance_count: int | None = None
     mapping_state: Literal["mapped", "partial", "unmapped"] | None = None
     mapping_label: str | None = None
@@ -201,6 +211,8 @@ class CatalogItemRead(Strict):
     column_count: int | None = None
     metric_kind: Literal["simple", "ratio", "expression"] | None = None
     dataset_name: str | None = None
+    parameter_count: int | None = None
+    effect_count: int | None = None
 
 
 class CatalogPageRead(Strict):

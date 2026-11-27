@@ -28,6 +28,7 @@ CATALOG_COUNT_COLLECTIONS = (
     "metrics",
     "value_types",
     "datasets",
+    "actions",
 )
 
 
@@ -148,6 +149,7 @@ def catalog_page(
                 parent=reference(e.extends),
                 property_count=len(index.effective_properties(e.id)),
                 link_count=len(index.effective_links(e.id)),
+                action_count=len(index.effective_actions(e.id)),
                 document_instance_count=document_counts.get(e.id, 0)
                 if instances_readable
                 else None,
@@ -173,6 +175,12 @@ def catalog_page(
 
             ds = dataset_for(draft, e) if mappings else None
             item.update(metric_kind=e.kind, dataset_name=ds.name if ds else None)
+        elif k == "action":
+            item.update(
+                target=reference(e.target_type_id) if e.target_type_id else None,
+                parameter_count=len(e.parameters),
+                effect_count=len(e.effects),
+            )
         items.append(item)
     end = offset + len(items)
     return {
@@ -241,6 +249,7 @@ def element_projection(version, kind, identity, *, mappings, instances):
     for type_id in object_ids:
         selected.update(p.id for p in index.effective_properties(type_id))
         selected.update(r.id for r in index.effective_rules(type_id))
+        selected.update(a.id for a in index.effective_actions(type_id))
         selected.update(m.id for m in resolve_binding(draft, type_id).mappings)
     # Dataset details list every definition that references that dataset.
     if kind == "dataset":

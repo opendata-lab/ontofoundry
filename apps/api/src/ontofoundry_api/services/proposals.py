@@ -346,6 +346,7 @@ KIND_LABELS = {
     ElementKind.MAPPING.value: "映射",
     ElementKind.DATASET.value: "数据集",
     ElementKind.METRIC.value: "指标",
+    ElementKind.ACTION.value: "动作",
 }
 
 

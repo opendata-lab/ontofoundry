@@ -286,7 +286,11 @@ def test_import_matching_rename_group_kinds():
 def test_proposals_and_diagnostics_lists():
     # Proposal diagnostics map every registered ElementKind to a fixed extract-kit part
     # whose example JSON actually contains a `create` item for that kind.
-    _assert_coverage(set(KIT_PARTS), ALL_KINDS, frozenset())
+    _assert_coverage(
+        set(KIT_PARTS),
+        ALL_KINDS,
+        frozenset({"action"}),  # added in PR C (skills)
+    )
     for kind, part in KIT_PARTS.items():
         items = json.loads((EXTRACT_KIT_DIR / f"{part}.json").read_text(encoding="utf-8"))
         create_kinds = {item["target_kind"] for item in items if item.get("operation") == "create"}
@@ -340,11 +344,12 @@ def test_element_diff_and_version_diff_lists():
 def test_element_save_scope_and_contract_kinds():
     save_kinds = frozenset(get_args(ElementSavePreview.model_fields["target_kind"].annotation))
     # Direct human save endpoints accept aggregate roots; properties and rules
-    # are saved inside their owner's aggregate, and instances use the instance store.
+    # are saved inside their owner's aggregate, actions are edited only through
+    # proposals in v1, and instances use the instance store.
     _assert_coverage(
         save_kinds,
         ALL_KINDS,
-        frozenset({"property", "rule", *INSTANCE_KINDS}),
+        frozenset({"property", "rule", "action", *INSTANCE_KINDS}),
     )
 
     draft = core.empty_draft(uuid4()).model_dump(mode="json")
@@ -390,7 +395,7 @@ def test_mcp_get_ontology_routing_lists():
     _assert_coverage(
         set(mcp_ontology.DIRECT_ELEMENT_KINDS),
         ALL_KINDS,
-        frozenset({"object_type", "link_type", "metric", "dataset", "mapping", *INSTANCE_KINDS}),
+        frozenset({"object_type", "link_type", "metric", "dataset", "action", "mapping", *INSTANCE_KINDS}),
     )
 
     listed = set(mcp_ontology.LIST_RESOURCE_KINDS)
@@ -399,11 +404,12 @@ def test_mcp_get_ontology_routing_lists():
     assert listed | direct == set(get_args(OntologyKind))
 
     # Physical SQL projection applies only to mapped ontology concepts (objects,
-    # links, metrics); datasets already carry physical metadata directly.
+    # links, metrics); datasets already carry physical metadata directly, and
+    # actions are declarative definitions without SQL bindings.
     _assert_coverage(
         mcp_ontology.PHYSICAL_PROJECTION_KINDS,
         CORE_KINDS,
-        frozenset({"property", "rule", "dataset", "mapping", "value_type"}),
+        frozenset({"property", "rule", "dataset", "mapping", "value_type", "action"}),
     )
 
 
@@ -429,5 +435,5 @@ def test_public_projection_modeling_input_and_legacy_lists():
     _assert_coverage(
         set(LEGACY_NAMED_COLLECTIONS),
         CORE_COLLECTIONS,
-        frozenset({"datasets", "mappings", "value_types"}),
+        frozenset({"datasets", "mappings", "value_types", "actions"}),
     )

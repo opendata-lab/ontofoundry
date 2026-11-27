@@ -4,7 +4,12 @@ import re
 
 from ontofoundry_api.adapters.archive import write_archive
 from ontofoundry_api.adapters.exporting import ExportBuilder, file_stem, json_bytes
-from ontofoundry_api.domain.core import DerivedExpression
+from ontofoundry_api.domain.core import (
+    AddLinkEffect,
+    DerivedExpression,
+    RemoveLinkEffect,
+    SetPropertyEffect,
+)
 from ontofoundry_api.domain.expressions import (
     render_references,
     resolve_derived_expression,
@@ -111,6 +116,7 @@ def export_document(model, ctx):
         "title_properties": {},
         "required": [],
         "rules": {},
+        "actions": {},
     }
     components, owners = [], {}
 
@@ -296,6 +302,71 @@ def export_document(model, ctx):
             )
     for metric in model.metrics:
         labels(metric, "metric:" + metric.name)
+    for pos, action in enumerate(model.actions):
+        serialized_effects = []
+        for effect in action.effects:
+            if isinstance(effect, SetPropertyEffect):
+                prop = index.properties[effect.property_id]
+                owner_name = index.objects[prop.owner_type_id].name
+                serialized_effects.append(
+                    {
+                        "kind": "set_property",
+                        "property": f"{owner_name}.{prop.name}",
+                        "description": effect.description,
+                    }
+                )
+            elif isinstance(effect, (AddLinkEffect, RemoveLinkEffect)):
+                link = index.links[effect.link_type_id]
+                source_name = index.objects[link.source_type_id].name
+                serialized_effects.append(
+                    {
+                        "kind": effect.kind,
+                        "link_type": f"{source_name}.{link.name}",
+                        "description": effect.description,
+                    }
+                )
+            else:
+                obj = index.objects[effect.object_type_id]
+                serialized_effects.append(
+                    {
+                        "kind": "create_object",
+                        "object_type": obj.name,
+                        "description": effect.description,
+                    }
+                )
+        extension["actions"][action.name] = {
+            "display_name": action.display_name,
+            "description": action.description,
+            "synonyms": list(action.synonyms),
+            "tags": list(action.tags),
+            "target_type": index.objects[action.target_type_id].name
+            if action.target_type_id is not None
+            else None,
+            "parameters": [
+                {
+                    "name": param.name,
+                    "display_name": param.display_name,
+                    "description": param.description,
+                    "value_kind": str(param.value_kind),
+                    "value_type": index.value_types[param.value_type_id].name
+                    if param.value_type_id is not None
+                    else None,
+                    "required": param.required,
+                }
+                for param in action.parameters
+            ],
+            "effects": serialized_effects,
+        }
+        report.issue(
+            f"/actions/{pos}",
+            "converted",
+            "actions",
+            None,
+            "业务动作写入平台扩展文件 ontofoundry-extension.json；仅取纯 .ossie.json 会丢失动作定义",
+            element=action,
+            target_path=f"/ontofoundry-extension.json#/actions/{action.name}",
+            severity="warning",
+        )
     extension["required"].sort()
     extension["generated_link_readings"].sort()
     value = {

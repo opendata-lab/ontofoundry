@@ -57,7 +57,7 @@ def parse(payload, ctx, lookup=lambda _: None):
     return parse_result(json.dumps(payload).encode(), ctx, lookup)
 
 
-def test_schema_has_exact_ten_targets():
+def test_schema_has_exact_eleven_targets():
     assert set(result_schema()["$defs"]["item"]["properties"]["target_kind"]["enum"]) == {
         "object_type",
         "property",
@@ -69,6 +69,7 @@ def test_schema_has_exact_ten_targets():
         "material_object",
         "material_link",
         "value_type",
+        "action",
     }
 
 
@@ -128,7 +129,7 @@ def test_whole_result_rejected(mutation):
     if mutation == "unknown":
         payload["items"][0]["after"]["extends"] = {"client_ref": "missing"}
     if mutation == "old_kind":
-        payload["items"][0]["target_kind"] = "action"
+        payload["items"][0]["target_kind"] = "entity_type"
     if mutation == "context":
         payload["run_token"] = "other"
     with pytest.raises(ProposalContractError):

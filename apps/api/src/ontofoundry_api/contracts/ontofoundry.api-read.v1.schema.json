@@ -1,5 +1,227 @@
 {
   "$defs": {
+    "Action": {
+      "additionalProperties": false,
+      "description": "Declarative business action definition (not executed by the platform).",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "effects": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "add_link": "#/$defs/AddLinkEffect",
+                "create_object": "#/$defs/CreateObjectEffect",
+                "remove_link": "#/$defs/RemoveLinkEffect",
+                "set_property": "#/$defs/SetPropertyEffect"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SetPropertyEffect"
+              },
+              {
+                "$ref": "#/$defs/AddLinkEffect"
+              },
+              {
+                "$ref": "#/$defs/RemoveLinkEffect"
+              },
+              {
+                "$ref": "#/$defs/CreateObjectEffect"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Effects",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/ActionParameter"
+          },
+          "maxItems": 50,
+          "title": "Parameters",
+          "type": "array"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "target_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Type Id"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Action",
+      "type": "object"
+    },
+    "ActionParameter": {
+      "additionalProperties": false,
+      "description": "Caller-supplied scalar input for an action definition.",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind"
+        },
+        "value_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Type Id"
+        }
+      },
+      "required": [
+        "name",
+        "value_kind"
+      ],
+      "title": "ActionParameter",
+      "type": "object"
+    },
+    "AddLinkEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "add_link",
+          "title": "Kind",
+          "type": "string"
+        },
+        "link_type_id": {
+          "format": "uuid",
+          "title": "Link Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "link_type_id"
+      ],
+      "title": "AddLinkEffect",
+      "type": "object"
+    },
     "AffectedItemImpact": {
       "additionalProperties": false,
       "properties": {
@@ -53,6 +275,18 @@
     "CatalogItemRead": {
       "additionalProperties": false,
       "properties": {
+        "action_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action Count"
+        },
         "column_count": {
           "anyOf": [
             {
@@ -104,6 +338,18 @@
           "default": null,
           "title": "Document Instance Count"
         },
+        "effect_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effect Count"
+        },
         "id": {
           "format": "uuid",
           "title": "Id",
@@ -114,7 +360,8 @@
             "object_type",
             "link_type",
             "metric",
-            "dataset"
+            "dataset",
+            "action"
           ],
           "title": "Kind",
           "type": "string"
@@ -191,6 +438,18 @@
         "name": {
           "title": "Name",
           "type": "string"
+        },
+        "parameter_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameter Count"
         },
         "parent": {
           "anyOf": [
@@ -516,6 +775,13 @@
     "CoreDraft": {
       "additionalProperties": false,
       "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/Action"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
         "datasets": {
           "items": {
             "$ref": "#/$defs/Dataset"
@@ -606,6 +872,33 @@
         "workspace_id"
       ],
       "title": "CoreDraft",
+      "type": "object"
+    },
+    "CreateObjectEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "create_object",
+          "title": "Kind",
+          "type": "string"
+        },
+        "object_type_id": {
+          "format": "uuid",
+          "title": "Object Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "object_type_id"
+      ],
+      "title": "CreateObjectEffect",
       "type": "object"
     },
     "DataMapping": {
@@ -2490,6 +2783,33 @@
       "title": "RatioMetric",
       "type": "object"
     },
+    "RemoveLinkEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "remove_link",
+          "title": "Kind",
+          "type": "string"
+        },
+        "link_type_id": {
+          "format": "uuid",
+          "title": "Link Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "link_type_id"
+      ],
+      "title": "RemoveLinkEffect",
+      "type": "object"
+    },
     "Rule": {
       "additionalProperties": false,
       "properties": {
@@ -2693,7 +3013,8 @@
             "rule",
             "metric",
             "dataset",
-            "value_type"
+            "value_type",
+            "action"
           ],
           "title": "Kind",
           "type": "string"
@@ -3114,9 +3435,11 @@
             "metric_denominator",
             "object_title_property",
             "object_link_type",
+            "object_action",
             "property_owner",
             "link_source_type",
-            "link_target_type"
+            "link_target_type",
+            "action_target_type"
           ],
           "title": "Relation",
           "type": "string"
@@ -3127,6 +3450,33 @@
         "relation"
       ],
       "title": "SearchViaRead",
+      "type": "object"
+    },
+    "SetPropertyEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Description",
+          "type": "string"
+        },
+        "kind": {
+          "const": "set_property",
+          "title": "Kind",
+          "type": "string"
+        },
+        "property_id": {
+          "format": "uuid",
+          "title": "Property Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "property_id"
+      ],
+      "title": "SetPropertyEffect",
       "type": "object"
     },
     "SimpleMetric": {

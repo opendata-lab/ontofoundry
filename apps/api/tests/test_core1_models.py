@@ -43,10 +43,10 @@ def test_design_examples_are_valid_core_graphs(name):
     assert validate_core_graph(draft) is draft
 
 
-def test_empty_draft_has_eight_collections():
+def test_empty_draft_has_nine_collections():
     draft = empty_draft(uuid4())
-    # schema_version, workspace_id and eight element collections (value_types last).
-    assert len(draft.model_dump()) == 10
+    # schema_version, workspace_id and nine element collections (actions last).
+    assert len(draft.model_dump()) == 11
     assert validate_core_graph(draft)
 
 
@@ -54,7 +54,7 @@ def test_empty_draft_has_eight_collections():
     "change",
     [
         {"schema_version": "3"},
-        {"actions": []},
+        {"entity_types": []},
         {"hash_algorithm": "legacy"},
         {"semantic_models": []},
         {"ontology_requires": []},

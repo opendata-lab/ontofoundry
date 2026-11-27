@@ -36,6 +36,7 @@ NATURAL_KEY_ORDER = (
     "metric",
     "dataset",
     "mapping",
+    "action",
 )
 # Kinds grouped for simultaneous name-exchange detection during import pruning.
 RENAME_GROUP_KINDS = frozenset(
@@ -46,6 +47,7 @@ RENAME_GROUP_KINDS = frozenset(
         "rule",
         "metric",
         "dataset",
+        "action",
     }
 )
 
@@ -72,7 +74,7 @@ def match_import(base: CoreDraft, source: CoreDraft, *, native: bool) -> dict[st
             return remap.get(value, value)
 
         technical = str(item.get("name", "")).casefold()
-        if kind in {"object_type", "metric", "value_type"}:
+        if kind in {"object_type", "metric", "value_type", "action"}:
             return technical
         if kind == "property":
             return owner("owner_type_id"), technical

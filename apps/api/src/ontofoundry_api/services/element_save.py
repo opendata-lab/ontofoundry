@@ -27,9 +27,14 @@ def element_scope(draft, kind, element_id):
             m["id"] for m in draft["mappings"] if m["type_id"] == element_id
         }
     if kind == "value_type":
-        # A base-kind change revises every referencing property (VT-09/VT-14).
+        # A base-kind change revises every referencing property and action parameter (VT-09/VT-14).
         scope["properties"] = {
             p["id"] for p in draft["properties"] if p.get("value_type_id") == element_id
+        }
+        scope["actions"] = {
+            a["id"]
+            for a in draft.get("actions", [])
+            if any(p.get("value_type_id") == element_id for p in a.get("parameters", []))
         }
     owners = {kind: {element_id}, "property": scope["properties"] if kind != "value_type" else set()}
     scope["rules"] = {
@@ -51,7 +56,7 @@ def _scope_error():
 def _check_member_boundaries(before, after, kind, element_id):
     start, end = [element_scope(s, kind, element_id) for s in (before, after)]
     if kind == "value_type":
-        # Only the inherited base kind of referencing properties may change.
+        # Only the inherited base kind of referencing properties and action parameters may change.
         def without_kind(prop):
             return {k: v for k, v in prop.items() if k != "value_kind"}
 
@@ -61,6 +66,27 @@ def _check_member_boundaries(before, after, kind, element_id):
                 prop["id"] in end["properties"]
                 and prop["id"] in old
                 and without_kind(prop) != without_kind(old[prop["id"]])
+            ):
+                _scope_error()
+
+        def action_without_param_kind(action):
+            return {
+                **action,
+                "parameters": [
+                    {k: v for k, v in p.items() if k != "value_kind"}
+                    if p.get("value_type_id") == element_id
+                    else p
+                    for p in action.get("parameters", [])
+                ],
+            }
+
+        old_actions = {a["id"]: a for a in before.get("actions", [])}
+        for action in after.get("actions", []):
+            if (
+                action["id"] in end["actions"]
+                and action["id"] in old_actions
+                and action_without_param_kind(action)
+                != action_without_param_kind(old_actions[action["id"]])
             ):
                 _scope_error()
     # Existing members may be deleted, but cannot cross aggregate boundaries.

@@ -369,6 +369,18 @@ def walk_references(kind, value, resolve):
         refs(result, "type_id")
     elif kind == "material_link":
         refs(result, "type_id", "source_id", "target_id")
+    elif kind == "action":
+        refs(result, "target_type_id")
+        for param in result.get("parameters", []):
+            refs(param, "value_type_id")
+        for effect in result.get("effects", []):
+            effect_kind = effect.get("kind")
+            if effect_kind == "set_property":
+                refs(effect, "property_id")
+            elif effect_kind in ("add_link", "remove_link"):
+                refs(effect, "link_type_id")
+            elif effect_kind == "create_object":
+                refs(effect, "object_type_id")
     return result
 
 
@@ -383,6 +395,7 @@ NAMED_PROPOSAL_KINDS = frozenset(
         "rule",
         "metric",
         "dataset",
+        "action",
     }
 )
 
@@ -483,10 +496,19 @@ def group_items(draft, items, *, references_resolved=False):
             renamed = changed.after is not None and any(
                 previous.get(k) != changed.after.get(k) for k in ("name",) if k in previous
             )
-            if changed.operation == "delete" or renamed:
+            value_kind_changed = (
+                changed.target_kind == "value_type"
+                and changed.after is not None
+                and previous.get("value_kind") != changed.after.get("value_kind")
+            )
+            if changed.operation == "delete" or renamed or value_kind_changed:
                 dependent = by_target.get(str(owner))
                 if dependent and dependent.id != changed.id:
                     deps[changed.id].add(dependent.id)
+                    if value_kind_changed:
+                        # Group a value_type base-kind change with every referencing
+                        # property/action update, rebind or deletion into one atomic decision.
+                        deps[dependent.id].add(changed.id)
     # Composite identity edits must be validated together: a prefix of a
     # multi-property identifier is not a valid single-property identifier.
     identity_edits = {}
@@ -891,6 +913,8 @@ def parse_result(
                         raw_item,
                     ),
                 ) from exc
+            from ontofoundry_api.services.element_diff import field_changes as compute_field_changes
+
             parsed.append(
                 ParsedItem(
                     ids[n],
@@ -902,7 +926,9 @@ def parse_result(
                     hashes.get(n),
                     befores.get(n),
                     after,
-                    raw_item.get("field_changes", []),
+                    compute_field_changes(befores[n], after)
+                    if raw_item["target_kind"] == "action" and n in befores and after is not None
+                    else raw_item.get("field_changes", []),
                     evidence,
                     raw_item.get("reason", ""),
                     item_fingerprint(

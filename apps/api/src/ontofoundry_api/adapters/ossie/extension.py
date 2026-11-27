@@ -58,6 +58,7 @@ def read_extension(translation):
         "required",
         "unsupported",
         "rules",
+        "actions",
     }
     for key in data.keys() - allowed:
         translation.issue(
@@ -134,6 +135,18 @@ def read_extension(translation):
     clean["required"] = (
         data.get("required", []) if isinstance(data.get("required", []), list) else []
     )
+    if "actions" in data and not isinstance(data["actions"], dict):
+        translation.issue(
+            source_path + "/actions",
+            "dropped",
+            "Action",
+            "RT-03",
+            "扩展字段 actions 必须是按英文标识为键的对象",
+            completion=True,
+        )
+        clean["actions"] = {}
+    else:
+        clean["actions"] = data.get("actions", {}) if isinstance(data.get("actions"), dict) else {}
     return Extension(clean, source_path)
 
 

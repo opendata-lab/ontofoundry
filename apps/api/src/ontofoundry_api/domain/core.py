@@ -407,6 +407,86 @@ class Rule(Strict):
     evidence: EvidenceList
 
 
+# --- actions ----------------------------------------------------------------
+
+
+ActionDescription = Annotated[str, Field(default="", max_length=200)]
+
+
+class ActionParameter(Strict):
+    """Caller-supplied scalar input for an action definition."""
+
+    name: Identifier
+    display_name: DisplayName | None = None
+    description: ActionDescription = ""
+    value_kind: ValueKind
+    value_type_id: UUID | None = None
+    required: bool = False
+
+
+class SetPropertyEffect(Strict):
+    kind: Literal["set_property"]
+    property_id: UUID
+    description: ActionDescription = ""
+
+
+class AddLinkEffect(Strict):
+    kind: Literal["add_link"]
+    link_type_id: UUID
+    description: ActionDescription = ""
+
+
+class RemoveLinkEffect(Strict):
+    kind: Literal["remove_link"]
+    link_type_id: UUID
+    description: ActionDescription = ""
+
+
+class CreateObjectEffect(Strict):
+    kind: Literal["create_object"]
+    object_type_id: UUID
+    description: ActionDescription = ""
+
+
+ActionEffect = Annotated[
+    SetPropertyEffect | AddLinkEffect | RemoveLinkEffect | CreateObjectEffect,
+    Field(discriminator="kind"),
+]
+
+
+def _effect_target_id(effect: ActionEffect) -> UUID:
+    if isinstance(effect, SetPropertyEffect):
+        return effect.property_id
+    if isinstance(effect, (AddLinkEffect, RemoveLinkEffect)):
+        return effect.link_type_id
+    return effect.object_type_id
+
+
+class Action(Strict):
+    """Declarative business action definition (not executed by the platform)."""
+
+    id: UUID
+    name: Identifier
+    display_name: DisplayName | None = None
+    description: Description = ""
+    synonyms: Labels
+    tags: Labels
+    target_type_id: UUID | None = None
+    parameters: list[ActionParameter] = Field(default_factory=list, max_length=50)
+    effects: list[ActionEffect] = Field(default_factory=list, max_length=50)
+    evidence: EvidenceList
+
+    @model_validator(mode="after")
+    def unique_parameters_and_effects(self) -> Action:
+        param_names = [param.name.casefold() for param in self.parameters]
+        if len(param_names) != len(set(param_names)):
+            raise ValueError("同一动作的参数英文标识重复")
+        effect_keys = [(effect.kind, _effect_target_id(effect)) for effect in self.effects]
+        if len(effect_keys) != len(set(effect_keys)):
+            raise ValueError("同一动作不能包含重复的效果")
+        return self
+
+
 # --- metrics ----------------------------------------------------------------
 
 
@@ -638,6 +718,7 @@ class CoreDraft(Strict):
     datasets: list[Dataset] = Field(default_factory=list)
     mappings: list[DataMapping] = Field(default_factory=list)
     value_types: list[ValueType] = Field(default_factory=list)
+    actions: list[Action] = Field(default_factory=list)
 
 
 COLLECTIONS = (
@@ -649,6 +730,7 @@ COLLECTIONS = (
     "datasets",
     "mappings",
     "value_types",
+    "actions",
 )
 
 

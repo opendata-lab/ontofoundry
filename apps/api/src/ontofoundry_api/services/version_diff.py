@@ -1,7 +1,7 @@
 """Stable-ID comparison with model references, without exposing unrelated facts."""
 
 # Collections whose elements are reported in `impacts` when an object type changes.
-IMPACT_COLLECTIONS = ("mappings", "link_types")
+IMPACT_COLLECTIONS = ("mappings", "link_types", "actions")
 
 
 def compare_snapshots(left, right):
@@ -66,4 +66,14 @@ def compare_snapshots(left, right):
             for item in changes
         ):
             impacts.append({"kind": "link_type", "id": link["id"], "label": link.get("display_name") or link["name"]})
+    for action in indexed["actions"].values():
+        action_targets = {
+            *(t for t in (action.get("target_type_id"),) if t),
+            *(e.get("object_type_id") for e in action.get("effects", []) if e.get("object_type_id")),
+        }
+        if any(
+            action["id"] in item["path"] or bool(affected & action_targets)
+            for item in changes
+        ):
+            impacts.append({"kind": "action", "id": action["id"], "label": action.get("display_name") or action["name"]})
     return {"changes": changes, "impacts": impacts}

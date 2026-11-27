@@ -65,7 +65,7 @@ def export_snapshot(db, settings, workspace_id, adapter_id, version_id):
             "adapter": adapter.id,
             "scopes": {str(k): v for k, v in scopes.items()},
             "connection_names": {str(k): v for k, v in connection_names.items()},
-            "compiler": "core-1-export-v3-dataset-sources",
+            "compiler": "core-1-export-v4-actions",
         }
     )
     root = export_root(settings, workspace_id, version.id, adapter.id)

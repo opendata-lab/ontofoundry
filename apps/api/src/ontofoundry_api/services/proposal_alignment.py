@@ -4,7 +4,7 @@ from ontofoundry_api.db_models import ConnectionRecord, MetadataSnapshotRecord
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.services.ontology_search import KeywordRecall, visible_elements
 
-SIMILAR_KINDS = {"object_type", "property", "link_type", "metric"}
+SIMILAR_KINDS = {"object_type", "property", "link_type", "metric", "action"}
 SIMILAR_LIMIT = 5
 
 

@@ -64,6 +64,7 @@ OWNER_LABEL_KINDS = frozenset(
         ElementKind.RULE.value,
         ElementKind.MATERIAL_OBJECT.value,
         ElementKind.MAPPING.value,
+        ElementKind.ACTION.value,
     }
 )
 
@@ -80,6 +81,8 @@ def owner_label(
         owner = element.get("owner_id")
     elif kind in (ElementKind.MATERIAL_OBJECT.value, ElementKind.MAPPING.value):
         owner = element.get("type_id")
+    elif kind == ElementKind.ACTION.value:
+        owner = element.get("target_type_id")
     if owner is None:
         return None
     found = elements.get(str(owner))

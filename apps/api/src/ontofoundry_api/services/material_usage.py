@@ -24,6 +24,7 @@ UNSETTLED_RESULT_STATES = {"processing"}
 COLLECTIONS = {
     "object_types": "object_type", "link_types": "link_type",
     "properties": "property", "rules": "rule", "metrics": "metric",
+    "actions": "action",
     "material_objects": "material_object", "material_links": "material_link",
 }
 
