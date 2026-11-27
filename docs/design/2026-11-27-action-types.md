@@ -2,7 +2,7 @@
 
 日期：2026-11-27。状态：方案已定，待实施。
 
-调研分两路独立进行：Gemini 4 Neon 和 Codex gpt-6.2-sol，记录在 `~/.agents/handoffs/2026-11-27-{neon,codex}-action-directions/`（不入库）。取舍由用户在 2026-11-27 决定。
+调研分两路独立进行：Gemini 4 Neon 和 Codex gpt-6.2-sol。设计又经两轮评审，先 Codex，后 Neon。记录都在 `~/.agents/handoffs/2026-11-27-*-action-*/`（不入库）。取舍由用户在 2026-11-27 决定。
 
 ## 1. 问题
 
@@ -81,15 +81,20 @@
 
 - **命名**：`name` 和参数 `name` 都是 ASCII 标识，规则与其他元素相同。动作名在工作空间内唯一，参数名在同一动作内唯一，都用 `casefold()` 判重。互换名称时整组接受合法，单独接受其中一条会撞名。`action` 要加进核心集合、`ElementKind`、图索引、身份登记、提案分组和导入自然键，与其他元素共用同一套机制。
 - **引用存在**：`target_type_id`、效果里的 id、参数的 `value_type_id` 都必须指向存在的元素。参数的 `value_kind` 与值概念一致。
-- **效果的作用范围**：每条效果按 `kind` 只带一个引用字段。
-  - 实例动作（`target_type_id` 非空）：`set_property` 的属性属于目标类型或其祖先，或属于本动作 `create_object` 所建的类型或其祖先；`add_link`、`remove_link` 的关系至少有一端是这些类型。
-  - 全局动作（`target_type_id` 为空）：效果可以引用任何已有的属性、关系或对象类型，影响哪些实例写在说明里。例如“切换值班安排”改的是现有安排的状态，不需要新建对象。
+- **效果的形状**：`effects` 是按 `kind` 区分的判别联合，四个分支各带一个引用字段，写法与 `DataJoin`、`Metric` 相同；JSON Schema、提案诊断和生成的 TS 类型都按 `kind` 分支提示。
+- **效果的作用范围**：只校验引用的元素存在，不限定属于目标类型。实例动作常会顺带改关联对象，例如派单时把受理班组的待办数加 1；限定范围的话，建模者会被迫把实例动作改成全局动作，反而丢掉归属。影响哪些实例写在效果说明里。
+- **边界**：
+  - `parameters`、`effects` 可以为空，各自最多 50 条；
+  - 同一动作内不能有完全相同的 `(kind, 引用 id)`，但“转派班组”这种对同一关系先 `remove_link` 再 `add_link` 是合法的；
+  - 默认值：`description` 为空串，`required` 为 `false`。
 - **继承**：动作挂在父类型上，对子类型同样适用；不另设字段，也不复制。读取时沿祖先链推导：巡检工单继承工单，巡检工单的详情里也列出“派单”，并标明定义在工单上。
 - **引用路径**：`target_type_id`、`parameters[].value_type_id`、`effects[]` 的各个 id 登记到 `walk_references` 和 `reference_index`。这样，同批提案的 `client_ref` 能换成新 UUID，导入重映射能改指本地 UUID，删除检查也能找出引用这些元素的动作。
 - **依赖与删除**：删除仍被动作引用的对象类型、属性、关系或值概念时，最终图有悬空引用，提案失败；同一组提案里可以同时改绑或删除该动作。
+- **值概念联动**：修改值概念的基础类型时，引用它的动作参数的 `value_kind` 一起改，处理方式与属性相同（`element_save.element_scope("value_type")`、值概念目录的“使用处”）。
+- **编辑方式**：首版动作只经提案增删改，不提供人工编辑表单，`ElementSavePreview.target_kind` 不加 `action`。审阅时 `parameters`、`effects` 和其他引用字段一样锁定，不能改；审阅界面把其中的 id 渲染成元素名。
 - **哈希兼容**：
   - 规范化器把 `actions` 登记为按 `id` 排序的集合，`parameters`、`effects` 登记为保持原顺序的数组。未登记的数组字段现在会直接报错。
-  - `actions` 为空时不进入规范化结果。`core_canonical.canonical` 现在会序列化默认值，不省略的话旧快照哈希会变。
+  - `actions` 为空时不进入规范化结果。`core_canonical.canonical` 现在会序列化默认值，不省略的话旧快照哈希会变。省略写在 `core_canonical._normalize` 处理顶层草稿的地方，`domain/canonical.canonical` 也调用它，两个入口结果一致。
   - 测试覆盖三种情况：缺少 `actions` 和显式空集合的哈希相同；旧快照哈希不变；非空动作能计算提案、元素和快照哈希。
 - **读取权限**：动作定义沿用本体读取权限，证据沿用 `can_read_instances`。`authorized_snapshot` 现在按固定集合清空证据，要把 `actions` 加进去。HTTP 版本展示、元素详情、MCP 详情和搜索摘要都要核对。
 
@@ -98,13 +103,13 @@
 | 层 | 改动 |
 |---|---|
 | 契约 | `contracts/` 的 core-1、提案、读取 JSON Schema 增加 action；同步更新 Pydantic 模型和前端类型 |
-| 后端 | `domain/core.py` 增加模型；补齐引用校验、依赖、差异、合并、快照和提案的 `target_kind: action`（create、update、delete） |
-| 前端 | 语义视图检查器里，对象详情列出适用于它的动作，含沿祖先链继承来的（推导，不存储），点开显示参数和效果；全局动作在动作列表里显示。提案工作台增加“动作”分类。动作旁固定显示灰色标签“仅定义” |
-| HTTP 读取 | 版本展示和元素详情返回动作；对象详情的动作集合与 MCP 共用同一个推导函数；按上面的读取权限裁剪证据 |
-| MCP 与检索 | `search_ontology`、`get_ontology` 的 `inputSchema` 和检索候选白名单加入 `action`；对象类型的结果附带适用的动作摘要（含继承）。`tools/list` 的工具名单不变，不新增写工具 |
-| Ossie | 动作写入 ZIP 内 `ontofoundry-extension.json` 的 `actions`，按名称为键，引用用英文路径（`work_order`、`work_order.status`）。ZIP 导入时按归属和元素种类解析路径，同一动作只要有一个引用解析失败，就不导入这个动作，原文留在报告里待补。纯 Ossie 文件本身没有动作信息，所以损失由导出方逐项报告，并登记到[核心设计](2026-10-14-core-model-and-format-adapters.md) §7 的例外表 |
+| 后端 | `domain/core.py` 增加模型；补齐引用校验、依赖、差异、合并、快照和提案的 `target_kind: action`（create、update、delete）。各模块里还有十多份各自硬编码的元素种类清单，见计划第 0 步 |
+| 前端 | 语义视图检查器里，对象详情列出适用于它的动作，含沿祖先链继承来的（推导，不存储），点开显示参数和效果。动作，包括全局动作，在检查器里有自己的只读视图，搜索结果点进去打开这个视图。提案工作台增加“动作”分类。动作旁固定显示灰色标签“仅定义” |
+| HTTP 读取 | 版本展示、`GET /types`、`GET /catalog`、版本摘要计数都纳入动作。元素局部投影 `GET /types/{id}/presentation` 对对象类型带上适用动作，并把效果和参数引用的元素一起放进引用闭包，否则名称解析不出来；它也要支持直接打开一个动作。对象详情的动作集合与 MCP 共用同一个推导函数，证据按上面的读取权限裁剪 |
+| MCP 与检索 | `search_ontology`、`get_ontology` 的 `inputSchema` 和检索候选加入 `action`。检索做双向扩展：命中对象类型时带出适用动作，命中动作时带出目标类型；对应的 `SearchViaRead.relation` 加两个值。否则“对工单能做哪些操作”只命中工单，召回不了派单。`get_ontology` 的规则：不传 `ids` 时列表包含动作；对象类型在默认 `include` 下附带分页的动作摘要；单查动作返回完整定义，没有实例读取权限时去掉证据。`tools/list` 的工具名单不变，不新增写工具；外部插件的 `ontology-grounding` 技能和工具描述同步说明动作 |
+| Ossie | 动作写入 ZIP 内 `ontofoundry-extension.json` 的 `actions`，按名称为键。每条自包含：显示名、说明、同义词、标签都内嵌，不拆到顶层的 `display_names` 等表；目标类型、效果和参数的值概念都用英文路径或名称（`work_order`、`work_order.status`、值概念名）。导出报告逐条记为 `converted` 加 warning，写明只取纯 `.ossie.json` 会丢失动作；不要记成 `dropped`，否则会进扩展文件的 `unsupported`。导出缓存键 `compiler` 要升级。ZIP 导入时按归属和元素种类解析路径，同一动作只要有一个引用解析失败，就不导入这个动作，原文留在报告里待补。纯 Ossie 文件本身没有动作信息，所以损失由导出方逐项报告，并登记到[核心设计](2026-10-14-core-model-and-format-adapters.md) §7 的例外表 |
 | 原生完整包 | 动作的 UUID、引用、证据和材料原文无损往返，单独测试 |
-| 建模技能 | `ontology-discovery` 从制度、操作手册、业务表单抽取动作，只在材料明确写出操作、对象和结果时提出。表里有 `status` 列或历史上出现过一次派单，不能据此推出动作。附一个参考例子，控制在现有字节预算内。`generate_output_schemas.py` 的 `TARGETS` 白名单要加 `action`，否则技能自己的输出 Schema 仍会拒绝动作提案 |
+| 建模技能 | `ontology-discovery` 从制度、操作手册、业务表单抽取动作，只在材料明确写出操作、对象和结果时提出。表里有 `status` 列或历史上出现过一次派单，不能据此推出动作。正例放在 `extract-kit/04.json`：它在第 2 页，余量约 5.5 KiB；第 1 页离 14 KiB 上限只剩不到 900 B，`guide.md` 最多加一句指引。辅助脚本里的清单也要补上：`runpaths.COLLECTIONS`、`show_element` 的引用字段、`show_example` 和 `proposal_diagnostics` 的示例分页、工作包元素摘要和 `draft_empty`。`generate_output_schemas.py` 的 `TARGETS` 白名单要加 `action`，否则技能自己的输出 Schema 仍会拒绝动作提案 |
 
 不需要数据库迁移：草稿和快照存为 JSON。
 
@@ -123,3 +128,4 @@
 | 4 | `target_type_id` 可为空，用于新建和全局动作；全局动作不要求有 `create_object` 效果 | 用户 2026-11-27；评审 |
 | 5 | 前提只写在说明里，不引用对象规则 | 调研核对：对象规则是不变式 |
 | 6 | 外部工具绑定是执行细节，以后放在工作空间配置里，不进核心模型 | AGENTS.md 产品原则 |
+| 7 | 效果只校验引用存在，不限定属于目标类型；首版动作只经提案编辑 | Neon 第二轮评审，2026-11-27 |

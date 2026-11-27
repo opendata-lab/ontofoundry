@@ -2,6 +2,13 @@
 
 设计：[业务动作定义](../design/2026-11-27-action-types.md)。分一个 PR 交付，按下列顺序实施，最后统一跑测试。
 
+0. **统一元素种类清单**：后端和技能脚本里有十多份各自硬编码的种类清单，例如：
+   - `catalog_reads`、`material_usage` 和 `contracts/materials`、`import_matching` 的自然键和改名分组；
+   - `element_diff`、`version_diff`、`proposals.KIND_LABELS`、`proposal_alignment.SIMILAR_KINDS`；
+   - 技能脚本 `runpaths.COLLECTIONS`；
+   - 前端 `elementMeta.ts`、`reviewMeta.ts`、`ElementInspector`、`SemanticView`、`OntologySearchDialog`。
+
+   能复用 `domain/models.COLLECTIONS` 的改成复用。确实要单独列的，加一个测试断言它覆盖全部元素种类，或者显式写明排除哪些、为什么排除。这一步先做，加 `action` 时就不会漏。
 1. **模型与契约**：`domain/core.py` 增加 `Action`、`ActionParameter`、`ActionEffect` 和 `CoreDraft.actions`；更新 `contracts/` 的 JSON Schema 和前端类型；在 `docs/concepts/` 增加动作概念说明，并更新 README 的对比表。把 `action` 加进 `COLLECTIONS`、`ElementKind`、图索引和身份登记。规范化器登记 `actions`（按 `id` 排序）、`parameters` 和 `effects`（保持原顺序）；空的 `actions` 不输出。测试三种情况：缺省与显式空集合的哈希一致、旧快照哈希不变、非空动作能计算各类哈希。
 2. **校验与依赖**：按设计 §3.2 实现命名（`casefold`）、引用、效果作用范围和继承规则。把动作的引用路径接入 `walk_references` 和 `reference_index`，覆盖同批 `client_ref`、导入重映射和删除检查。
 3. **提案、差异与合并**：提案支持 `target_kind: action` 的 create、update、delete；`parameters`、`effects` 保持原顺序。补正例和反例。
