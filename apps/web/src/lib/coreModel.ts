@@ -3,6 +3,7 @@
 // the server validates them. Nothing here writes back into the draft.
 import { indexedById, owned } from "./definitionIndex";
 import type {
+  Action,
   Aggregation,
   DataJoin,
   DataMapping,
@@ -70,6 +71,7 @@ export function emptyDraft(workspaceId: UUID): Draft {
     material_objects: [],
     material_links: [],
     value_types: [],
+    actions: [],
   };
 }
 
@@ -178,6 +180,16 @@ export function effectiveRules(draft: Draft, typeId: UUID): Inherited<Rule>[] {
 
 export function rulesOfLink(draft: Draft, linkId: UUID): Rule[] {
   return draft.rules.filter((r) => r.owner_kind === "link_type" && r.owner_id === linkId);
+}
+
+/** Own actions first, then inherited ones, nearest ancestor first. */
+export function effectiveActions(draft: Draft, typeId: UUID): Inherited<Action>[] {
+  const owners = lineage(draft, typeId);
+  const actions = draft.actions ?? [];
+  return owners.flatMap((owner) =>
+    owned(actions, "target_type_id", owner)
+      .map((definition) => ({ definition, inheritedFrom: owner === typeId ? null : owner })),
+  );
 }
 
 /** Effective identifier properties, ordered by UUID bytes like the server. */

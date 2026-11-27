@@ -23,6 +23,16 @@ export type Property = Stored<Core.Property>;
 export type LinkType = Stored<Core.LinkType>;
 export type Rule = Stored<Core.Rule>;
 export type ValueType = Stored<Core.ValueType>;
+export type ActionParameter = Stored<Core.ActionParameter>;
+export type SetPropertyEffect = Stored<Core.SetPropertyEffect>;
+export type AddLinkEffect = Stored<Core.AddLinkEffect>;
+export type RemoveLinkEffect = Stored<Core.RemoveLinkEffect>;
+export type CreateObjectEffect = Stored<Core.CreateObjectEffect>;
+export type ActionEffect = SetPropertyEffect | AddLinkEffect | RemoveLinkEffect | CreateObjectEffect;
+export type Action = Omit<Stored<Core.Action>, "parameters" | "effects"> & {
+  parameters: ActionParameter[];
+  effects: ActionEffect[];
+};
 export type Dataset = Stored<Core.Dataset>;
 export type DatasetColumn = Core.DatasetColumn;
 export type BindingMode = Core.BindingMode;
@@ -69,7 +79,8 @@ export type TargetKind =
   | "mapping"
   | "material_object"
   | "material_link"
-  | "value_type";
+  | "value_type"
+  | "action";
 
 export type ElementByKind = {
   object_type: ObjectType;
@@ -82,6 +93,7 @@ export type ElementByKind = {
   material_object: MaterialObject;
   material_link: MaterialLink;
   value_type: ValueType;
+  action: Action;
 };
 export type CoreElement = ElementByKind[TargetKind];
 
@@ -95,7 +107,8 @@ export type CollectionKey =
   | "mappings"
   | "material_objects"
   | "material_links"
-  | "value_types";
+  | "value_types"
+  | "actions";
 
 export const COLLECTION_BY_KIND = {
   object_type: "object_types",
@@ -108,6 +121,7 @@ export const COLLECTION_BY_KIND = {
   material_object: "material_objects",
   material_link: "material_links",
   value_type: "value_types",
+  action: "actions",
 } as const satisfies Record<TargetKind, CollectionKey>;
 
 /** A core-1 draft with the live document instances merged in for display (see api/client.ts). */
@@ -124,6 +138,7 @@ export type Draft = {
   material_objects: MaterialObject[];
   material_links: MaterialLink[];
   value_types: ValueType[];
+  actions: Action[];
 };
 
 export type Page<T> = { total: number; items: T[]; next_cursor: string | null };
@@ -200,6 +215,7 @@ export type Counts = {
   rules: number;
   metrics: number;
   datasets?: number;
+  actions?: number;
   mappings?: number;
   material_objects?: number;
   material_links?: number;
@@ -307,10 +323,21 @@ export type LinkRead = Effective<LinkType> & {
 };
 export type MappingRead = DataMapping & { binding_status: BindingStatus };
 
+export type ActionSummaryRead = {
+  id: UUID;
+  name: string;
+  display_name?: string | null;
+  description: string;
+  inherited_from: UUID | null;
+  parameter_count: number;
+  effect_count: number;
+};
+
 export type ObjectTypeRead = ObjectType & {
   properties: PropertyRead[];
   links: LinkRead[];
   rules: Effective<Rule>[];
+  actions?: ActionSummaryRead[];
   child_types: Pick<ObjectType, "id" | "display_name" | "name">[];
   binding_status: BindingStatus;
   mapping?: MappingRead | null;
@@ -325,7 +352,8 @@ export type ResourceRead =
   | { kind: "object_type"; definition: ObjectTypeRead }
   | { kind: "link_type"; definition: LinkRead }
   | { kind: "metric"; definition: MetricRead | ForbiddenMetricRead }
-  | { kind: "dataset"; definition: DatasetRead };
+  | { kind: "dataset"; definition: DatasetRead }
+  | { kind: "action"; definition: Action };
 export type ResourceKind = ResourceRead["kind"];
 
 export type TypeList = VersionEnvelope & Items<ResourceRead> & {
@@ -687,7 +715,7 @@ export type AssetTable = DataTable & {
   missing: boolean;
   datasets: DatasetRead[];
 };
-export type OntologySearchKind = "object_type" | "property" | "link_type" | "rule" | "metric" | "dataset" | "value_type";
+export type OntologySearchKind = "object_type" | "property" | "link_type" | "rule" | "metric" | "dataset" | "value_type" | "action";
 /** Why an element is in the results: matched directly, or reached in one step from a match. */
 export type OntologySearchMatch =
   | { by: "name_in_query" | "query_in_name" | "description" | "vector"; text: string; via?: undefined }
@@ -884,6 +912,7 @@ export type MaterialUsage = {
   properties: number;
   rules: number;
   metrics: number;
+  actions?: number;
   material_objects: number;
   material_links: number;
   references: string[];
@@ -996,7 +1025,7 @@ export type MCPResponse<T> = { jsonrpc: "2.0"; id: string | number | null } & (
   | { result: T }
   | { error: { code: number; message: string; data?: Json } }
 );
-export type OntologyKind = "object_type" | "property" | "link_type" | "rule" | "metric";
+export type OntologyKind = "object_type" | "property" | "link_type" | "rule" | "metric" | "action";
 export type Paging = { cursor?: string; limit?: number };
 export type SearchOntologyArgs = Paging & { query: string; kinds?: OntologyKind[] };
 export type GetOntologyArgs = Paging & {
@@ -1062,6 +1091,7 @@ export type MCPElement = {
   properties?: Page<PropertyRead>;
   rules?: Page<Effective<Rule>>;
   links?: Page<LinkRead>;
+  actions?: Page<ActionSummaryRead>;
   child_types?: Page<Pick<ObjectType, "id" | "display_name" | "name">>;
   datasets?: Page<DatasetRead>;
   sources?: Page<MappingSource>;
@@ -1184,12 +1214,13 @@ export type ConnectionReference = {
 export type CatalogReference = { id: UUID; name: string; display_name?: string | null };
 export type CatalogItem = {
   id: UUID; kind: ResourceKind; name: string; display_name: string | null; description: string; tags: string[];
-  parent?: CatalogReference | null; property_count?: number; link_count?: number; document_instance_count?: number | null;
+  parent?: CatalogReference | null; property_count?: number; link_count?: number; action_count?: number; document_instance_count?: number | null;
   mapping_state?: "mapped" | "partial" | "unmapped"; mapping_label?: string;
   source?: CatalogReference | null; target?: CatalogReference | null; multiplicity?: LinkType["multiplicity"];
   verbalizes?: string[]; source_role_name?: string | null; target_role_name?: string | null;
   source_kind?: "table" | "query"; column_count?: number | null;
   metric_kind?: Metric["kind"]; dataset_name?: string | null;
+  parameter_count?: number; effect_count?: number;
 };
 export type CatalogPage = VersionEnvelope & { items: CatalogItem[]; counts: Record<string, number>; tags: string[]; total: number; next_cursor: string | null };
 /** This target closure is incomplete and must never be submitted as a save baseline. */

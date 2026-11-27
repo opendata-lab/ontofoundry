@@ -112,6 +112,23 @@ function toStoredDraft(source: CoreDraft & ExampleInstances): Draft {
     material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o }) as Draft["material_objects"][number]),
     material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l }) as Draft["material_links"][number]),
     value_types: (source.value_types ?? []).map((v) => ({ description: "", evidence: [], display_name: null, ...v })),
+    actions: (source.actions ?? []).map((a) => ({
+      description: "",
+      display_name: null,
+      synonyms: [],
+      tags: [],
+      target_type_id: null,
+      evidence: [],
+      ...a,
+      parameters: (a.parameters ?? []).map((p) => ({
+        display_name: null,
+        value_type_id: null,
+        required: true,
+        description: "",
+        ...p,
+      })),
+      effects: (a.effects ?? []).map((e) => ({ description: "", ...e })),
+    })),
   };
 }
 
@@ -551,9 +568,89 @@ export const ELEMENTS = {
 };
 ELEMENTS.dataset.columns!.push({ name: "stat_date", physical_type: "date", comment: "每日快照日期" });
 
+const PARTY = ELEMENT_DRAFT.object_types.find((item) => item.name === "party")!;
+const PARTY_LEVEL_PROP = ELEMENT_DRAFT.properties.find((p) => p.owner_type_id === PARTY.id && p.name === "level") ?? ELEMENT_DRAFT.properties[0];
+export const VISUAL_ACTION_BOUND_ID = "act-visual-update-party-level";
+export const VISUAL_ACTION_GLOBAL_ID = "act-visual-register-contract";
+
+export function buildActionDraft(): Draft {
+  const draft = structuredClone(ELEMENT_DRAFT);
+  draft.actions = [
+    {
+      id: VISUAL_ACTION_BOUND_ID,
+      name: "update_party_level",
+      display_name: "调整当事人等级",
+      description: "仅审核通过的当事人可调整等级；调整后同步记录生效时间。",
+      synonyms: ["升级等级"],
+      tags: ["客户治理"],
+      target_type_id: PARTY.id,
+      parameters: [
+        {
+          name: "target_level",
+          display_name: "目标等级",
+          value_kind: "string",
+          value_type_id: null,
+          required: true,
+          description: "新的当事人等级编码",
+        },
+        {
+          name: "reason",
+          display_name: "调整原因",
+          value_kind: "string",
+          value_type_id: null,
+          required: false,
+          description: "人工复核备注",
+        },
+      ],
+      effects: [
+        {
+          kind: "set_property",
+          property_id: PARTY_LEVEL_PROP.id,
+          description: "更新当事人等级为目标等级",
+        },
+      ],
+      evidence: [],
+    },
+    {
+      id: VISUAL_ACTION_GLOBAL_ID,
+      name: "register_contract_record",
+      display_name: "登记新合同",
+      description: "由法务或商务人员登记一份新的生效合同，并关联签署当事人。",
+      synonyms: ["新建合同"],
+      tags: ["合同流转"],
+      target_type_id: null,
+      parameters: [
+        {
+          name: "contract_title",
+          display_name: "合同名称",
+          value_kind: "string",
+          value_type_id: null,
+          required: true,
+          description: "待登记合同的正式名称",
+        },
+      ],
+      effects: [
+        {
+          kind: "create_object",
+          object_type_id: ELEMENT_DRAFT.object_types.find((o) => o.name === "contract")?.id ?? PARTY.id,
+          description: "生成新的合同实体记录",
+        },
+        {
+          kind: "add_link",
+          link_type_id: ELEMENTS.relation.id,
+          description: "建立合同与签署当事人的关系",
+        },
+      ],
+      evidence: [],
+    },
+  ];
+  return draft;
+}
+
 /** Inspector requests reuse the common workspace fixture and never reach a backend. */
-export async function mockElementsApi(page: Page, options: { impact?: boolean } = {}) {
+export async function mockElementsApi(page: Page, options: { impact?: boolean; withActions?: boolean } = {}) {
   await mockMappingsApi(page);
+  const activeDraft = options.withActions ? buildActionDraft() : ELEMENT_DRAFT;
   const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
   const personalSession: ModelingSession = {
     ...REVIEW_SESSION,
@@ -561,7 +658,7 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
     title: "个人建模会话",
     base_version_id: FIXTURE_WORKSPACE.version_id,
     revision: 1,
-    draft: ELEMENT_DRAFT,
+    draft: activeDraft,
     pending_proposal_count: 0,
     unpublished_change_count: 0,
     latest_batch_id: null,
@@ -589,7 +686,7 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
     async (route) => {
       const { pathname } = new URL(route.request().url());
       if (pathname === `${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`) {
-        await route.fulfill({ json: { version: FIXTURE_VERSIONS[0], model: ELEMENT_DRAFT } });
+        await route.fulfill({ json: { version: FIXTURE_VERSIONS[0], model: activeDraft } });
       } else if (pathname === `${base}/sessions/personal` || pathname === `${base}/sessions/${personalSession.id}`) {
         await route.fulfill({ json: personalSession });
       } else if (pathname === `/api/v1/workspaces/${WORKSPACE_ID}/metrics/preview`) {
@@ -599,7 +696,7 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
           session_revision: personalSession.revision,
           affected_items: options.impact ? [{
             target_kind: "material_object",
-            target_id: ELEMENT_DRAFT.material_objects.find((item) => item.type_id === ELEMENTS.object.id)!.id,
+            target_id: activeDraft.material_objects.find((item) => item.type_id === ELEMENTS.object.id)!.id,
             expected_target_hash: "1".repeat(64),
             reason: "当前元素修改需要同步此依赖的定义或引用",
           }] : [],
@@ -618,8 +715,8 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
       }
     },
   );
-  await mockInstances(page, ELEMENT_DRAFT);
-  await mockFocusedReads(page, ELEMENT_DRAFT);
+  await mockInstances(page, activeDraft);
+  await mockFocusedReads(page, activeDraft);
 }
 
 
@@ -699,7 +796,7 @@ async function mockFocusedReads(page: Page, draft: Draft) {
     if (url.pathname.endsWith("/document-context")) return route.fulfill({ json: { ...envelope, material_objects: draft.material_objects, material_links: draft.material_links } });
     if (url.pathname.endsWith("/presentation")) return route.fulfill({ json: { ...envelope, representation: "element-1", complete: false, model: draft } });
     const kind = url.searchParams.get("kind") ?? "object_type";
-    const collections = { object_type: draft.object_types, link_type: draft.link_types, metric: draft.metrics, dataset: draft.datasets };
+    const collections = { object_type: draft.object_types, link_type: draft.link_types, metric: draft.metrics, dataset: draft.datasets, action: draft.actions ?? [] };
     const values = collections[kind as keyof typeof collections] ?? [];
     const q = url.searchParams.get("q")?.toLowerCase() ?? "";
     const items = values.filter(item => JSON.stringify(item).toLowerCase().includes(q)).map(item => {
@@ -709,10 +806,13 @@ async function mockFocusedReads(page: Page, draft: Draft) {
         const parent = draft.object_types.find(o => o.id === item.extends);
         return { ...base, parent, property_count: effectiveProperties(draft,item.id).length, link_count: effectiveLinks(draft,item.id).length, mapping_state: mapping.state, mapping_label: mapping.label, document_instance_count: draft.material_objects.filter(o => isA(draft, o.type_id, item.id)).length };
       }
+      if (kind === "action" && "parameters" in item) {
+        return { ...base, target: item.target_type_id ? draft.object_types.find(o => o.id === item.target_type_id) ?? null : null, parameter_count: item.parameters.length, effect_count: item.effects.length };
+      }
       if ("source_type_id" in item) return { ...base, source: draft.object_types.find(o=>o.id===item.source_type_id), target: draft.object_types.find(o=>o.id===item.target_type_id), multiplicity: item.multiplicity, verbalizes: item.verbalizes, source_role_name: item.source_role_name, target_role_name: item.target_role_name };
       if ("source_kind" in item) return { ...base, source_kind: item.source_kind, column_count: item.columns?.length };
       return { ...base, metric_kind: "kind" in item ? item.kind : undefined, dataset_name: "dataset_id" in item ? draft.datasets.find(d=>d.id===item.dataset_id)?.name : null };
     });
-    return route.fulfill({ json: { ...envelope, items, total: items.length, next_cursor: null, tags: [], counts: { object_types: draft.object_types.length, value_types: draft.value_types.length, link_types: draft.link_types.length, metrics: draft.metrics.length, datasets: draft.datasets.length } } });
+    return route.fulfill({ json: { ...envelope, items, total: items.length, next_cursor: null, tags: [], counts: { object_types: draft.object_types.length, value_types: draft.value_types.length, link_types: draft.link_types.length, metrics: draft.metrics.length, datasets: draft.datasets.length, actions: (draft.actions ?? []).length } } });
   });
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { ELEMENTS, mockElementsApi, WORKSPACE_ID } from "./fixtures";
+import { ELEMENTS, mockElementsApi, VISUAL_ACTION_GLOBAL_ID, WORKSPACE_ID } from "./fixtures";
 
 const base = `/workspaces/${WORKSPACE_ID}/elements`;
 
@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 test("object overview aligns key values and the relation graph", async ({ page }) => {
   const detail = await openElement(page, "object_type", ELEMENTS.object.id);
   await expect(detail.getByText("标题属性", { exact: true })).toBeVisible();
-  await expect(detail.locator('[role=tab][aria-selected]')).toHaveCount(4);
+  await expect(detail.locator('[role=tab][aria-selected]')).toHaveCount(5);
   await expect(detail.getByRole("tab", { name: "实例", exact: true })).toHaveCount(0);
   await expect(detail.getByRole("heading", { name: "数据来源", exact: true })).toHaveCount(0);
   await expect(detail.getByRole("region", { name: "实体实例", exact: true })).toHaveCount(0);
@@ -138,4 +138,37 @@ test("save impact confirmation lists dependent elements and reasons", async ({ p
   await expect(page).toHaveScreenshot("element-save-impact.png", { fullPage: true });
   await confirmation.getByRole("button", { name: "取消", exact: true }).click();
   await expect(detail.getByRole("textbox", { name: "名称", exact: true })).toHaveValue("个人示例");
+});
+
+test("object actions tab displays inherited actions read-only with 仅定义 marker", async ({ page }) => {
+  await mockElementsApi(page, { withActions: true });
+  const detail = await openElement(page, "object_type", ELEMENTS.object.id, "actions");
+  await expect(detail.getByText("调整当事人等级").first()).toBeVisible();
+  await expect(detail.getByText("仅定义").first()).toBeVisible();
+  await expect(detail.getByText("继承自 当事人", { exact: true })).toBeVisible();
+  await expect(page).toHaveScreenshot("element-object-actions.png", { fullPage: true });
+});
+
+test("standalone global action detail page is read-only without edit button", async ({ page }) => {
+  await mockElementsApi(page, { withActions: true });
+  await page.goto(`${base}/action/${VISUAL_ACTION_GLOBAL_ID}`);
+  const detail = page.getByRole("tabpanel").filter({ has: page.getByRole("heading", { level: 1 }) });
+  await expect(detail.getByRole("heading", { level: 1 })).toContainText("登记新合同");
+  await expect(detail.getByText("全局动作", { exact: true })).toBeVisible();
+  await expect(detail.getByText("仅定义").first()).toBeVisible();
+  await expect(detail.getByRole("button", { name: "编辑", exact: true })).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page).toHaveScreenshot("element-action-global.png", { fullPage: true });
+});
+
+test("catalog actions tab lists bound and global actions without create button", async ({ page }) => {
+  await mockElementsApi(page, { withActions: true });
+  await page.goto(`/workspaces/${WORKSPACE_ID}/objects?catalogTab=actions`);
+  await expect(page.getByRole("link", { name: "调整当事人等级" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "登记新合同" })).toBeVisible();
+  await expect(page.getByText("仅定义").first()).toBeVisible();
+  await expect(page.getByText("全局动作", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "新建动作", exact: true })).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page).toHaveScreenshot("catalog-actions.png", { fullPage: true });
 });

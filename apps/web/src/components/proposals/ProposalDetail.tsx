@@ -2,6 +2,7 @@ import { Alert, Button, Descriptions, Modal, Table, Typography } from "antd";
 import { useState } from "react";
 import type { Dataset, DuplicateCandidate, Draft, MaterialObject, ProposalItem } from "../../api/types";
 import { byId, effectiveProperties } from "../../lib/coreModel";
+import { ActionDefinitionTag } from "../elements/ActionPanel";
 import { SectionTitle, StatusMark } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
 import { ElementChangeHistory } from "./ElementChangeHistory";
@@ -140,6 +141,7 @@ export function ProposalDetail({
             {OPERATION[item.operation]}
             {reviewKindName(item.target_kind)} · {item.display_name}
           </span>
+          {item.target_kind === "action" && <ActionDefinitionTag />}
           <ProposalStatusMark status={item.status} />
           <code className="text-xs font-normal text-muted">{technical}</code>
         </div>

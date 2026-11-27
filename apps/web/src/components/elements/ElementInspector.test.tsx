@@ -113,6 +113,7 @@ describe("object popup", () => {
         "字段4",
         "关系1",
         "规则0",
+        "动作0",
       ]),
     );
     expect(within(dialog).getByText("已映射")).toBeInTheDocument();
@@ -195,8 +196,33 @@ describe("object popup", () => {
       "字段4",
       "关系1",
       "规则0",
+      "动作0",
     ]));
     expect(api.elementPresentation).toHaveBeenCalledWith("w", "object_type", draft.object_types[0].id, "v1");
+    expect(within(dialog).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
+  });
+
+  it("opens an action definition read-only without an edit button", async () => {
+    const draft = example("01-basic-sales");
+    draft.actions = [
+      {
+        id: "act-1",
+        name: "close_order",
+        display_name: "关闭订单",
+        description: "取消未支付订单。",
+        synonyms: [],
+        tags: ["订单流转"],
+        target_type_id: null,
+        parameters: [],
+        effects: [],
+        evidence: [],
+      },
+    ];
+    show(draft, "inspect=action:act-1");
+    const dialog = await screen.findByRole("dialog");
+    expect((await within(dialog).findAllByText("关闭订单")).length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText("仅定义").length).toBeGreaterThan(0);
+    expect(within(dialog).getByText("全局动作")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
   });
 

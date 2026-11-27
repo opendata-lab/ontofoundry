@@ -417,7 +417,7 @@ export const modelingApi = {
   snapshot: async (id: string, versionId?: string | null): Promise<Draft> => {
     const current = await api.workspace(id);
     const fixed = versionId ?? current.version_id;
-    if (!fixed) return { schema_version: "core-1", workspace_id: id, object_types: [], properties: [], link_types: [], rules: [], metrics: [], datasets: [], mappings: [], value_types: [], ...NO_INSTANCES };
+    if (!fixed) return { schema_version: "core-1", workspace_id: id, object_types: [], properties: [], link_types: [], rules: [], metrics: [], datasets: [], mappings: [], value_types: [], actions: [], ...NO_INSTANCES };
     const { model } = await api.presentation(id, fixed);
     // Live instances have no historical baseline. Never join them across publication.
     if (current.version_id !== fixed) throw new Error("本体版本已更新，请刷新后查看实例");

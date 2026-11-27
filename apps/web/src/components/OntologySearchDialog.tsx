@@ -1,11 +1,12 @@
 import { Button, Empty, Input, Modal, Spin, Typography } from "antd";
-import { Box, Database, GitBranch, ListTree, Search, Shapes, ShieldCheck, Sigma } from "lucide-react";
+import { Box, Database, GitBranch, ListTree, Search, Shapes, ShieldCheck, Sigma, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { OntologySearchHit, OntologySearchKind, OntologySearchResult } from "../api/types";
 import { elementHref } from "../lib/elementInspector";
 import { NAVIGABLE_SEARCH_KINDS, SEARCH_KIND_LABELS } from "../lib/elementKinds";
+import { ActionDefinitionTag } from "./elements/ActionPanel";
 
 const ICONS: Record<OntologySearchKind, typeof Box> = {
   object_type: Box,
@@ -15,6 +16,7 @@ const ICONS: Record<OntologySearchKind, typeof Box> = {
   metric: Sigma,
   dataset: Database,
   value_type: Shapes,
+  action: Zap,
 };
 const KIND_LABELS = SEARCH_KIND_LABELS;
 const RELATION_LABELS: Record<string, string> = {
@@ -23,6 +25,8 @@ const RELATION_LABELS: Record<string, string> = {
   metric_denominator: "比率指标的分母",
   object_title_property: "标题属性",
   object_link_type: "实体的关系",
+  object_action: "实体的适用动作",
+  action_target_type: "动作的目标实体",
   property_owner: "所属实体",
   link_source_type: "关系起点",
   link_target_type: "关系终点",
@@ -119,6 +123,7 @@ export function OntologySearchDialog({ workspaceId, open, onClose }: { workspace
                 <span className="flex flex-wrap items-center gap-2">
                   <span>{label(hit)}</span>
                   <code className="text-xs text-muted">{hit.name}</code>
+                  {hit.kind === "action" && <ActionDefinitionTag />}
                   <Typography.Text type="secondary" className="text-xs">
                     {KIND_LABELS[hit.kind] ?? hit.kind}
                     {hit.owner ? ` · ${label(hit.owner)}` : ""}

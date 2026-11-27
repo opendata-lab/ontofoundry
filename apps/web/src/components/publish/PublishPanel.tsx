@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
 import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, VersionSummary } from "../../api/types";
+import { formatActionField } from "../../lib/actionFormat";
 import type { ElementRequest } from "../../lib/elementInspector";
 import { NAMED_DRAFT_COLLECTIONS, PUBLISH_KIND_ORDER } from "../../lib/elementKinds";
 import { documentDisplayText } from "../../lib/instanceDisplay";
@@ -10,6 +11,7 @@ import { lineDiff } from "../../lib/lineDiff";
 import { fieldLabel, KIND } from "../proposals/elementMeta";
 import { FieldDiff } from "../proposals/FieldDiff";
 import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "../layout";
+import { ActionDefinitionTag } from "../elements/ActionPanel";
 import { ElementModal } from "../elements/ElementInspector";
 import { ConflictResolver } from "./ConflictResolver";
 
@@ -37,6 +39,7 @@ const REFERENCE_FIELDS = new Set([
   "numerator_id",
   "denominator_id",
   "title_property_id",
+  "value_type_id",
 ]);
 
 type Filter = "all" | ElementChange["change"];
@@ -47,8 +50,10 @@ function show(value: unknown) {
 }
 
 /** A field value as a reader would want it, not as stored. */
-function readable(key: string, value: unknown): string {
+function readable(key: string, value: unknown, names?: Map<string, string>): string {
   if (typeof value === "boolean") return value ? "是" : "否";
+  const actionFormatted = formatActionField(key, value, names);
+  if (actionFormatted !== null) return actionFormatted;
   if (key === "evidence" && Array.isArray(value)) {
     const quotes = value
       .map((e) => (e as { quote?: string }).quote)
@@ -106,7 +111,7 @@ function FieldList({ value, names }: { value: Record<string, unknown>; names: Ma
       items={rows.map(([key, v]) => ({
         key,
         label: fieldLabel(key),
-        children: <span className="text-xs whitespace-pre-wrap break-all">{readable(key, named(key, v))}</span>,
+        children: <span className="text-xs whitespace-pre-wrap break-all">{readable(key, named(key, v), names)}</span>,
       }))}
     />
   );
@@ -178,6 +183,7 @@ function ChangeList({
             <Tag className="m-0">
               {KIND[c.element_kind].label}
             </Tag>
+            {c.element_kind === "action" && <ActionDefinitionTag />}
             <strong>{changeLabel(c)}</strong>
             {c.change === "updated" && c.field_changes.length > 0 && (
               <Text type="secondary" className="text-xs">
@@ -213,7 +219,7 @@ function sortChanges<T extends ElementChange>(changes: T[]) {
 function elementNames(preview: PublishPreview | null, draft: ModelingSession["draft"]): Map<string, string> {
   const names = new Map<string, string>();
   for (const key of NAMED_DRAFT_COLLECTIONS)
-    for (const item of draft[key] as { id: string; name?: string; display_name?: string | null }[]) if (item.name) names.set(item.id, item.display_name || item.name);
+    for (const item of (draft[key] ?? []) as { id: string; name?: string; display_name?: string | null }[]) if (item.name) names.set(item.id, item.display_name || item.name);
   for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
   if (preview?.merged_model) {
     for (const fact of preview.merged_model.material_objects)

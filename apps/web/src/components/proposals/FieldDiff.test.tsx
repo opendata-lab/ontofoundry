@@ -53,4 +53,40 @@ describe("FieldDiff inline editing", () => {
     renderWithProviders(<FieldDiff changes={changes} />);
     expect(screen.queryByLabelText("修改名称")).toBeNull();
   });
+
+  it("renders action parameters and effects with resolved names and locks them against inline editing", () => {
+    const onEdit = vi.fn().mockResolvedValue(true);
+    const names = new Map([
+      ["vt-1", "班组编码"],
+      ["prop-1", "状态"],
+      ["link-1", "受理班组关系"],
+    ]);
+    renderWithProviders(
+      <FieldDiff
+        names={names}
+        onEdit={onEdit}
+        changes={[
+          {
+            path: "parameters",
+            before: [],
+            after: [{ name: "team_code", display_name: "班组代码", value_kind: "string", value_type_id: "vt-1", required: true, description: "受理班组" }],
+          },
+          {
+            path: "effects",
+            before: [],
+            after: [
+              { kind: "set_property", property_id: "prop-1", description: "置为已派单" },
+              { kind: "add_link", link_type_id: "link-1", description: "关联班组" },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText(/班组代码 \(team_code\)：文本 \/ 值类型「班组编码」（必填） — 受理班组/)).toBeInTheDocument();
+    expect(screen.getByText(/修改属性：状态 — 置为已派单/)).toBeInTheDocument();
+    expect(screen.getByText(/建立关系：受理班组关系 — 关联班组/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("修改参数")).toBeNull();
+    expect(screen.queryByLabelText("修改效果")).toBeNull();
+  });
 });

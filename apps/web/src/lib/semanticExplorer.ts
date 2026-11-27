@@ -16,6 +16,7 @@ export const RESOURCE_KIND_LABELS: Record<ResourceKind, string> = {
   relation: "关系",
   metric: "指标",
   dataset: "数据集",
+  action: "动作",
 };
 
 export type SemanticResource = {
@@ -74,6 +75,18 @@ export function semanticResources(graph: TypeGraph, model?: Draft | null): Seman
       subtitle: dataset.snapshot_date_column ? `每日快照 · ${dataset.snapshot_date_column}` : undefined,
       selection: null,
       detail: { kind: "dataset", id: dataset.id, tab: "basic", sessionId: null },
+    });
+  }
+  for (const action of model.actions ?? []) {
+    const target = action.target_type_id ? byId(model.object_types, action.target_type_id) : undefined;
+    resources.push({
+      id: action.id,
+      kind: "action",
+      name: action.display_name || action.name,
+      technical: action.name,
+      subtitle: target ? target.display_name || target.name : "全局动作",
+      selection: null,
+      detail: { kind: "action", id: action.id, tab: "basic", sessionId: null },
     });
   }
   return resources;

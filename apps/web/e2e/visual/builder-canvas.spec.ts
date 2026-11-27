@@ -48,7 +48,7 @@ test("builder proposals retain session and material controls", async ({ page }) 
 
   await page.getByRole("tab", { name: /^本体草稿/ }).click();
   await expect(page.getByRole("button", { name: "发布本体", exact: true })).toBeEnabled();
-  await expect(page.getByLabel("模型分类", { exact: true }).getByRole("button")).toHaveCount(9);
+  await expect(page.getByLabel("模型分类", { exact: true }).getByRole("button")).toHaveCount(10);
   await page.getByRole("button", { name: "供应商", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("提供商品或服务的组织", { exact: true })).toBeVisible();

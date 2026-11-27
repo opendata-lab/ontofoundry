@@ -90,9 +90,8 @@ describe("frontend element-kind and collection coverage", () => {
   });
 
   it("covers named draft collections shared by reviewMeta and PublishPanel", () => {
-    // Mappings have no `name` field; value_types are currently excluded from
-    // proposal/publish name-map preloading.
-    assertCoverage(NAMED_DRAFT_COLLECTIONS, schemaCollections, ["mappings", "value_types"]);
+    // Mappings have no `name` field.
+    assertCoverage(NAMED_DRAFT_COLLECTIONS, schemaCollections, ["mappings"]);
   });
 
   it("covers ElementInspector kinds and inspectable roots", () => {
@@ -116,6 +115,7 @@ describe("frontend element-kind and collection coverage", () => {
       relation: "link_type",
       metric: "metric",
       dataset: "dataset",
+      action: "action",
     };
     expect([...RESOURCE_KINDS]).toEqual([...SEMANTIC_RESOURCE_KINDS]);
     expect(Object.keys(RESOURCE_KIND_LABELS).sort()).toEqual([...SEMANTIC_RESOURCE_KINDS].sort());
@@ -150,6 +150,6 @@ describe("frontend element-kind and collection coverage", () => {
   });
 
   it("keeps locked proposal review fields explicit", () => {
-    expect([...LOCKED_PROPOSAL_FIELDS].sort()).toEqual(["evidence", "extends", "id", "type_id"]);
+    expect([...LOCKED_PROPOSAL_FIELDS].sort()).toEqual(["effects", "evidence", "extends", "id", "parameters", "type_id"]);
   });
 });

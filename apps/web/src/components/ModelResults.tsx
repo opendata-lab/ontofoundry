@@ -12,6 +12,7 @@ import { BINDING_MODES } from "../lib/objectMapping";
 import { draftGraph } from "../lib/semanticExplorer";
 import { Panel as ResultPanel, PanelToolbar, StatusMark, type StatusState } from "./layout";
 import { ElementCategoryTiles } from "./ElementCategoryTiles";
+import { ActionDefinitionTag } from "./elements/ActionPanel";
 import { ElementModal } from "./elements/ElementInspector";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
@@ -71,6 +72,12 @@ function rowsOf(draft: Draft, kind: TargetKind): Row[] {
           "",
           staged(l) + ((byId(draft.link_types, l.type_id)?.display_name || byId(draft.link_types, l.type_id)?.name) ?? ""),
         );
+      });
+    case "action":
+      return (draft.actions ?? []).map((a) => {
+        const target = a.target_type_id ? byId(draft.object_types, a.target_type_id) : undefined;
+        const scope = target ? (target.display_name || target.name) : "全局动作";
+        return row(a.id, a.display_name || a.name, a.name, a.description ? `${scope} · ${a.description}` : scope);
       });
     case "value_type":
       // Value types are managed in ValueTypeCatalog rather than ModelResults categories.
@@ -223,18 +230,21 @@ export function ModelResults({
                           key: "name",
                           render: (_, r) => (
                             <div className={`flex flex-col ${r.deleted ? "line-through opacity-60" : ""}`}>
-                              {session && !r.deleted ? (
-                                <Button
-                                  type="link"
-                                  size="small"
-                                  className="h-auto self-start p-0"
-                                  onClick={() => setInspected({ kind: r.kind, id: r.id, sessionId: session.id })}
-                                >
-                                  {r.name || "未命名"}
-                                </Button>
-                              ) : (
-                                <span>{r.name}</span>
-                              )}
+                              <span className="inline-flex flex-wrap items-center gap-1.5">
+                                {session && !r.deleted ? (
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    className="h-auto self-start p-0"
+                                    onClick={() => setInspected({ kind: r.kind, id: r.id, sessionId: session.id })}
+                                  >
+                                    {r.name || "未命名"}
+                                  </Button>
+                                ) : (
+                                  <span>{r.name}</span>
+                                )}
+                                {r.kind === "action" && <ActionDefinitionTag />}
+                              </span>
                               {r.technical && <code className="text-xs text-muted">{r.technical}</code>}
                             </div>
                           ),

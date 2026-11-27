@@ -1,6 +1,6 @@
 import { Button, Dropdown, Empty, Input, Segmented, Table, Tag, Tooltip, Tree, Typography } from "antd";
 import type { DataNode } from "antd/es/tree";
-import { Box, Database, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Sigma, Workflow } from "lucide-react";
+import { Box, Database, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Sigma, Workflow, Zap } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import type { Draft, TypeGraph } from "../api/types";
 import { usePageActive } from "../hooks/usePageTab";
@@ -13,13 +13,14 @@ import {
   type ResourceKind,
   type SemanticResource,
 } from "../lib/semanticExplorer";
+import { ActionDefinitionTag } from "./elements/ActionPanel";
 import { PanelToolbar, SectionTitle } from "./layout";
 import { OntologyGraph, type SelectedGraphItem } from "./OntologyGraph";
 
 const { Text } = Typography;
 const STORAGE_KEY = "ontofoundry.semantic.explorer.collapsed";
 const KINDS: readonly ResourceKind[] = RESOURCE_KINDS;
-const ICONS: Record<ResourceKind, typeof Box> = { object: Box, relation: Workflow, metric: Sigma, dataset: Database };
+const ICONS: Record<ResourceKind, typeof Box> = { object: Box, relation: Workflow, metric: Sigma, dataset: Database, action: Zap };
 type Filter = "all" | ResourceKind;
 
 function storedCollapsed() {
@@ -146,7 +147,10 @@ export const SemanticView = memo(function SemanticView({
           >
             <Icon size={14} className="flex-none text-muted" />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate">{resource.name}</span>
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate">{resource.name}</span>
+                {resource.kind === "action" && <ActionDefinitionTag />}
+              </span>
               {resource.subtitle && <span className="truncate text-xs text-muted">{resource.subtitle}</span>}
             </span>
             <Dropdown menu={menu(resource)} trigger={["click"]}>
@@ -164,7 +168,7 @@ export const SemanticView = memo(function SemanticView({
       })),
     };
   });
-  const listing = filter === "metric" || filter === "dataset" ? filter : null;
+  const listing = filter === "metric" || filter === "dataset" || filter === "action" ? filter : null;
   const objects = resources.filter((r) => r.kind === "object").length;
   const relations = resources.filter((r) => r.kind === "relation").length;
   const expandExplorer = (
@@ -244,8 +248,17 @@ export const SemanticView = memo(function SemanticView({
           <div className="flex h-full flex-col overflow-auto">
             <PanelToolbar>
               {collapsed && expandExplorer}
-              <SectionTitle title={RESOURCE_KIND_LABELS[listing]} note={listing === "metric" ? "指标只挂在一个数据集上，只使用该数据集的列" : "登记后供对象映射、关系映射表和指标使用"} />
-              {canCreate && (
+              <SectionTitle
+                title={RESOURCE_KIND_LABELS[listing]}
+                note={
+                  listing === "metric"
+                    ? "指标只挂在一个数据集上，只使用该数据集的列"
+                    : listing === "action"
+                      ? "仅定义业务行为契约与影响，平台不直接执行"
+                      : "登记后供对象映射、关系映射表和指标使用"
+                }
+              />
+              {canCreate && listing !== "action" && (
                 <Button
                   type="primary"
                   size="small"
@@ -269,14 +282,17 @@ export const SemanticView = memo(function SemanticView({
                   title: RESOURCE_KIND_LABELS[listing],
                   key: "name",
                   render: (_, r) => (
-                    <Button type="link" className="h-auto p-0" onClick={() => onOpenPage(r.detail)}>
-                      {r.name}
-                    </Button>
+                    <span className="inline-flex items-center gap-2">
+                      <Button type="link" className="h-auto p-0" onClick={() => onOpenPage(r.detail)}>
+                        {r.name}
+                      </Button>
+                      {listing === "action" && <ActionDefinitionTag />}
+                    </span>
                   ),
                 },
-                { title: listing === "metric" ? "英文标识" : "物理位置", key: "technical", render: (_, r) => <code>{r.technical}</code> },
+                { title: listing === "dataset" ? "物理位置" : "英文标识", key: "technical", render: (_, r) => <code>{r.technical}</code> },
                 {
-                  title: listing === "metric" ? "数据集 · 计算方式" : "快照",
+                  title: listing === "metric" ? "数据集 · 计算方式" : listing === "action" ? "作用对象" : "快照",
                   key: "subtitle",
                   render: (_, r) => (r.subtitle ? <Tag className="m-0">{r.subtitle}</Tag> : <Text type="secondary">—</Text>),
                 },

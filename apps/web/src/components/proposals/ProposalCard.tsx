@@ -3,6 +3,7 @@ import { Button, Checkbox, Popover, Tag, Tooltip, Typography } from "antd";
 import { FileText } from "lucide-react";
 import type { ProposalItem, ProposalStatus } from "../../api/types";
 import { OPERATION, STATUS } from "./elementMeta";
+import { ActionDefinitionTag } from "../elements/ActionPanel";
 import { StatusMark, type StatusState } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
 import { requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
@@ -133,6 +134,7 @@ export function ProposalCard({
           <Tag className="m-0">
             {reviewKindName(item.target_kind)}
           </Tag>
+          {item.target_kind === "action" && <ActionDefinitionTag />}
           <code className="truncate text-xs" title={technical}>
             {technical}
           </code>

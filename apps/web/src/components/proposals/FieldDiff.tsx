@@ -1,6 +1,7 @@
 import { Table, Tooltip, Typography } from "antd";
 import type { ReactNode } from "react";
 import type { FieldChange } from "../../api/types";
+import { formatActionField } from "../../lib/actionFormat";
 import { LOCKED_PROPOSAL_FIELDS } from "../../lib/elementKinds";
 import { fieldLabel } from "./elementMeta";
 import { InlineValueEditor } from "./InlineValueEditor";
@@ -14,15 +15,20 @@ const LOCKED = LOCKED_PROPOSAL_FIELDS;
 const isEmpty = (value: unknown) =>
   value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
 
-const cell = (value: unknown, removed: boolean, names?: Map<string, string>) =>
-  isEmpty(value) ? (
-    <Text type="secondary">（空）</Text>
-  ) : (
+const cell = (path: string, value: unknown, removed: boolean, names?: Map<string, string>) => {
+  if (isEmpty(value)) return <Text type="secondary">（空）</Text>;
+  const formatted = formatActionField(path, value, names);
+  return (
     <span className={`text-xs whitespace-pre-wrap break-all ${removed ? "text-danger line-through" : "text-success"}`}>
       {/* Shown by name; the change itself is the id, kept in the tooltip for same-named items. */}
-      {typeof value === "string" && names?.has(value) ? <Tooltip title={value}><span>{names.get(value)}</span></Tooltip> : valueText(value)}
+      {formatted !== null
+        ? formatted
+        : typeof value === "string" && names?.has(value)
+          ? <Tooltip title={value}><span>{names.get(value)}</span></Tooltip>
+          : valueText(value)}
     </span>
   );
+};
 
 /** Field-by-field before/after, reused by proposals and the publish preview. */
 export function FieldDiff({
@@ -58,7 +64,7 @@ export function FieldDiff({
         dataSource={rows}
         columns={[
           { title: "字段", key: "path", width: 140, render: (_, c) => fieldLabel(c.path) },
-          { title: beforeLabel, key: "before", render: (_, c) => cell(c.before, true, names) },
+          { title: beforeLabel, key: "before", render: (_, c) => cell(c.path, c.before, true, names) },
           {
             title: afterLabel,
             key: "after",
@@ -69,12 +75,12 @@ export function FieldDiff({
                     path={c.path}
                     label={fieldLabel(c.path)}
                     value={c.after}
-                    display={cell(c.after, false, names)}
+                    display={cell(c.path, c.after, false, names)}
                     disabled={editDisabled}
                     onSave={(next) => onEdit(c.path, next)}
                   />
                 ) : (
-                  cell(c.after, false, names)
+                  cell(c.path, c.after, false, names)
                 );
               const note = annotations[c.path];
               return note ? (
