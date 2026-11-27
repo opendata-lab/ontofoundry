@@ -7,6 +7,21 @@
 - 开工时，中大型变更先按 AGENTS.md 写 `design/` 和 `plans/`，并在这里附链接。
 - 做完后移到文末“已完成”，保留结果链接。
 
+## 删除旧版 Ossie 扩展块的读取兼容
+
+现状：平台扩展信息只导出到 ZIP 内的 `ontofoundry-extension.json`，导入仍兼容旧文件里的 `ai_context.ontofoundry`。具体是 `adapters/ossie/extension.py` 的 `read_extension` 回退分支，读取时报 RT-03 converted；`importer.py` 的文档级 `ai_context` 检查也排除了 `ontofoundry` 键。
+
+要做：删掉回退分支和 `ontofoundry` 键的特殊排除，让 `ai_context.ontofoundry` 和其他文档级上下文一样报 RT-02 dropped。同时清理依赖旧块的测试和夹具：`tests/fixtures/core1_ossie/07-document-source.ossie.json`、`ossie_synthetic/*.ossie.json`、`test_core1_ossie_import.py`。另外核对设计文档里把 `ai_context.ontofoundry` 写成现行导出位置的段落。
+
+改后：
+- 受影响的只有旧单文件，而且其中的块必须是 `version: core-1`；更早版本的块现在本来就整块不读。这种文件导入后不再恢复中文名、标签和必填标记，中文名回退为英文名（`customer` 显示为 `customer`，不再是“客户”），转换报告会列出。
+- 补救办法有两种，都不丢信息：
+  - 在平台重新导出，得到 ZIP；
+  - 把旧块原样存成 `ontofoundry-extension.json`，和 Ossie JSON 一起打成 ZIP。两者内容格式相同。
+- 新格式 ZIP 和原生完整包不受影响。
+
+来源：用户 2026-11-27，结论是精简掉。
+
 ## 主键含日期的非快照表与表类型证据
 
 现状：`expand_tables.py` 只认每日全量快照（`snapshot_date_column`），见 `docs/design/2026-11-18-large-material-modeling.md` LM-04、LM-06。要做，按内网实际遇到的先后：
