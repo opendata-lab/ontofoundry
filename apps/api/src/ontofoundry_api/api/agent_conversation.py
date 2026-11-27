@@ -248,13 +248,19 @@ def _run_ref(
     *,
     mode: str,
     detail: str,
+    finished_at: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    run = {
         "task_id": task_id or "",
         "status": status,
         "detail": detail,
         "metadata": {"mode": _mode(mode)},
     }
+    # The SDK stamps the answer with DataAgent's finish time; without it the
+    # live turn keeps the send time until the page is reloaded.
+    if finished_at:
+        run["finished_at"] = finished_at
+    return run
 
 
 def _raise_dataagent(exc: DataAgentError) -> None:
@@ -290,7 +296,8 @@ async def snapshot(
         task = await dataagent.task(item.dataagent_task_id)
         upstream_status = str(task.get("task_status") or "")
         run = _run_ref(item.dataagent_task_id, to_run_status(upstream_status),
-                       mode=item.dataagent_task_mode, detail=_detail(upstream_status, task.get("error")))
+                       mode=item.dataagent_task_mode, detail=_detail(upstream_status, task.get("error")),
+                       finished_at=task.get("finished_at"))
     return {"messages": present_messages(messages), "run": run}
 
 
@@ -819,6 +826,7 @@ async def events(
                     to_run_status(upstream_status),
                     mode=mode,
                     detail=_detail(upstream_status, task.get("error")),
+                    finished_at=task.get("finished_at"),
                 )
             )
             return
@@ -868,6 +876,7 @@ async def cancel(
         status,
         mode=item.dataagent_task_mode,
         detail=_detail(upstream_status, result.get("error")),
+        finished_at=result.get("finished_at"),
     )
 
 

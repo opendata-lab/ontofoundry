@@ -1061,7 +1061,8 @@ def test_old_event_stream_ends_with_its_own_task_and_leaves_the_new_one(client, 
                 dataagent_run_token="new-token",
             )
             return httpx.Response(
-                200, json={"task_id": "task-old", "task_status": "finished"}
+                200,
+                json={"task_id": "task-old", "task_status": "finished", "finished_at": "2026-11-27T09:05:00Z"},
             )
         raise AssertionError(request.url.path)
 
@@ -1072,6 +1073,8 @@ def test_old_event_stream_ends_with_its_own_task_and_leaves_the_new_one(client, 
     # The old stream ends cleanly, naming only its own task; the new run is untouched.
     done = response.text.split("event: done\ndata: ", 1)[1].split("\n\n", 1)[0]
     assert json.loads(done)["task_id"] == "task-old"
+    # The SDK stamps the live answer with the finish time carried by `done`.
+    assert json.loads(done)["finished_at"] == "2026-11-27T09:05:00Z"
     row = _session_row(client, session["id"])
     assert row.dataagent_task_id == "task-new"
     assert row.task_status == "running"
