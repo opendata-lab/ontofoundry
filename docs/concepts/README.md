@@ -51,6 +51,7 @@ flowchart TD
 | [时间与快照](time-and-snapshots.md) | 哪些表是快照、指标按哪个时间归周期、当前与期末取哪一天？ |
 | [指标](metrics.md) | 可信聚合口径怎样定义和复用？ |
 | [规则](rules.md) | 约束与派生说明属于谁？ |
+| [业务动作](actions.md) | 对业务对象能做哪些操作，需要什么参数、会影响哪些状态和关系？ |
 | [证据与实例](evidence-and-instances.md) | 文档事实怎样保存和追溯？ |
 | [查询语义](query-semantics.md) | MCP 返回什么，agent 怎样查数？ |
 | [格式与转换](formats.md) | 怎样备份、交换与理解转换损失？ |
@@ -69,6 +70,7 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
 | `link_types` | 元素数组 | 必须提供，可为空数组。 | 保存二元关系定义，两端通过对象 id 指定。 |
 | `metrics` | 指标数组 | 必须提供。 | 此数组保存独立的聚合定义，指标与本体并列。 |
 | `rules` | 元素数组 | 必须提供，可为空数组。 | 保存归属具体元素的业务约束或派生说明。 |
+| `actions` | 元素数组 | 可省略，默认空数组。 | 保存声明式业务动作定义（参数与结构化效果，首版仅定义不执行）。 |
 | `datasets` | 元素数组 | 必须提供，可为空数组。 | 保存物理数据集登记，表位置在此维护。 |
 | `mappings` | 元素数组 | 必须提供，可为空数组。 | 保存业务对象到数据集来源和列的绑定。 |
 | `material_objects` | 事实数组 | 必须提供，可为空数组。 | 保存从材料或人工确认中得到的对象事实。 |
@@ -314,5 +316,6 @@ FROM dw.orders AS o;
 | 继承 | [Interface](https://www.palantir.com/docs/foundry/interfaces/interface-overview) 是抽象接口，不等于具体对象单父继承。 | [单父继承](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-inheritance)不继承普通关系与绑定。 | extends 支持更宽表达；本平台只保留单父。 |
 | 指标 | [对象集合聚合](https://www.palantir.com/docs/foundry/api/ontology-resources/objects/aggregate)；本体没有同构可复用指标定义。 | [定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)为顶层 model.metrics[]，[操作页](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-metrics)按 measure 所在表对应实体展示。 | [开放语义交换规范 OSI（Open Semantic Interchange）中的指标 Metric，用于交换计算定义](https://github.com/apache/ossie/blob/main/core-spec/spec.yaml)保存表达式。 |
 | 规则 | [Submission criteria](https://www.palantir.com/docs/foundry/action-types/submission-criteria)有执行语义；与本平台只保存的规则不同。 | [业务规则](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-rules)为自然语言上下文。 | requires / derived_by 挂在概念或关系；不支持的语义按例外表报告。 |
+| 业务动作 | [Action Type](https://www.palantir.com/docs/foundry/action-types/overview) 含参数、提交条件、效果规则及执行引擎；core-1 首版仅定义不执行。 | 无本体动作概念；执行放在外部 Activator / Power Automate。 | 规范尚无动作（上游 [#106](https://github.com/apache/ossie/issues/106) 讨论中）；ZIP 扩展文件承载，纯 `.ossie.json` 导出报损失。 |
 
 - [值类型](value-types.md)：属性共用的值域（基础类型 + 约束）。
