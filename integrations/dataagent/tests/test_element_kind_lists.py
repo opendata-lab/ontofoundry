@@ -3,8 +3,8 @@
 Skill scripts run in isolation without importing `ontofoundry_api`, so they
 carry their own kind/collection registries (`runpaths.py`, `show_element.py`,
 `show_example.py`, `generate_output_schemas.py`). These tests verify every
-registry against the platform's JSON schemas so adding a new element kind
-fails immediately and points at every script to update.
+registry against the platform's JSON schemas and core registries so adding or
+mis-mapping an element kind fails immediately and points at every script to update.
 """
 
 from __future__ import annotations
@@ -16,12 +16,18 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parents[1]
 REPO = BASE.parents[1]
 CONTRACTS = REPO / "apps/api/src/ontofoundry_api/contracts"
+API_SRC = REPO / "apps/api/src"
 
-sys.path.insert(0, str(BASE))
+for path in (str(BASE), str(API_SRC)):
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
 import generate_output_schemas  # noqa: E402
 import runpaths  # noqa: E402
 import show_element  # noqa: E402
 import show_example  # noqa: E402
+from ontofoundry_api.contracts.proposal_diagnostics import KIT_PARTS  # noqa: E402
+from ontofoundry_api.domain.models import COLLECTIONS as PLATFORM_COLLECTIONS  # noqa: E402
 
 
 def _core_collections() -> set[str]:
@@ -58,7 +64,10 @@ def _schema_reference_like_fields() -> set[str]:
 def test_runpaths_collections_and_target_kinds_match_platform_schemas():
     core_collections = _core_collections()
     proposal_kinds = _proposal_target_kinds()
+    expected_pairs = {kind.value: collection for kind, collection in PLATFORM_COLLECTIONS.items()}
 
+    # Assert exact kind -> collection pairs, not only collection-name sets.
+    assert runpaths.COLLECTIONS == expected_pairs
     assert set(runpaths.COLLECTIONS.values()) == core_collections
     assert runpaths.INSTANCE_KINDS == frozenset({"material_object", "material_link"})
     assert set(runpaths.COLLECTIONS) | set(runpaths.INSTANCE_KINDS) == proposal_kinds
@@ -79,11 +88,17 @@ def test_generate_output_schemas_targets_partition_proposal_kinds():
     assert discovery | extraction == proposal_kinds
 
 
-def test_show_example_parts_by_kind_covers_all_proposal_kinds():
+def test_show_example_parts_by_kind_and_backend_kit_parts_match_extract_kit_examples():
     proposal_kinds = _proposal_target_kinds()
     assert set(show_example.PARTS_BY_KIND) == proposal_kinds
-    for part in set(show_example.PARTS_BY_KIND.values()):
-        assert (show_example.KIT / f"{part}.json").is_file()
+    assert show_example.PARTS_BY_KIND == KIT_PARTS
+
+    for kind, part in show_example.PARTS_BY_KIND.items():
+        example_file = show_example.KIT / f"{part}.json"
+        assert example_file.is_file()
+        items = json.loads(example_file.read_text(encoding="utf-8"))
+        create_kinds = {item["target_kind"] for item in items if item.get("operation") == "create"}
+        assert kind in create_kinds, f"{part}.json does not contain a create example for {kind!r}"
 
 
 def test_show_element_reference_fields_cover_core_schema_element_refs():

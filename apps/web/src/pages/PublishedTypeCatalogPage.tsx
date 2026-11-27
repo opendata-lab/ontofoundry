@@ -16,14 +16,18 @@ import { usePersonalSession } from "../hooks/usePersonalSession";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { MULTIPLICITY } from "../lib/coreModel";
-import { PUBLISHED_CATALOG_COUNT_COLLECTIONS, PUBLISHED_CATALOG_KINDS } from "../lib/elementKinds";
+import {
+  CATALOG_RESOURCE_KINDS,
+  CATALOG_TAB_COLLECTIONS,
+  CATALOG_TAB_LABELS,
+  type CatalogTab as Tab,
+} from "../lib/elementKinds";
 import { isForwardReading } from "../lib/linkReadings";
 import { METRIC_KINDS } from "../lib/metricEditing";
 
-type Tab = "entities" | "values" | "relations" | "metrics" | "datasets";
-const LABELS: Record<Tab, string> = { entities: "实体类型", values: "值类型", relations: "关系", metrics: "指标", datasets: "数据集" };
-const KINDS = PUBLISHED_CATALOG_KINDS;
-const COUNT = PUBLISHED_CATALOG_COUNT_COLLECTIONS;
+const LABELS = CATALOG_TAB_LABELS;
+const KINDS = CATALOG_RESOURCE_KINDS;
+const COUNT = CATALOG_TAB_COLLECTIONS;
 const { Text } = Typography;
 
 /** Published directories never acquire a complete editable definition baseline. */

@@ -106,7 +106,8 @@ def envelope(version):
     }
 
 
-RESOURCE_KINDS = frozenset({"object_type", "link_type", "metric", "dataset"})
+RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset")
+RESOURCE_KIND_PATTERN = f"^({'|'.join(RESOURCE_KINDS)})$"
 # Published version summaries report core counts under stable external keys
 # ("attributes" maps to core collection "properties"; value_types is omitted).
 VERSION_SUMMARY_COUNT_FIELDS = {

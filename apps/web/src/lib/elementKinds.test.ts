@@ -1,44 +1,52 @@
 /// <reference types="vite/client" />
 /**
- * Guard every frontend element-kind and collection list against the generated
- * core-1 schema types (`api/core.generated.ts`).
+ * Guard every frontend element-kind and collection list against the core-1 JSON
+ * Schema (`ontofoundry.core-1.schema.json`) and generated `CoreDraft` types.
  *
- * When a new core collection is added to `CoreDraft`, both `tsc -b` (via
- * `CoreCollectionKey` in `elementKinds.ts`) and these runtime coverage tests
- * fail and point at every UI list that must decide whether to include or
- * exclude the new kind.
+ * When a new core collection is added to core-1, both `tsc -b` (via
+ * `CORE_COLLECTIONS_IN_SYNC` in `elementKinds.ts` and exhaustive switches) and
+ * these runtime tests fail and point at every UI list that must decide whether
+ * to include or exclude the new kind.
  */
 import { describe, expect, it } from "vitest";
-import coreGeneratedSource from "../api/core.generated.ts?raw";
 import { COLLECTION_BY_KIND, type TargetKind } from "../api/types";
 import { KIND as PROPOSAL_KIND_META } from "../components/proposals/elementMeta";
 import { ELEMENT_CATEGORIES } from "./elementCategories";
 import {
   ALL_TARGET_KINDS,
+  CATALOG_RESOURCE_KINDS,
+  CATALOG_TAB_COLLECTIONS,
+  CATALOG_TAB_LABELS,
   CORE_COLLECTION_KEYS,
-  CORE_KIND_BY_COLLECTION,
+  CORE_COLLECTIONS_IN_SYNC,
   CORE_TARGET_KINDS,
   ELEMENT_INSPECTOR_KINDS,
   INSPECTABLE_KINDS,
   INSPECTABLE_NOUN,
-  INSTANCE_KIND_BY_COLLECTION,
+  INSTANCE_COLLECTION_KEYS,
   INSTANCE_TARGET_KINDS,
+  KIND_BY_COLLECTION,
   LOCKED_PROPOSAL_FIELDS,
   NAMED_DRAFT_COLLECTIONS,
   NAVIGABLE_SEARCH_KINDS,
-  PUBLISHED_CATALOG_COUNT_COLLECTIONS,
-  PUBLISHED_CATALOG_KINDS,
   PUBLISH_KIND_ORDER,
   SEARCH_KIND_LABELS,
   SEMANTIC_RESOURCE_KINDS,
 } from "./elementKinds";
 import { RESOURCE_KIND_LABELS, RESOURCE_KINDS, type ResourceKind } from "./semanticExplorer";
 
-function generatedCoreDraftCollections(): string[] {
-  const match = coreGeneratedSource.match(/export interface CoreDraft\s*\{([\s\S]*?)\n\}/);
-  expect(match, "CoreDraft interface should exist in core.generated.ts").not.toBeNull();
-  const keys = [...match![1].matchAll(/^\s*([a-z_]+)\??:/gm)].map((m) => m[1]);
-  return keys.filter((key) => key !== "schema_version" && key !== "workspace_id").sort();
+// Glob keeps apps/web standalone image builds compiling when apps/api is absent.
+const coreSchemaFiles = import.meta.glob<{ properties: Record<string, unknown> }>(
+  "../../../api/src/ontofoundry_api/contracts/ontofoundry.core-1.schema.json",
+  { eager: true, import: "default" },
+);
+
+function schemaCoreDraftCollections(): string[] {
+  const schema = Object.values(coreSchemaFiles)[0];
+  expect(schema, "ontofoundry.core-1.schema.json should be loaded").toBeDefined();
+  return Object.keys(schema.properties)
+    .filter((key) => key !== "schema_version" && key !== "workspace_id")
+    .sort();
 }
 
 function assertCoverage(actual: Iterable<string>, registered: Iterable<string>, excluded: Iterable<string>) {
@@ -52,17 +60,19 @@ function assertCoverage(actual: Iterable<string>, registered: Iterable<string>, 
 }
 
 describe("frontend element-kind and collection coverage", () => {
-  const generatedCollections = generatedCoreDraftCollections();
+  const schemaCollections = schemaCoreDraftCollections();
 
-  it("matches generated CoreDraft collections in elementKinds and COLLECTION_BY_KIND", () => {
-    expect([...CORE_COLLECTION_KEYS].sort()).toEqual(generatedCollections);
-    const coreKinds = generatedCollections.map((collection) => CORE_KIND_BY_COLLECTION[collection as keyof typeof CORE_KIND_BY_COLLECTION]);
-    expect(coreKinds.every(Boolean)).toBe(true);
-    expect([...CORE_TARGET_KINDS].sort()).toEqual([...coreKinds].sort());
-
-    const instanceCollections = Object.keys(INSTANCE_KIND_BY_COLLECTION);
-    expect(Object.values(COLLECTION_BY_KIND).sort()).toEqual([...generatedCollections, ...instanceCollections].sort());
+  it("matches core-1 JSON Schema collections in COLLECTION_BY_KIND and derived reverse map", () => {
+    expect(CORE_COLLECTIONS_IN_SYNC).toBe(true);
+    expect([...CORE_COLLECTION_KEYS].sort()).toEqual(schemaCollections);
+    expect(Object.values(COLLECTION_BY_KIND).sort()).toEqual(
+      [...schemaCollections, ...INSTANCE_COLLECTION_KEYS].sort(),
+    );
     expect([...ALL_TARGET_KINDS].sort()).toEqual([...CORE_TARGET_KINDS, ...INSTANCE_TARGET_KINDS].sort());
+    for (const [kind, collection] of Object.entries(COLLECTION_BY_KIND)) {
+      expect(KIND_BY_COLLECTION[collection as keyof typeof KIND_BY_COLLECTION]).toBe(kind);
+    }
+    expect(Object.keys(KIND_BY_COLLECTION).length).toBe(Object.keys(COLLECTION_BY_KIND).length);
   });
 
   it("covers all target kinds in proposal elementMeta and documented subsets in elementCategories and PublishPanel", () => {
@@ -82,7 +92,7 @@ describe("frontend element-kind and collection coverage", () => {
   it("covers named draft collections shared by reviewMeta and PublishPanel", () => {
     // Mappings have no `name` field; value_types are currently excluded from
     // proposal/publish name-map preloading.
-    assertCoverage(NAMED_DRAFT_COLLECTIONS, generatedCollections, ["mappings", "value_types"]);
+    assertCoverage(NAMED_DRAFT_COLLECTIONS, schemaCollections, ["mappings", "value_types"]);
   });
 
   it("covers ElementInspector kinds and inspectable roots", () => {
@@ -125,15 +135,16 @@ describe("frontend element-kind and collection coverage", () => {
     assertCoverage(NAVIGABLE_SEARCH_KINDS, CORE_TARGET_KINDS, ["mapping", "value_type"]);
   });
 
-  it("covers PublishedTypeCatalogPage resource tabs and counts", () => {
+  it("covers catalog tabs shared by TypeCatalogPage and PublishedTypeCatalogPage", () => {
+    expect(Object.keys(CATALOG_TAB_LABELS).sort()).toEqual(Object.keys(CATALOG_TAB_COLLECTIONS).sort());
     assertCoverage(
-      Object.values(PUBLISHED_CATALOG_KINDS),
+      Object.values(CATALOG_RESOURCE_KINDS),
       CORE_TARGET_KINDS,
       ["property", "rule", "mapping", "value_type"],
     );
     assertCoverage(
-      Object.values(PUBLISHED_CATALOG_COUNT_COLLECTIONS),
-      generatedCollections,
+      Object.values(CATALOG_TAB_COLLECTIONS),
+      schemaCollections,
       ["properties", "rules", "mappings"],
     );
   });

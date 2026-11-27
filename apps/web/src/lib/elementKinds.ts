@@ -1,9 +1,9 @@
 /**
  * Shared element-kind and draft-collection registries for the web client.
  *
- * Core collections are keyed against the generated `CoreDraft` interface so
- * TypeScript and vitest both fail if a new core-1 collection is added without
- * updating each UI surface's coverage decision.
+ * Core collections are verified against the generated `CoreDraft` interface so
+ * TypeScript (`tsc -b`) and vitest (against `ontofoundry.core-1.schema.json`)
+ * both fail if a new core-1 collection is added without updating each UI surface.
  */
 import type { CoreDraft } from "../api/core.generated";
 import {
@@ -15,33 +15,36 @@ import {
 } from "../api/types";
 
 export type CoreCollectionKey = Exclude<keyof CoreDraft, "schema_version" | "workspace_id">;
-export type InstanceCollectionKey = "material_objects" | "material_links";
-export type CoreTargetKind = Exclude<TargetKind, "material_object" | "material_link">;
 export type InstanceTargetKind = "material_object" | "material_link";
+export type CoreTargetKind = Exclude<TargetKind, InstanceTargetKind>;
+export type InstanceCollectionKey = (typeof COLLECTION_BY_KIND)[InstanceTargetKind];
 
-export const CORE_KIND_BY_COLLECTION = {
-  object_types: "object_type",
-  properties: "property",
-  link_types: "link_type",
-  rules: "rule",
-  metrics: "metric",
-  datasets: "dataset",
-  mappings: "mapping",
-  value_types: "value_type",
-} as const satisfies Record<CoreCollectionKey, CoreTargetKind>;
+type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
 
-export const INSTANCE_KIND_BY_COLLECTION = {
-  material_objects: "material_object",
-  material_links: "material_link",
-} as const satisfies Record<InstanceCollectionKey, InstanceTargetKind>;
+// Compile-time guard: `COLLECTION_BY_KIND` core values must match `keyof CoreDraft`.
+export const CORE_COLLECTIONS_IN_SYNC: Exact<
+  CoreCollectionKey,
+  (typeof COLLECTION_BY_KIND)[CoreTargetKind]
+> = true;
 
-export const CORE_COLLECTION_KEYS = Object.keys(CORE_KIND_BY_COLLECTION) as CoreCollectionKey[];
-export const CORE_TARGET_KINDS = Object.values(CORE_KIND_BY_COLLECTION) as CoreTargetKind[];
-export const INSTANCE_TARGET_KINDS = Object.values(INSTANCE_KIND_BY_COLLECTION) as InstanceTargetKind[];
+export const INSTANCE_TARGET_KINDS = ["material_object", "material_link"] as const satisfies readonly InstanceTargetKind[];
+const INSTANCE_KIND_SET = new Set<TargetKind>(INSTANCE_TARGET_KINDS);
+
+// Reverse map derived from the single `COLLECTION_BY_KIND` registry.
+export const KIND_BY_COLLECTION = Object.fromEntries(
+  Object.entries(COLLECTION_BY_KIND).map(([kind, collection]) => [collection, kind]),
+) as Record<CollectionKey, TargetKind>;
+
 export const ALL_TARGET_KINDS = Object.keys(COLLECTION_BY_KIND) as TargetKind[];
-
-// Compile-time check: every generated core collection is present in CollectionKey.
-export const _ALL_COLLECTIONS_BY_KIND: Record<TargetKind, CollectionKey> = COLLECTION_BY_KIND;
+export const CORE_TARGET_KINDS = ALL_TARGET_KINDS.filter(
+  (kind): kind is CoreTargetKind => !INSTANCE_KIND_SET.has(kind),
+);
+export const CORE_COLLECTION_KEYS = CORE_TARGET_KINDS.map(
+  (kind) => COLLECTION_BY_KIND[kind],
+) as CoreCollectionKey[];
+export const INSTANCE_COLLECTION_KEYS = INSTANCE_TARGET_KINDS.map(
+  (kind) => COLLECTION_BY_KIND[kind],
+) as InstanceCollectionKey[];
 
 // Draft collections whose elements have `name` / `display_name` and are indexed
 // for review and publish name lookup (shared by reviewMeta and PublishPanel).
@@ -115,17 +118,26 @@ export const NAVIGABLE_SEARCH_KINDS = new Set<OntologySearchKind>([
   "dataset",
 ]);
 
-// Tab mappings for PublishedTypeCatalogPage.
-export const PUBLISHED_CATALOG_KINDS: Record<"entities" | "relations" | "metrics" | "datasets", CatalogResourceKind> = {
+// Shared catalog tab mappings for both TypeCatalogPage (draft) and PublishedTypeCatalogPage.
+export type CatalogTab = "entities" | "values" | "relations" | "metrics" | "datasets";
+export type ResourceCatalogTab = Exclude<CatalogTab, "values">;
+export const CATALOG_TAB_LABELS: Record<CatalogTab, string> = {
+  entities: "实体类型",
+  values: "值类型",
+  relations: "关系",
+  metrics: "指标",
+  datasets: "数据集",
+};
+export const CATALOG_RESOURCE_KINDS: Record<ResourceCatalogTab, CatalogResourceKind> = {
   entities: "object_type",
   relations: "link_type",
   metrics: "metric",
   datasets: "dataset",
 };
-export const PUBLISHED_CATALOG_COUNT_COLLECTIONS = {
-  entities: "object_types",
-  values: "value_types",
-  relations: "link_types",
-  metrics: "metrics",
-  datasets: "datasets",
-} as const;
+export const CATALOG_TAB_COLLECTIONS = {
+  entities: COLLECTION_BY_KIND.object_type,
+  values: COLLECTION_BY_KIND.value_type,
+  relations: COLLECTION_BY_KIND.link_type,
+  metrics: COLLECTION_BY_KIND.metric,
+  datasets: COLLECTION_BY_KIND.dataset,
+} as const satisfies Record<CatalogTab, CoreCollectionKey>;

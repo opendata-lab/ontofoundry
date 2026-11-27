@@ -19,14 +19,19 @@ import { useSnapshot } from "../hooks/useSnapshot";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { MULTIPLICITY, byId, effectiveLinks, effectiveProperties, isA, metricDatasetId } from "../lib/coreModel";
+import {
+  CATALOG_RESOURCE_KINDS,
+  CATALOG_TAB_COLLECTIONS,
+  CATALOG_TAB_LABELS,
+  type CatalogTab,
+} from "../lib/elementKinds";
 import { isForwardReading, renderLinkReading } from "../lib/linkReadings";
 import { METRIC_KINDS } from "../lib/metricEditing";
 import { objectMapping } from "../lib/objectMapping";
 
 const { Text } = Typography;
-type CatalogTab = "entities" | "values" | "relations" | "metrics" | "datasets";
 type CatalogItem = ObjectType | LinkType | Metric | Dataset;
-const LABELS: Record<CatalogTab, string> = { entities: "实体类型", values: "值类型", relations: "关系", metrics: "指标", datasets: "数据集" };
+const LABELS = CATALOG_TAB_LABELS;
 
 /** One catalog owns entities, relationships and metrics, including session drafts. */
 export function TypeCatalogPage({ kind = "object_type" }: { kind?: "object_type" | "link_type" }) {
@@ -43,8 +48,13 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
   const [createValueType, setCreateValueType] = useState(0);
   const [params, setParams] = useSearchParams();
   const requested = params.get("catalogTab");
-  const tab: CatalogTab = requested === "metrics" || requested === "relations" || requested === "values" || requested === "datasets" ? requested : initialKind === "link_type" ? "relations" : "entities";
-  const kind = tab === "entities" ? "object_type" : tab === "relations" ? "link_type" : tab === "datasets" ? "dataset" : "metric";
+  const tab: CatalogTab =
+    requested && requested in LABELS
+      ? (requested as CatalogTab)
+      : initialKind === "link_type"
+        ? "relations"
+        : "entities";
+  const kind = tab === "values" ? "metric" : CATALOG_RESOURCE_KINDS[tab];
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState<string>();
   const [importOpen, setImportOpen] = useState(false);
@@ -84,7 +94,7 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
   const objects = tab === "entities";
   const metrics = tab === "metrics";
   const datasets = tab === "datasets";
-  const items: CatalogItem[] = objects ? draft.object_types : metrics ? draft.metrics : datasets ? draft.datasets : tab === "values" ? [] : draft.link_types;
+  const items: CatalogItem[] = tab === "values" ? [] : (draft[CATALOG_TAB_COLLECTIONS[tab]] as CatalogItem[]);
   const tags = [...new Set(items.flatMap((item) => "tags" in item ? item.tags : []))];
   const normalized = query.trim().toLowerCase();
   const filtered = items.filter((item) =>
@@ -145,7 +155,12 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
   const table = <Table<CatalogItem> size="middle" rowKey="id" dataSource={filtered} columns={columns}
     onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })} pagination={filtered.length > 20 ? { pageSize: 20 } : false}
     locale={{ emptyText: <Empty description={items.length ? "没有匹配的定义" : canEdit ? `还没有${LABELS[tab]}定义` : "暂无已发布定义"} /> }} />;
-  const counts = { entities: draft.object_types.length, values: (draft.value_types ?? []).length, datasets: draft.datasets.length, relations: draft.link_types.length, metrics: draft.metrics.length };
+  const counts = Object.fromEntries(
+    (Object.keys(CATALOG_TAB_COLLECTIONS) as CatalogTab[]).map((key) => [
+      key,
+      (draft[CATALOG_TAB_COLLECTIONS[key]] ?? []).length,
+    ]),
+  ) as Record<CatalogTab, number>;
   const publishSession = session ?? personalSession;
   const deliverySuffix = suffix || (publishSession && publishSession.unpublished_change_count > 0 ? `?session=${publishSession.id}` : "");
   return <div className="flex h-full min-h-0 flex-col bg-canvas">

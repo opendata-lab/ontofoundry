@@ -24,8 +24,9 @@ from ontofoundry_api.domain.expressions import (
 from ontofoundry_api.domain.models import COLLECTIONS
 from ontofoundry_api.domain.validation import validate_core_graph
 
-# Natural-key matching order: objects and value_types first because properties,
-# links, rules and mappings reference their remapped owner/target UUIDs.
+# Natural-key matching order over core collections (`elements()` iterates COLLECTIONS):
+# objects and value_types first, and link_type before rule so link-owned rules match
+# against the remapped link UUID.
 NATURAL_KEY_ORDER = (
     "object_type",
     "value_type",
@@ -35,8 +36,6 @@ NATURAL_KEY_ORDER = (
     "metric",
     "dataset",
     "mapping",
-    "material_object",
-    "material_link",
 )
 # Kinds grouped for simultaneous name-exchange detection during import pruning.
 RENAME_GROUP_KINDS = frozenset(
