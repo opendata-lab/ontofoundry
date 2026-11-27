@@ -30,6 +30,7 @@ from ontofoundry_api.services.access import (
 )
 from ontofoundry_api.services.mcp_ontology import ResolveEntity
 from ontofoundry_api.services.ontology_query import (
+    RESOURCE_KIND_PATTERN,
     current_version,
     get_type,
     search_types,
@@ -152,9 +153,7 @@ def types(
     workspace_id: str,
     version_id: str | None = None,
     q: str = "",
-    kind: str | None = Query(
-        default=None, pattern="^(object_type|link_type|metric|dataset)$"
-    ),
+    kind: str | None = Query(default=None, pattern=RESOURCE_KIND_PATTERN),
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
@@ -211,9 +210,7 @@ def catalog(
     workspace_id: str,
     request: Request,
     version_id: str | None = None,
-    kind: str | None = Query(
-        default=None, pattern="^(object_type|link_type|metric|dataset)$"
-    ),
+    kind: str | None = Query(default=None, pattern=RESOURCE_KIND_PATTERN),
     q: str = "",
     tag: str | None = None,
     limit: int = Query(default=20, ge=1, le=200),

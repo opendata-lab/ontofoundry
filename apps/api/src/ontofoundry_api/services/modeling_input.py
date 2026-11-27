@@ -226,6 +226,17 @@ async def upload_work_pack(
     return str(uploaded["rel_path"])
 
 
+# Top-level collections whose absence means the draft has no definitions yet
+# (properties, rules and mappings require an owner in one of these collections).
+DRAFT_EMPTY_COLLECTIONS = (
+    "object_types",
+    "link_types",
+    "metrics",
+    "datasets",
+    "value_types",
+)
+
+
 def scenario_facts(
     draft: dict,
     manifest: dict,
@@ -238,9 +249,7 @@ def scenario_facts(
     session, which is the only recorded baseline.
     """
     facts: dict = {
-        "draft_empty": not any(
-            draft.get(c) for c in ("object_types", "link_types", "metrics", "datasets", "value_types")
-        )
+        "draft_empty": not any(draft.get(c) for c in DRAFT_EMPTY_COLLECTIONS)
     }
     if not previous.get("input_files"):
         return facts

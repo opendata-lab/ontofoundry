@@ -72,8 +72,13 @@ function rowsOf(draft: Draft, kind: TargetKind): Row[] {
           staged(l) + ((byId(draft.link_types, l.type_id)?.display_name || byId(draft.link_types, l.type_id)?.name) ?? ""),
         );
       });
-    default:
+    case "value_type":
+      // Value types are managed in ValueTypeCatalog rather than ModelResults categories.
       return [];
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
   }
 }
 

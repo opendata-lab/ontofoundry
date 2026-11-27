@@ -97,7 +97,7 @@ export type CollectionKey =
   | "material_links"
   | "value_types";
 
-export const COLLECTION_BY_KIND: Record<TargetKind, CollectionKey> = {
+export const COLLECTION_BY_KIND = {
   object_type: "object_types",
   property: "properties",
   link_type: "link_types",
@@ -108,7 +108,7 @@ export const COLLECTION_BY_KIND: Record<TargetKind, CollectionKey> = {
   material_object: "material_objects",
   material_link: "material_links",
   value_type: "value_types",
-};
+} as const satisfies Record<TargetKind, CollectionKey>;
 
 /** A core-1 draft with the live document instances merged in for display (see api/client.ts). */
 export type Draft = {

@@ -57,9 +57,22 @@ def element_label(kind, element, snapshot_elements):
     return str(element.get("display_name") or element.get("name") or element.get("id"))
 
 
+# Kinds whose diff entries carry a single owning element's label (`owner_label`).
+OWNER_LABEL_KINDS = frozenset(
+    {
+        ElementKind.PROPERTY.value,
+        ElementKind.RULE.value,
+        ElementKind.MATERIAL_OBJECT.value,
+        ElementKind.MAPPING.value,
+    }
+)
+
+
 def owner_label(
     kind: str, element: dict, elements: dict[str, tuple[str, dict]]
 ) -> str | None:
+    if kind not in OWNER_LABEL_KINDS:
+        return None
     owner = None
     if kind == ElementKind.PROPERTY.value:
         owner = element.get("owner_type_id", element.get("owner_ref", {}).get("ref"))

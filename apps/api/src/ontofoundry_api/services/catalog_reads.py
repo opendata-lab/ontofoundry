@@ -4,6 +4,7 @@ from contextlib import suppress
 from uuid import UUID
 
 from ontofoundry_api.domain.bindings import resolve_binding
+from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 from ontofoundry_api.domain.snapshot import empty_snapshot
 from ontofoundry_api.services.access import (
     authorization_fingerprint,
@@ -13,22 +14,21 @@ from ontofoundry_api.services.access import (
 from ontofoundry_api.services.cursors import decode_cursor, encode_cursor
 from ontofoundry_api.services.errors import NotFoundError
 from ontofoundry_api.services.ontology_query import (
+    RESOURCE_KINDS,
     envelope,
     read_context,
 )
 from ontofoundry_api.services.public_projection import authorized_snapshot
 
-RESOURCE_KINDS = {"object_type", "link_type", "metric", "dataset"}
-COLLECTIONS = {
-    "object_type": "object_types",
-    "link_type": "link_types",
-    "property": "properties",
-    "rule": "rules",
-    "metric": "metrics",
-    "dataset": "datasets",
-    "mapping": "mappings",
-    "value_type": "value_types",
-}
+# Top-level catalog tabs show counts for browsable resource/value collections
+# (properties, rules and mappings are viewed inside their owning object/link).
+CATALOG_COUNT_COLLECTIONS = (
+    "object_types",
+    "link_types",
+    "metrics",
+    "value_types",
+    "datasets",
+)
 
 
 def catalog_page(
@@ -56,14 +56,8 @@ def catalog_page(
         if k in RESOURCE_KINDS and (mappings or k != "dataset")
     ]
     counts = {
-        name: len(getattr(draft, collection))
-        for name, collection in (
-            ("object_types", "object_types"),
-            ("link_types", "link_types"),
-            ("metrics", "metrics"),
-            ("value_types", "value_types"),
-            ("datasets", "datasets"),
-        )
+        collection: len(getattr(draft, collection))
+        for collection in CATALOG_COUNT_COLLECTIONS
     }
     if not mappings:
         counts["datasets"] = 0
@@ -283,7 +277,7 @@ def element_projection(version, kind, identity, *, mappings, instances):
         element = index.elements.get(item_id)
         if element:
             item_kind, e = element
-            model[COLLECTIONS[item_kind]].append(e.model_dump(mode="json"))
+            model[COLLECTIONS[ElementKind(item_kind)]].append(e.model_dump(mode="json"))
     # Stable ordering keeps inherited/property table order identical to full definitions.
     for collection in COLLECTIONS.values():
         order = {str(e.id): n for n, e in enumerate(getattr(draft, collection))}

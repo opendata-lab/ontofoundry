@@ -2,8 +2,9 @@ import { Alert, Button, Collapse, Descriptions, Drawer, Empty, Form, Input, List
 import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
-import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, TargetKind, VersionSummary } from "../../api/types";
+import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, VersionSummary } from "../../api/types";
 import type { ElementRequest } from "../../lib/elementInspector";
+import { NAMED_DRAFT_COLLECTIONS, PUBLISH_KIND_ORDER } from "../../lib/elementKinds";
 import { documentDisplayText } from "../../lib/instanceDisplay";
 import { lineDiff } from "../../lib/lineDiff";
 import { fieldLabel, KIND } from "../proposals/elementMeta";
@@ -19,17 +20,7 @@ const CHANGE: Record<ElementChange["change"], { text: string; state: StatusState
   updated: { text: "修改", state: "info" },
   deleted: { text: "删除", state: "error" },
 };
-const KIND_ORDER: TargetKind[] = [
-  "object_type",
-  "property",
-  "link_type",
-  "rule",
-  "metric",
-  "dataset",
-  "mapping",
-  "material_object",
-  "material_link",
-];
+const KIND_ORDER = PUBLISH_KIND_ORDER;
 /** Past this many changes, cards start collapsed. */
 const COLLAPSE_AFTER = 20;
 /** Fields that point at another element; the object view shows its name. */
@@ -221,7 +212,7 @@ function sortChanges<T extends ElementChange>(changes: T[]) {
 /** Element names by id: the preview's labels first, the session's draft as fallback. */
 function elementNames(preview: PublishPreview | null, draft: ModelingSession["draft"]): Map<string, string> {
   const names = new Map<string, string>();
-  for (const key of ["object_types", "properties", "link_types", "rules", "metrics", "datasets"] as const)
+  for (const key of NAMED_DRAFT_COLLECTIONS)
     for (const item of draft[key] as { id: string; name?: string; display_name?: string | null }[]) if (item.name) names.set(item.id, item.display_name || item.name);
   for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
   if (preview?.merged_model) {

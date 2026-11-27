@@ -21,6 +21,20 @@ from ontofoundry_api.domain.core import (
 )
 
 
+# Index iteration order preserves link_type before property in `names` lookups;
+# collection names come from domain.models.COLLECTIONS.
+INDEX_KIND_ORDER = (
+    "object_type",
+    "link_type",
+    "property",
+    "rule",
+    "metric",
+    "dataset",
+    "mapping",
+    "value_type",
+)
+
+
 def _memoized(method):
     @wraps(method)
     def read(self, type_id):
@@ -75,16 +89,11 @@ class DraftIndex:
         self.incoming_by_owner = group(self.draft.link_types, "target_type_id")
         self.mappings_by_type = {m.type_id: m for m in self.draft.mappings}
         self.elements, self.names = {}, {}
-        for kind, collection in (
-            ("object_type", "object_types"),
-            ("link_type", "link_types"),
-            ("property", "properties"),
-            ("rule", "rules"),
-            ("metric", "metrics"),
-            ("dataset", "datasets"),
-            ("mapping", "mappings"),
-            ("value_type", "value_types"),
-        ):
+        # Lazy import: domain.models imports draft_index at module top level.
+        from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
+
+        for kind in INDEX_KIND_ORDER:
+            collection = COLLECTIONS[ElementKind(kind)]
             for item in getattr(self.draft, collection):
                 self.elements[item.id] = (kind, item)
                 if hasattr(item, "name"):

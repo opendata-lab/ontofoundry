@@ -9,6 +9,7 @@ from typing import Literal, Protocol
 from ontofoundry_api.contracts.read_models import OntologySearchRead, OntologySearchRequest
 from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import CoreDraft
+from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 from ontofoundry_api.domain.snapshot import empty_snapshot
 from ontofoundry_api.services.access import (
     authorization_fingerprint,
@@ -185,18 +186,27 @@ class KeywordRecall:
 DEFAULT_SOURCES: tuple[RecallSource, ...] = (KeywordRecall(),)
 
 
+# Searchable ontology kinds: mappings are internal physical bindings and never recalled.
+SEARCHABLE_KINDS = (
+    "object_type",
+    "property",
+    "link_type",
+    "rule",
+    "metric",
+    "dataset",
+    "value_type",
+)
+
+
 def visible_elements(draft: CoreDraft, *, mappings: bool) -> list[SearchElement]:
     """Use an allowlist so recall sources never receive evidence or hidden columns."""
     elements = []
-    for kind, values in (
-        ("object_type", draft.object_types),
-        ("property", draft.properties),
-        ("link_type", draft.link_types),
-        ("rule", draft.rules),
-        ("metric", draft.metrics),
-        ("dataset", draft.datasets if mappings else []),
-        ("value_type", draft.value_types),
-    ):
+    for kind in SEARCHABLE_KINDS:
+        values = (
+            []
+            if kind == "dataset" and not mappings
+            else getattr(draft, COLLECTIONS[ElementKind(kind)])
+        )
         for value in values:
             raw = value.model_dump(mode="json")
             allowed = {"id", "name", "display_name", "description", "synonyms"}

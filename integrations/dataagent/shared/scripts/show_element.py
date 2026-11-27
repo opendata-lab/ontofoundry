@@ -11,6 +11,27 @@ from runpaths import COLLECTIONS, TARGET_KINDS, command, error, without_material
 
 LIMIT = 8192
 PAGE_BYTES = 3000
+# Core-element UUID reference fields walked by reverse_refs().
+REFERENCE_FIELDS = frozenset(
+    {
+        "extends",
+        "title_property_id",
+        "owner_type_id",
+        "value_type_id",
+        "source_type_id",
+        "target_type_id",
+        "owner_id",
+        "dataset_id",
+        "type_id",
+        "property_id",
+        "link_type_id",
+        "numerator_id",
+        "denominator_id",
+        "property_ids",
+        "source_property_ids",
+        "target_property_ids",
+    }
+)
 TOKEN = re.compile(
     r"(?P<space>\s+)|(?P<comment>--[^\n]*|/\*[\s\S]*?\*/)|"
     r"(?P<string>'(?:''|\\.|[^'\\])*')|"
@@ -159,13 +180,6 @@ class ElementIndex:
     def reverse_refs(self):
         reverse = defaultdict(set)
 
-        reference_fields = {
-            "extends", "title_property_id", "owner_type_id", "value_type_id",
-            "source_type_id", "target_type_id", "owner_id", "dataset_id", "type_id",
-            "property_id", "link_type_id", "numerator_id", "denominator_id",
-            "property_ids", "source_property_ids", "target_property_ids",
-        }
-
         def ids(value):
             # Evidence, SQL and free text never become references by coincidence.
             if isinstance(value, dict):
@@ -173,7 +187,7 @@ class ElementIndex:
                 for key, child in value.items():
                     if key in {"id", "evidence", "description", "query_sql", "expression", "values"}:
                         continue
-                    if key in reference_fields:
+                    if key in REFERENCE_FIELDS:
                         values = child if isinstance(child, list) else [child]
                         found |= {v for v in values if isinstance(v, str) and v in self.elements}
                     elif key == "inherited_link_bindings":

@@ -1,8 +1,17 @@
 """Convert previous core-1 files only at the external import boundary."""
 
+# Frozen to the five collections that existed in pre-core-1 files with `technical_name`.
+LEGACY_NAMED_COLLECTIONS = (
+    "object_types",
+    "properties",
+    "link_types",
+    "rules",
+    "metrics",
+)
+
 
 def convert_names(data, report):
-    for collection in ("object_types", "properties", "link_types", "rules", "metrics"):
+    for collection in LEGACY_NAMED_COLLECTIONS:
         for position, element in enumerate(data.get(collection, [])):
             if "technical_name" not in element:
                 continue

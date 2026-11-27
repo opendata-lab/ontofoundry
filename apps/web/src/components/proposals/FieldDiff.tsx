@@ -1,6 +1,7 @@
 import { Table, Tooltip, Typography } from "antd";
 import type { ReactNode } from "react";
 import type { FieldChange } from "../../api/types";
+import { LOCKED_PROPOSAL_FIELDS } from "../../lib/elementKinds";
 import { fieldLabel } from "./elementMeta";
 import { InlineValueEditor } from "./InlineValueEditor";
 import { valueText } from "./reviewMeta";
@@ -8,7 +9,7 @@ import { valueText } from "./reviewMeta";
 const { Text } = Typography;
 
 // References and identity are chosen elsewhere (source issues, relations), not typed in.
-const LOCKED = new Set(["id", "evidence", "extends", "type_id"]);
+const LOCKED = LOCKED_PROPOSAL_FIELDS;
 
 const isEmpty = (value: unknown) =>
   value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);

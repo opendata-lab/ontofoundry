@@ -372,6 +372,21 @@ def walk_references(kind, value, resolve):
     return result
 
 
+# Proposal kinds with unique `name` namespaces where simultaneous name swaps
+# must be grouped into one atomic decision (excludes mapping and instance kinds).
+NAMED_PROPOSAL_KINDS = frozenset(
+    {
+        "object_type",
+        "value_type",
+        "property",
+        "link_type",
+        "rule",
+        "metric",
+        "dataset",
+    }
+)
+
+
 def apply_items(draft, items):
     """The draft with each item applied: updates stay where the element was,
     creates are appended, deletes are removed."""
@@ -511,15 +526,7 @@ def group_items(draft, items, *, references_resolved=False):
         return (kind, owner)
 
     for item in items:
-        if item.after is None or item.target_kind not in {
-            "object_type",
-            "value_type",
-            "property",
-            "link_type",
-            "rule",
-            "metric",
-            "dataset",
-        }:
+        if item.after is None or item.target_kind not in NAMED_PROPOSAL_KINDS:
             continue
         for other in items:
             previous = original.get(other.target_id)

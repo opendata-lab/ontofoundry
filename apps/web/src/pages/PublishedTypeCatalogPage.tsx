@@ -4,7 +4,7 @@ import { Box, Download, GitBranch, Plus, RefreshCw, Rocket, Search, Sigma, Uploa
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
-import type { CatalogItem, CatalogPage, ResourceKind, VersionSummary } from "../api/types";
+import type { CatalogItem, CatalogPage, VersionSummary } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { ExportDialog } from "../components/ExportDialog";
 import { ImportDialog } from "../components/ImportDialog";
@@ -16,13 +16,18 @@ import { usePersonalSession } from "../hooks/usePersonalSession";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { MULTIPLICITY } from "../lib/coreModel";
+import {
+  CATALOG_RESOURCE_KINDS,
+  CATALOG_TAB_COLLECTIONS,
+  CATALOG_TAB_LABELS,
+  type CatalogTab as Tab,
+} from "../lib/elementKinds";
 import { isForwardReading } from "../lib/linkReadings";
 import { METRIC_KINDS } from "../lib/metricEditing";
 
-type Tab = "entities" | "values" | "relations" | "metrics" | "datasets";
-const LABELS: Record<Tab, string> = { entities: "实体类型", values: "值类型", relations: "关系", metrics: "指标", datasets: "数据集" };
-const KINDS: Record<Exclude<Tab, "values">, ResourceKind> = { entities: "object_type", relations: "link_type", metrics: "metric", datasets: "dataset" };
-const COUNT = { entities: "object_types", values: "value_types", relations: "link_types", metrics: "metrics", datasets: "datasets" } as const;
+const LABELS = CATALOG_TAB_LABELS;
+const KINDS = CATALOG_RESOURCE_KINDS;
+const COUNT = CATALOG_TAB_COLLECTIONS;
 const { Text } = Typography;
 
 /** Published directories never acquire a complete editable definition baseline. */

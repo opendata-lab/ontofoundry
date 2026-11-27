@@ -106,18 +106,35 @@ def envelope(version):
     }
 
 
+RESOURCE_KINDS = ("object_type", "link_type", "metric", "dataset")
+RESOURCE_KIND_PATTERN = f"^({'|'.join(RESOURCE_KINDS)})$"
+# Published version summaries report core counts under stable external keys
+# ("attributes" maps to core collection "properties"; value_types is omitted).
+VERSION_SUMMARY_COUNT_FIELDS = {
+    "object_types": "object_types",
+    "link_types": "link_types",
+    "attributes": "properties",
+    "rules": "rules",
+    "metrics": "metrics",
+}
+VERSION_SUMMARY_MAPPING_COUNT_FIELDS = {
+    "datasets": "datasets",
+    "mappings": "mappings",
+}
+
+
 def version_summary(version, *, include_mappings=True, include_instances=True):
     snapshot = snapshot_of(version)
     counts = {
-        "object_types": len(snapshot["object_types"]),
-        "link_types": len(snapshot["link_types"]),
-        "attributes": len(snapshot["properties"]),
-        "rules": len(snapshot["rules"]),
-        "metrics": len(snapshot["metrics"]),
+        field: len(snapshot[collection])
+        for field, collection in VERSION_SUMMARY_COUNT_FIELDS.items()
     }
     if include_mappings:
         counts.update(
-            datasets=len(snapshot["datasets"]), mappings=len(snapshot["mappings"])
+            {
+                field: len(snapshot[collection])
+                for field, collection in VERSION_SUMMARY_MAPPING_COUNT_FIELDS.items()
+            }
         )
     return {
         **envelope(version),
@@ -482,7 +499,7 @@ def get_type(
     located = [
         (kind, element)
         for kind, element in located
-        if kind in {"object_type", "link_type", "metric", "dataset"}
+        if kind in RESOURCE_KINDS
         and (include_context_elements or kind != "dataset")
     ]
     found = resource_items(
