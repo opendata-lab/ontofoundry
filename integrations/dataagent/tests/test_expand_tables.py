@@ -351,6 +351,7 @@ def test_without_a_snapshot_column_the_date_stays_in_the_key():
 
 @pytest.mark.parametrize("change, message", [
     (lambda s: s["items"][0].update(snapshot_date_column="nope"), "没有的列"),
+    (lambda s: s["items"][0].update(snapshot_date_column=["stat_date"]), "一个列名"),
     (lambda s: s["items"].append({"name": "store_copy", "display_name": "门店副本", "table": "t1"}), "不一致"),
 ])
 def test_snapshot_spec_mistakes_are_reported(change, message):

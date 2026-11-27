@@ -7,6 +7,15 @@
 - 开工时，中大型变更先按 AGENTS.md 写 `design/` 和 `plans/`，并在这里附链接。
 - 做完后移到文末“已完成”，保留结果链接。
 
+## 主键含日期的非快照表与表类型证据
+
+现状：`expand_tables.py` 只认每日全量快照（`snapshot_date_column`），见 `docs/design/2026-11-18-large-material-modeling.md` LM-04、LM-06。要做，按内网实际遇到的先后：
+- 主键 `(ds, 编号)` 的流水表现在要在 01b、03b 手写；可给 `entities.json` 加按业务编号作标识的写法（Foundry 的事件对象也只用业务主键）。
+- `links` 经 `via` 生成的关联表数据集不能声明快照列，每日全量的关系表会混入已解除的旧关系。
+- 展开关系用的键按列定义顺序收集、映射键按主键顺序，两者不一致时复合键会错位（main 上原有）。
+- 平台给工作包补证据：Doris 分区列、OpenDataWorks 的 `update_type`（di/df）与 `layer`、最近两个分区的键重合度。只作证据，表类型仍由 Agent 声明、用户确认。
+来源：用户 2026-11-25；Neon 评审 `~/.agents/handoffs/2026-11-25-neon-table-kinds-review/`（不入库）。
+
 ## 建模命令行（确定性生成与本地预检）
 
 现状：有表的实体、属性、映射由 `entities.json` 加 `expand_tables.py` 生成（场景 B 中占 91% 的提案）；查询数据集、指标、规则、特殊关系仍手写提案 JSON，只占 9% 的提案，却占约 30% 的输出，修错和反查 client_ref 又用了 10 个回合。要做：把这部分改为命令或紧凑写法生成，提交前用工作包里的契约、上下文、表清单和材料清单做本地预检（同源，不复制规则）；示例改为按需的 `--help`。先做小步（扩展 `expand_tables.py`、`prepare_result.py` 提交前预检），在场景 B 上对比后再决定是否统一成完整命令行。来源：用户 2026-11-18；可行性评估见 `~/.agents/handoffs/2026-11-18-gemini-modeling-cli/`（不入库），依据 `docs/design/2026-11-18-large-material-modeling.md` §5.1 的运行数据。2026-11-19～20 内网复测（同设计 §7）：模型服务每回合 63–109 秒，40 分钟单轮只够约 22–38 回合，而抽取在本地需约 35 回合；压低回合数是内网能一轮跑完的前提。

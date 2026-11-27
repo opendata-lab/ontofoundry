@@ -106,6 +106,9 @@ def expand(spec, tables):
     backed = {}
     for item in entities:
         claim(item.get("name"), f"实体 {item.get('display_name') or item.get('name')}")
+        snapshot = item.get("snapshot_date_column")
+        if snapshot is not None and (not isinstance(snapshot, str) or not snapshot):
+            raise SpecError(f"{item['name']} 的 snapshot_date_column 必须是一个列名（字符串）")
         table = source_table(item, tables)
         if table:
             backed[item["name"]] = table
@@ -182,7 +185,7 @@ def expand(spec, tables):
         if not pk:
             raise SpecError(f"表 {table['key']} 没有声明主键（或只有快照日期列）；{name} 请在 01b、03b 片段里手写属性和映射")
         if excluded & set(pk):
-            raise SpecError(f"{name} 不能排除主键列 {', '.join(sorted(excluded & set(pk)))}；每日快照表的日期列写在 snapshot_date_column")
+            raise SpecError(f"{name} 不能排除主键列 {', '.join(sorted(excluded & set(pk)))}；按 references/table-kinds.md 判断：每日全量快照表的日期列写在 snapshot_date_column，其他表在 01b、03b 手写")
         if snapshot:
             excluded.add(snapshot)  # declared on the dataset, not a business property
         fields = {}
