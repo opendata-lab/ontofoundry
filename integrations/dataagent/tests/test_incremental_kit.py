@@ -74,7 +74,7 @@ def logical_graph(graph, refs):
             return [normalize(v) for v in value]
         return ids.get(value, value) if isinstance(value, str) else value
 
-    return {c: sorted((normalize(e) for e in graph[c]), key=lambda e: e["id"]) for c in COLLECTIONS.values()}
+    return {c: sorted((normalize(e) for e in graph.get(c, [])), key=lambda e: e["id"]) for c in COLLECTIONS.values()}
 
 
 def test_fixed_v1_is_the_accepted_conservative_model():
@@ -87,7 +87,7 @@ def test_fixed_v1_is_the_accepted_conservative_model():
     assert json.loads((RETAIL / "v1-refs.json").read_bytes()) == {i.client_ref: i.target_id for i in accepted.items}
     assert ctx["run"]["base_version_id"]
     assert ctx["run"]["source_draft_sha256"] == ctx["run"]["base_version_sha256"] == snapshot_sha256(ctx["draft"])
-    assert ctx["element_hashes"] == {e["id"]: element_sha256(e, collection=c) for c in COLLECTIONS.values() for e in ctx["draft"][c]}
+    assert ctx["element_hashes"] == {e["id"]: element_sha256(e, collection=c) for c in COLLECTIONS.values() for e in ctx["draft"].get(c, [])}
 
 
 def test_new_incremental_route_proves_seven_items_final_graph_and_sqlite(tmp_path, monkeypatch):
@@ -193,7 +193,7 @@ def test_exact_queries_return_full_definitions_hashes_and_only_small_reference_l
     ctx = context()
     status, data = cli(tmp_path, ctx, "refund", "property:refund.refund_amount", "refund.refund_for_order")
     assert status == 0
-    existing = {e["id"]: e for c in COLLECTIONS.values() for e in ctx["draft"][c]}
+    existing = {e["id"]: e for c in COLLECTIONS.values() for e in ctx["draft"].get(c, [])}
     for element in data["elements"]:
         definition = element["definition"]
         assert definition == without_material_hashes(existing[definition["id"]])
@@ -350,8 +350,8 @@ def test_library_base_is_independent_and_incremental_references_are_explicit():
     added = {"claim_map", "ledger_ds", "charge", "ledger_deposits", "ledger_charges", "claim_share"}
     base = []
     for part in parts:
-        # The v1 base is definitions only; the kit's document instances are not in it.
-        subset = [deepcopy(i) for i in part if i["client_ref"] not in added and i["target_kind"] not in INSTANCE_KINDS]
+        # The v1 base predates document instances and actions in the fixed kit.
+        subset = [deepcopy(i) for i in part if i["client_ref"] not in added and i["target_kind"] not in INSTANCE_KINDS and i["target_kind"] != "action"]
         for item in subset:
             if item["client_ref"] == "claim_ds":
                 item["after"].update(columns=[], description="赔偿表待同步")
@@ -368,7 +368,7 @@ def test_library_base_is_independent_and_incremental_references_are_explicit():
     assert refs == {i.client_ref: i.target_id for i in accepted.items}
     assert set(ctx["element_hashes"]).isdisjoint(context()["element_hashes"])
     assert ctx["run"]["source_draft_sha256"] == snapshot_sha256(ctx["draft"])
-    assert ctx["element_hashes"] == {e["id"]: element_sha256(e, collection=c) for c in COLLECTIONS.values() for e in ctx["draft"][c]}
+    assert ctx["element_hashes"] == {e["id"]: element_sha256(e, collection=c) for c in COLLECTIONS.values() for e in ctx["draft"].get(c, [])}
     items = json.loads(lookup("--part", "update").stdout)
     assert len(items) == 7
     target, mapping, query, metric, first, second, ratio = items

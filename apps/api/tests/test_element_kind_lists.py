@@ -289,7 +289,7 @@ def test_proposals_and_diagnostics_lists():
     _assert_coverage(
         set(KIT_PARTS),
         ALL_KINDS,
-        frozenset({"action"}),  # added in PR C (skills)
+        frozenset(),
     )
     for kind, part in KIT_PARTS.items():
         items = json.loads((EXTRACT_KIT_DIR / f"{part}.json").read_text(encoding="utf-8"))

@@ -25,6 +25,7 @@ REFERENCE_FIELDS = frozenset(
         "type_id",
         "property_id",
         "link_type_id",
+        "object_type_id",
         "numerator_id",
         "denominator_id",
         "property_ids",

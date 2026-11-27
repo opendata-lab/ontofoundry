@@ -61,18 +61,12 @@ def _schema_reference_like_fields() -> set[str]:
     return found
 
 
-DEFERRED_SKILL_KINDS = frozenset({"action"})  # added in PR C (skills)
-DEFERRED_SKILL_COLLECTIONS = frozenset({"actions"})  # added in PR C (skills)
-DEFERRED_SKILL_REFERENCE_FIELDS = frozenset({"object_type_id"})  # added in PR C (skills)
-
-
 def test_runpaths_collections_and_target_kinds_match_platform_schemas():
-    core_collections = _core_collections() - DEFERRED_SKILL_COLLECTIONS
-    proposal_kinds = _proposal_target_kinds() - DEFERRED_SKILL_KINDS
+    core_collections = _core_collections()
+    proposal_kinds = _proposal_target_kinds()
     expected_pairs = {
         kind.value: collection
         for kind, collection in PLATFORM_COLLECTIONS.items()
-        if kind.value not in DEFERRED_SKILL_KINDS
     }
 
     # Assert exact kind -> collection pairs, not only collection-name sets.
@@ -85,7 +79,7 @@ def test_runpaths_collections_and_target_kinds_match_platform_schemas():
 
 
 def test_generate_output_schemas_targets_partition_proposal_kinds():
-    proposal_kinds = _proposal_target_kinds() - DEFERRED_SKILL_KINDS
+    proposal_kinds = _proposal_target_kinds()
     discovery = generate_output_schemas.TARGETS["ontology-discovery"]
     extraction = generate_output_schemas.TARGETS["entity-extraction"]
 
@@ -98,7 +92,7 @@ def test_generate_output_schemas_targets_partition_proposal_kinds():
 
 
 def test_show_example_parts_by_kind_and_backend_kit_parts_match_extract_kit_examples():
-    proposal_kinds = _proposal_target_kinds() - DEFERRED_SKILL_KINDS
+    proposal_kinds = _proposal_target_kinds()
     assert set(show_example.PARTS_BY_KIND) == proposal_kinds
     assert show_example.PARTS_BY_KIND == KIT_PARTS
 
@@ -128,7 +122,66 @@ def test_show_element_reference_fields_cover_core_schema_element_refs():
     )
     assert non_element_refs <= schema_ref_fields
     assert not (show_element.REFERENCE_FIELDS & non_element_refs)
-    assert (
-        show_element.REFERENCE_FIELDS
-        == schema_ref_fields - non_element_refs - DEFERRED_SKILL_REFERENCE_FIELDS
-    )
+    assert show_element.REFERENCE_FIELDS == schema_ref_fields - non_element_refs
+
+
+def test_show_element_resolves_action_and_all_action_reference_fields():
+    ids = {
+        "target": "00000000-0000-4000-8000-000000000001",
+        "created": "00000000-0000-4000-8000-000000000002",
+        "prop": "00000000-0000-4000-8000-000000000003",
+        "link": "00000000-0000-4000-8000-000000000004",
+        "vt": "00000000-0000-4000-8000-000000000005",
+        "action": "00000000-0000-4000-8000-000000000006",
+    }
+    ctx = {
+        "draft": {
+            "object_types": [
+                {"id": ids["target"], "name": "ticket", "display_name": "工单"},
+                {"id": ids["created"], "name": "log_entry", "display_name": "记录"},
+            ],
+            "properties": [
+                {"id": ids["prop"], "name": "status", "owner_type_id": ids["target"], "value_kind": "string"},
+            ],
+            "link_types": [
+                {
+                    "id": ids["link"],
+                    "name": "ticket_log",
+                    "source_type_id": ids["created"],
+                    "target_type_id": ids["target"],
+                    "multiplicity": "many_to_one",
+                },
+            ],
+            "value_types": [
+                {"id": ids["vt"], "name": "team_code", "value_kind": "string"},
+            ],
+            "actions": [
+                {
+                    "id": ids["action"],
+                    "name": "dispatch_ticket",
+                    "display_name": "派单",
+                    "target_type_id": ids["target"],
+                    "parameters": [
+                        {
+                            "name": "team",
+                            "value_kind": "string",
+                            "value_type_id": ids["vt"],
+                            "required": True,
+                        }
+                    ],
+                    "effects": [
+                        {"kind": "set_property", "property_id": ids["prop"], "description": "已派单"},
+                        {"kind": "add_link", "link_type_id": ids["link"], "description": "关联记录"},
+                        {"kind": "create_object", "object_type_id": ids["created"], "description": "新建记录"},
+                    ],
+                }
+            ],
+        }
+    }
+    index = show_element.ElementIndex(ctx)
+    found, status = index.query(["action:dispatch_ticket"])
+    assert status == 0
+    assert found["elements"][0]["definition"]["id"] == ids["action"]
+    reverse = index.reverse_refs()
+    for ref_key in ("target", "created", "prop", "link", "vt"):
+        assert ids["action"] in reverse[ids[ref_key]], f"missing reverse ref for {ref_key}"

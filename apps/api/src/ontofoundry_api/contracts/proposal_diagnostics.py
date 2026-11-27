@@ -32,7 +32,7 @@ def diagnostic(pointer, message, expected, actual, item=None, *, graph=False):
 # Where the skill's fixed kit shows each kind (create).
 KIT_PARTS = {
     "object_type": "01", "property": "01", "value_type": "01", "link_type": "02",
-    "dataset": "03", "mapping": "03", "metric": "04", "rule": "04",
+    "dataset": "03", "mapping": "03", "metric": "04", "rule": "04", "action": "04",
     "material_object": "05", "material_link": "05",
 }
 KIT_VARIANTS = {("metric", "ratio"): "metric-ratio", ("metric", "expression"): "metric-expression",

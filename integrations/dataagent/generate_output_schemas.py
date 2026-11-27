@@ -8,7 +8,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent
 SOURCE = BASE.parents[1] / "apps/api/src/ontofoundry_api/contracts/ontofoundry.proposals.v1.schema.json"
 TARGETS = {
-    "ontology-discovery": {"object_type", "property", "value_type", "link_type", "dataset", "mapping", "metric", "rule"},
+    "ontology-discovery": {"object_type", "property", "value_type", "link_type", "dataset", "mapping", "metric", "rule", "action"},
     "entity-extraction": {"material_object", "material_link"},
 }
 
