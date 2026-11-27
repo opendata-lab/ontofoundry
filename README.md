@@ -171,8 +171,8 @@ ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://user:password@127.0.0.1:5432
 
 | MCP / 目录端点 | 鉴权方式 | 核心工具 / 用途 |
 | --- | --- | --- |
-| `POST /api/v1/mcp` | 个人访问令牌（PAT） | 跨空间智能体网关：`list_spaces`、`search_ontology`、`get_ontology`、`submit_feedback` |
-| `POST /api/v1/workspaces/{workspace_id}/mcp` | `ONTOFOUNDRY_MCP_TOKEN` / 运行凭据 | 单空间读取与实体解析：`search_ontology`、`get_ontology`、`search_objects`、`get_object`、`resolve_entity` |
+| `POST /api/v1/mcp` | 个人访问令牌（PAT） | 跨空间智能体网关：`list_spaces`（列出空间）、`search_ontology`（搜索本体）、`get_ontology`（查询本体）、`submit_feedback`（提交反馈） |
+| `POST /api/v1/workspaces/{workspace_id}/mcp` | `ONTOFOUNDRY_MCP_TOKEN` / 运行凭据 | 单空间读取与实体解析：`search_ontology`（搜索本体）、`get_ontology`（查询本体）、`search_objects`（搜索事实）、`get_object`（查看事实）、`resolve_entity`（解析实体） |
 | `GET /api/v1/mcp/workspaces` | Bearer Token | 获取当前令牌可访问的工作空间与发布版本目录 |
 
 ### 2. AI 辅助建模（可选接入 OpenDataWorks DataAgent）

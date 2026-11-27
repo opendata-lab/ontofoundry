@@ -703,7 +703,7 @@ type MCPRequest = { jsonrpc: "2.0"; id: string | number } & (
 );
 type MCPNotification = { jsonrpc: "2.0"; method: "notifications/initialized"; params?: MCPMeta };
 type ToolDescription = {
-  name: ToolName; description: string; inputSchema: Record<string, Json>;
+  name: ToolName; title: string; description: string; inputSchema: Record<string, Json>;
   annotations: { readOnlyHint: true; destructiveHint: false };
 };
 type MCPResponse<T> = { jsonrpc: "2.0"; id: string | number | null } & (

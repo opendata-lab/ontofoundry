@@ -177,12 +177,12 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 ## 5. 网关工具契约
 
-| 工具 | 入参 | 行为 |
-|---|---|---|
-| `list_spaces` | 无 | 列出用户当前可阅读的空间（成员空间和公开空间）：`workspace_id`、名称、角色（非成员的公开空间为 `public`）、`version_id`、`version_number`，未发布的空间两个版本字段为 `null`；另返回当前令牌的 `permissions`。只查成员关系和发布版本号，不加载版本快照（不复用会统计元素数的 `workspace_summary`），因为 Skill 每个问题都会调用。 |
-| `search_ontology` | `query`；可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor`。除 `workspace_ids` 外与单空间入口相同 | 省略 `workspace_ids` 时检索用户有成员角色的全部空间；公开空间和平台管理员仅凭配置可读的空间不进入默认检索，需显式传入（它们出现在 `list_spaces` 中），避免默认检索因空间过多触发上限。结果按空间分组，每组即单空间检索的结果（`workspace_id`、`version_id`、`items`、`total`、`next_cursor`、`retrieval`、`unmatched_terms`），组内排序不变，`limit` 按组生效；组按空间名称排序，不做跨空间统一排序。续页时传入该组的 `next_cursor`，`workspace_ids` 只含该组空间，其余参数不变。 |
-| `get_ontology` | `workspace_id`；其余参数与单空间入口相同（`ids`、`kinds`、`include`、`limit`、`cursor`） | 读取一个空间的已发布定义和有权限的投影，响应带 `workspace_id`、`version_id`，分页和字段分段沿用现有规则。 |
-| `submit_feedback` | `workspace_id`、`kind`（`correction` 纠正／`suggestion` 建议）、`user_text`、`agent_text`；可选 `element_ids`（最多 20 个） | 按第 7 节写入一条反馈，返回 `feedback_id`、`workspace_id`、`version_id`、`created_at`。只新增记录，不改本体。 |
+| 工具 | 显示标题 | 入参 | 行为 |
+|---|---|---|---|
+| `list_spaces` | 列出空间 | 无 | 列出用户当前可阅读的空间（成员空间和公开空间）：`workspace_id`、名称、角色（非成员的公开空间为 `public`）、`version_id`、`version_number`，未发布的空间两个版本字段为 `null`；另返回当前令牌的 `permissions`。只查成员关系和发布版本号，不加载版本快照（不复用会统计元素数的 `workspace_summary`），因为 Skill 每个问题都会调用。 |
+| `search_ontology` | 搜索本体 | `query`；可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor`。除 `workspace_ids` 外与单空间入口相同 | 省略 `workspace_ids` 时检索用户有成员角色的全部空间；公开空间和平台管理员仅凭配置可读的空间不进入默认检索，需显式传入（它们出现在 `list_spaces` 中），避免默认检索因空间过多触发上限。结果按空间分组，每组即单空间检索的结果（`workspace_id`、`version_id`、`items`、`total`、`next_cursor`、`retrieval`、`unmatched_terms`），组内排序不变，`limit` 按组生效；组按空间名称排序，不做跨空间统一排序。续页时传入该组的 `next_cursor`，`workspace_ids` 只含该组空间，其余参数不变。 |
+| `get_ontology` | 查询本体 | `workspace_id`；其余参数与单空间入口相同（`ids`、`kinds`、`include`、`limit`、`cursor`） | 读取一个空间的已发布定义和有权限的投影，响应带 `workspace_id`、`version_id`，分页和字段分段沿用现有规则。 |
+| `submit_feedback` | 提交反馈 | `workspace_id`、`kind`（`correction` 纠正／`suggestion` 建议）、`user_text`、`agent_text`；可选 `element_ids`（最多 20 个） | 按第 7 节写入一条反馈，返回 `feedback_id`、`workspace_id`、`version_id`、`created_at`。只新增记录，不改本体。 |
 
 前三个工具在 `tools/list` 中标注只读；`submit_feedback` 标注非只读、非破坏性（`readOnlyHint: false`、`destructiveHint: false`）。
 

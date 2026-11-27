@@ -177,12 +177,13 @@ async def handle_rpc(request, *, tools, inputs, instructions, call_tool):
         result = {
             "tools": [
                 {
-                    "name": n,
-                    "description": d,
-                    "inputSchema": inputs[n].model_json_schema(),
-                    "annotations": {"readOnlyHint": n != "submit_feedback", "destructiveHint": False},
+                    "name": name,
+                    "title": title,
+                    "description": description,
+                    "inputSchema": inputs[name].model_json_schema(),
+                    "annotations": {"readOnlyHint": name != "submit_feedback", "destructiveHint": False},
                 }
-                for n, d in tools.items()
+                for name, (title, description) in tools.items()
             ]
         }
     elif method == "tools/call":
