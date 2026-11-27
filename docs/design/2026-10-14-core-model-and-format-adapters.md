@@ -1385,7 +1385,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 34 | Ossie 语义基准 | 尽量无损保留 Ossie 语义，未承载能力集中列 §7；派生定义、元组标识、值类型约束仅成功完整转换的具体条目按 converted，其余原文待补全，避免夸大能力 |
 | 35 | 单父与属性标识 | 保留文件首父，其他父类及影响逐项报告；派生条件或关系仅是需审阅的业务改写建议，不等价、不自动生成关系；含关系的 identify_by 整组待补全，避免改变身份（§5.2） |
 | 36 | 多元关系标识 | 按基数确定构键角色，复合标识逐项生成 required 编号属性；角色 direct 使用同组编号，不另加一致性规则；仅有对应证据才绑外键，否则保留原角色映射并待补编号绑定，缺决定角色标识不裁剪键（§5.3） |
-| 37 | 删除业务动作 | 首版删除 actions、Action、参数、效果、precondition_rule_ids 及 owner_kind=action 规则。只有定义没有执行器，本期先做建模问数；原参考是 Palantir Action Type，Ossie 与本次核对的 Fabric 本体定义协议没有对应构造，待做执行时完整设计。沿第 5 项清空，不做 v2 迁移或迁移报告 |
+| 37 | 删除业务动作 | 首版删除 actions、Action、参数、效果、precondition_rule_ids 及 owner_kind=action 规则。只有定义没有执行器，本期先做建模问数；原参考是 Palantir Action Type，Ossie 与本次核对的 Fabric 本体定义协议没有对应构造，待做执行时完整设计。沿第 5 项清空，不做 v2 迁移或迁移报告。**2026-11-27 修订**：恢复为只定义、不执行的业务动作，见[业务动作定义](2026-11-27-action-types.md) |
 | 38 | 派生成员定义 | 删除 row_filter，改为 ObjectType.derived_by；simple 条件与 expression 互斥，空数组无本层条件，多项为并集，多层逐级限定并与成员扩展来源同时限定。按 id 保留角色方向和 EXISTS，普通 Rule 不参与成员定义（§3.2、§5.5） |
 | 39 | 精简重复字段与限制 | 删除 DataMapping.primary_source_id，independent 固定 main、shared_parent 沿父；simple、ratio.value_kind 只读推导、输入不收，expression 仍声明类型；删除固定 DECIMAL(38,10) 和 SQL 保留字禁用，精度和引号交给 agent（§3.6–3.9） |
 | 40 | 报告与补全 | 删除 placeholder outcome 及占位串机制，仅 converted、dropped、error；删持久化 blocked，按实际依赖实时算阻断，保留原文与历史报告；通用解析、版本和原生证据错误 rule_id 可空，避免假编号（§4.2–4.5） |
