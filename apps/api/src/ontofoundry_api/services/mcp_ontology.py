@@ -84,9 +84,8 @@ INPUTS = {
     "search_objects": SearchObjects,
     "get_object": GetObject,
 }
-BUDGET = 110_000  # Structured payload target; wire size is bounded separately below 256 KiB.
-WIRE_BUDGET = 220_000  # Target JSON-RPC wire bytes (content[].text + structuredContent) under 256 KiB.
-WIRE_LIMIT = 248_000  # Hard cap on tool_result wire bytes so full HTTP JSON-RPC body stays <= 256 KiB.
+BUDGET = 110_000  # Both text and structuredContent count toward the 256 KiB wire limit.
+ACTION_EVIDENCE_WIRE_BUDGET = 220_000  # Wire-byte budget for action evidence paging (content[].text + structuredContent) under 256 KiB.
 
 
 def size(value):
@@ -99,8 +98,8 @@ def size(value):
     )
 
 
-def wire_size(value):
-    """Exact UTF-8 byte size of tool_result(value) as serialized by FastAPI/Starlette."""
+def _wire_size(value):
+    """UTF-8 byte size of tool_result(value) as serialized by FastAPI/Starlette (used by action evidence paging)."""
     from fastapi.encoders import jsonable_encoder
 
     structured = jsonable_encoder(value)
@@ -115,7 +114,7 @@ def wire_size(value):
 
 
 def _wire_item_delta(value):
-    """Incremental JSON-RPC wire bytes contributed by one list item (structuredContent + escaped text)."""
+    """Incremental JSON-RPC wire bytes contributed by one evidence item (structuredContent + escaped text)."""
     from fastapi.encoders import jsonable_encoder
 
     structured = jsonable_encoder(value)
@@ -169,15 +168,33 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     )
     index = draft_index(draft)
 
-    def page(values, path, start=0, *, budget=WIRE_BUDGET // 2):
+    def page(values, path, start=0):
         items, cursor = [], None
-        used = 0
         for n in range(start, min(len(values), start + args.limit)):
-            delta = _wire_item_delta(values[n])
-            if items and used + delta > budget:
+            if items and size(items + [values[n]]) > BUDGET // 2:
                 break
             items.append(values[n])
-            used += delta
+        end = start + len(items)
+        if end < len(values):
+            cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
+        return {"total": len(values), "items": items, "next_cursor": cursor}
+
+    def page_action_evidence(values, path, base_element, start=0):
+        # Measure both real JSON-RPC wire bytes and structuredContent size for action
+        # evidence so backslash-heavy evidence never overflows 256 KiB or the 120 KB cap.
+        wire_budget = max(8_000, ACTION_EVIDENCE_WIRE_BUDGET - _wire_size(base_element) - 8_000)
+        raw_budget = max(4_000, BUDGET - size(base_element) - 4_000)
+        items, cursor = [], None
+        used_wire = 0
+        for n in range(start, min(len(values), start + args.limit)):
+            delta_wire = _wire_item_delta(values[n])
+            if items and (
+                used_wire + delta_wire > wire_budget
+                or size(items + [values[n]]) > raw_budget
+            ):
+                break
+            items.append(values[n])
+            used_wire += delta_wire
         end = start + len(items)
         if end < len(values):
             cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
@@ -366,9 +383,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     element["definition"] = definition
                     if action_evidence is not None and instances:
                         d["evidence"] = action_evidence
-                        ev_budget = max(8_000, WIRE_BUDGET - wire_size(element) - 8_000)
-                        element["evidence"] = page(
-                            action_evidence, [len(values), "evidence"], budget=ev_budget
+                        element["evidence"] = page_action_evidence(
+                            action_evidence, [len(values), "evidence"], element
                         )
                 for key in ("properties", "child_types", "actions"):
                     if key in d:
@@ -398,17 +414,11 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             n, key = path
             d = lookup[values[n]["id"]]["definition"]
             raw = d.get(key)
-            list_budget = (
-                max(
-                    8_000,
-                    WIRE_BUDGET
-                    - wire_size({k: v for k, v in values[n].items() if k != "evidence"})
-                    - 8_000,
-                )
-                if key == "evidence" and values[n]["kind"] == "action"
-                else WIRE_BUDGET // 2
-            )
-            values[n][key] = page(raw, path, offset, budget=list_budget)
+            if key == "evidence" and values[n]["kind"] == "action":
+                base_el = {k: v for k, v in values[n].items() if k != "evidence"}
+                values[n][key] = page_action_evidence(raw, path, base_el, offset)
+            else:
+                values[n][key] = page(raw, path, offset)
             return {
                 **envelope,
                 "total": len(values),
@@ -676,7 +686,7 @@ def invoke(db, workspace_id, principal, name, arguments, settings):
     result = bounded(result)
     if segments:
         result.setdefault("field_segments", []).extend(segments)
-    if wire_size(result) > WIRE_LIMIT:
+    if size(result) > 120000:
         raise ServiceError(
             "当前投影超过单页预算，请缩小 limit 或 include",
             code="response_too_large",

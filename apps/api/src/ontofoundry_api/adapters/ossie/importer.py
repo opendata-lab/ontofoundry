@@ -916,18 +916,21 @@ class OntologyImporter:
         # source paths can never silently fall through to a normalized core identifier.
         source_concept_counts: Counter[str] = Counter()
         source_member_counts: Counter[str] = Counter()
-        for concept in self.document.get("ontology", []):
+        raw_ontology = self.document.get("ontology")
+        for concept in raw_ontology if isinstance(raw_ontology, list) else ():
             if not isinstance(concept, dict):
                 continue
             cname = concept.get("concept")
             if not isinstance(cname, str) or not cname:
                 continue
             source_concept_counts[cname] += 1
-            for rel in concept.get("relationships", []) or []:
-                if isinstance(rel, dict):
-                    rname = rel.get("name")
-                    if isinstance(rname, str) and rname:
-                        source_member_counts[f"{cname}.{rname}"] += 1
+            raw_rels = concept.get("relationships")
+            if isinstance(raw_rels, list):
+                for rel in raw_rels:
+                    if isinstance(rel, dict):
+                        rname = rel.get("name")
+                        if isinstance(rname, str) and rname:
+                            source_member_counts[f"{cname}.{rname}"] += 1
 
         carried_concepts: dict[str, list[ObjectType | ValueType]] = {}
         for name, obj in self.t.objects.items():

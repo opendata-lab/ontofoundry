@@ -1318,10 +1318,10 @@ def test_action_proposal_drops_submitter_field_changes_for_create_update_delete(
 
 
 def test_mcp_action_backslash_heavy_evidence_stays_under_256kib_wire_cap(client):
-    """Reproduces Codex round-2 A: 40 backslash-heavy evidence entries at limit=100 must keep HTTP JSON-RPC <= 256 KiB."""
+    """Reproduces Codex round-2/3 A: 40 backslash-heavy evidence entries at limit=100 must keep HTTP JSON-RPC <= 256 KiB."""
     from test_modeling import mcp_request
 
-    lines = [f"L{i:02d}:" + ("\\" * 950) for i in range(1, 41)]
+    lines = [f"L{i:02d}:" + ("\\" * 995) for i in range(1, 41)]
     upload = client.post(
         ROOT + "/materials",
         params={"name": "backslash-policy.md"},
@@ -1335,7 +1335,7 @@ def test_mcp_action_backslash_heavy_evidence_stays_under_256kib_wire_cap(client)
         {
             "kind": "material",
             "material_id": material_id,
-            "locator": {"heading": f"条款 {i}", "line_start": i, "line_end": i},
+            "locator": {"heading": f"条款 {i} " + ("\\" * 100), "line_start": i, "line_end": i},
             "quote": lines[i - 1],
         }
         for i in range(1, 41)
@@ -1532,3 +1532,189 @@ def test_version_diff_skips_action_helper_without_actions_and_stays_linear(monke
     assert len(diff["changes"]) == 2000
     assert diff["impacts"] == []
     assert elapsed < 1.0, f"no-action 2000-property diff took too long: {elapsed:.3f}s"
+
+
+def test_mcp_property_with_40_evidence_reads_at_limit_1_like_main(client):
+    """Reproduces Codex round-3 A regression: reading a 40-evidence property at limit=1 succeeds as on main."""
+    from test_modeling import mcp_request
+
+    lines = [f"P{i:02d}:" + ("\\" * 950) for i in range(1, 41)]
+    upload = client.post(
+        ROOT + "/materials",
+        params={"name": "prop-evidence-policy.md"},
+        content=("\n".join(lines) + "\n").encode("utf-8"),
+    )
+    assert upload.status_code in (200, 201), upload.text
+    material_id = upload.json()["id"]
+
+    evidences = [
+        {
+            "kind": "material",
+            "material_id": material_id,
+            "locator": {"heading": f"字段条款 {i}", "line_start": i, "line_end": i},
+            "quote": lines[i - 1],
+        }
+        for i in range(1, 41)
+    ]
+    session = create_session(client)
+    batch = seed_batch(
+        client,
+        session,
+        [
+            create("obj_ev_prop", "object_type", {"name": "ev_work_order", "display_name": "证据工单"}),
+            create(
+                "prop_40_ev",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "obj_ev_prop"},
+                    "name": "remark_text",
+                    "display_name": "备注",
+                    "value_kind": "string",
+                    "evidence": evidences,
+                },
+            ),
+        ],
+    )
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-prop-40-ev",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    session = dec.json()["session"]
+    prop_id = next(p["id"] for p in session["draft"]["properties"] if p["name"] == "remark_text")
+    pub = publish(client, session)
+    assert pub.status_code == 200, pub.text
+
+    resp = mcp_request(
+        client,
+        "tools/call",
+        {"name": "get_ontology", "arguments": {"ids": [prop_id], "limit": 1}},
+    )
+    assert resp.status_code == 200, resp.text
+    result = resp.json()["result"]
+    assert not result["isError"], result
+    el = result["structuredContent"]["elements"][0]
+    assert el["kind"] == "property"
+    assert len(el["definition"]["evidence"]) == 40
+
+
+def test_ossie_exported_action_ref_names_core_fallback_and_no_dropped_marker():
+    """Reproduces Codex round-3 B1: extension reader keeps action_ref_names='core' so core-name fallback works with no dropped marker."""
+    ws_id = uuid4()
+    obj_id = uuid4()
+    prop_id = uuid4()
+    act_id = uuid4()
+    model = CoreDraft(
+        workspace_id=ws_id,
+        object_types=[ObjectType(id=obj_id, name="work_order", display_name="工单")],
+        properties=[
+            Property(
+                id=prop_id,
+                owner_type_id=obj_id,
+                name="status_code",
+                display_name="状态编码",
+                value_kind=ValueKind.STRING,
+            )
+        ],
+        actions=[
+            Action(
+                id=act_id,
+                name="update_status",
+                display_name="更新状态",
+                target_type_id=obj_id,
+                effects=[
+                    SetPropertyEffect(
+                        kind="set_property",
+                        property_id=prop_id,
+                        description="更新状态编码",
+                    )
+                ],
+            )
+        ],
+    )
+    adapter = OssieAdapter()
+    exported = adapter.export_document(
+        model,
+        ExportContext(workspace_name="ops_demo", workspace_slug="ops-demo", workspace_description=""),
+    )
+    assert exported.document is not None
+
+    # Rewrite ONLY the .ossie.json inside the exported ZIP to rename status_code -> status-code,
+    # keeping ontofoundry-extension.json untouched (with action_ref_names="core").
+    repacked = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(exported.document), "r") as zin, zipfile.ZipFile(
+        repacked, "w"
+    ) as zout:
+        for info in zin.infolist():
+            raw = zin.read(info.filename)
+            if info.filename.endswith(".ossie.json"):
+                doc = json.loads(raw.decode("utf-8"))
+                for concept in doc["ontology"]:
+                    if concept.get("concept") == "work_order":
+                        for rel in concept.get("relationships", []):
+                            if rel.get("name") == "status_code":
+                                rel["name"] = "status-code"
+                raw = json.dumps(doc, ensure_ascii=False).encode("utf-8")
+            zout.writestr(info.filename, raw)
+
+    imported = adapter.import_document(repacked.getvalue(), ImportContext(workspace_id=ws_id))
+    assert [a.name for a in imported.model.actions] == ["update_status"]
+    assert imported.model.actions[0].effects[0].property_id == imported.model.properties[0].id
+    dropped_marker = [
+        i
+        for i in imported.report.issues
+        if "action_ref_names" in i.source_path and i.outcome == "dropped"
+    ]
+    assert dropped_marker == []
+
+
+def test_ossie_import_tolerates_malformed_concept_relationships_and_keeps_valid_actions():
+    """Reproduces Codex round-3 B2: unrelated concept with relationships=1 must not crash import_actions."""
+    ossie_doc = {
+        "version": "0.2.0.dev0",
+        "name": "ops_demo",
+        "ontology": [
+            {"concept": "broken_concept", "type": "EntityType", "relationships": 1},
+            {
+                "concept": "work_order",
+                "type": "EntityType",
+                "relationships": [
+                    {
+                        "name": "status",
+                        "verbalizes": ["{work_order} status {String}"],
+                        "roles": [{"concept": "String"}],
+                    }
+                ],
+            },
+        ],
+    }
+    ext_doc = {
+        "version": "core-1",
+        "actions": {
+            "close_work_order": {
+                "display_name": "关闭工单",
+                "target_type": "work_order",
+                "parameters": [],
+                "effects": [
+                    {
+                        "kind": "set_property",
+                        "property": "work_order.status",
+                        "description": "设置工单为已关闭",
+                    }
+                ],
+            }
+        },
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("model.ossie.json", json.dumps(ossie_doc, ensure_ascii=False))
+        zf.writestr("ontofoundry-extension.json", json.dumps(ext_doc, ensure_ascii=False))
+
+    result = OssieAdapter().import_document(buf.getvalue(), ImportContext(workspace_id=uuid4()))
+    assert [o.name for o in result.model.object_types] == ["work_order"]
+    assert [a.name for a in result.model.actions] == ["close_work_order"]
+    assert any(i.outcome == "error" for i in result.report.issues)

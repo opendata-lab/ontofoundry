@@ -7,6 +7,17 @@
 - 开工时，中大型变更先按 AGENTS.md 写 `design/` 和 `plans/`，并在这里附链接。
 - 做完后移到文末“已完成”，保留结果链接。
 
+## MCP 全种类真实线缆传输预算与 JSON-RPC 封装计费
+
+现状：`apps/api/src/ontofoundry_api/services/mcp_ontology.py` 的共享 `page()` 与最终响应上限（`120,000` 字节）只计量 `structuredContent`，未计入 `apps/api/src/ontofoundry_api/api/mcp_rpc.py::tool_result` 中重复序列化并二次转义的 `content[].text`；同时外层 JSON-RPC 响应在工具预算检查后才拼入请求 `id`。实测（2026-11-27，PR #126 复核）：
+- 含 40 条反斜杠密集证据的动作仅按 `structuredContent` 计量时首屏 HTTP 响应达 **304,821 字节**（超过 256 KiB；PR #126 已仅对动作证据分页单独改用真实线缆字节，分三页降至 204,471 / 204,531 / 103,495 字节）；
+- 含 40 条证据的属性直接读取在 `limit=1` 下响应达 **254,174 字节**（属性与规则的证据仍内嵌在 `definition` 中，无独立证据游标）；
+- 同一动作请求若传入 60,000 字节合法字符串 JSON-RPC `id`，完整 HTTP 响应仍可达 **270,273 字节**。
+
+要做：统一设计全种类 MCP 响应的线缆字节预算与分页策略（评估属性/规则证据是否游标分页、并在 `mcp_rpc.py` 限制请求 `id` 长度或纳入外层封装预算），确保所有工具与种类在任何合法转义字符及请求 `id` 下都不超过 256 KiB，同时不破坏既有无游标直读契约。
+
+来源：PR #126 Review Round 2–3（2026-11-27）。
+
 ## 删除旧版 Ossie 扩展块的读取兼容
 
 现状：平台扩展信息只导出到 ZIP 内的 `ontofoundry-extension.json`，导入仍兼容旧文件里的 `ai_context.ontofoundry`。具体是 `adapters/ossie/extension.py` 的 `read_extension` 回退分支，读取时报 RT-03 converted；`importer.py` 的文档级 `ai_context` 检查也排除了 `ontofoundry` 键。
