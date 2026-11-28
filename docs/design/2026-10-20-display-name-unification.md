@@ -11,7 +11,7 @@
 | N-03 | 关系新增 display_name；verbalizes 与 source_role_name、target_role_name 保持原语义。 | 2026-10-20 |
 | N-04 | 旧本体内容清理、不转换。新增 Alembic 迁移，清空版本、会话、提案、导入与身份登记，保留用户、空间、成员、材料与分块、磁盘材料、连接、服务令牌及范围、元数据快照。 | 2026-10-20 |
 | N-05 | Ossie 导出 ZIP：纯 Ossie JSON + ontofoundry-extension.json；官方 vendored schema 校验纯 Ossie 文件。 | 2026-10-20 |
-| N-06 | Ossie 单文件导入不填显示名；ZIP 恢复扩展；外部旧 ai_context.ontofoundry 仍读取并报告“旧版扩展块”。 | 2026-10-20 |
+| N-06 | Ossie 单文件导入不填显示名；ZIP 恢复扩展；外部旧 `ai_context.ontofoundry` 块不再读取，按 RT-02 dropped 并提示重新导出为 ZIP（2026-11-27 精简，原 2026-10-20 曾临时保留读取兼容）。 | 2026-10-20 / 2026-11-27 |
 | N-07 | 原生单文件及完整包导出新字段，旧外部文件仅在导入边界转换并报告。 | 2026-10-20 |
 | N-08 | 契约、MCP、DataAgent、前端与测试同步；界面“名称”为 display_name，“英文标识”为 name。 | 2026-10-20 |
 

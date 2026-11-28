@@ -313,7 +313,7 @@ Field 对应的列被 Metric.time_field 或 Dataset.snapshot_date_column 使用�
 
 | RT | 本次变更与保留边界 |
 |---|---|
-| RT-03 | 扩展允许上述三项及 dataset 显示名定位；旧扩展块仍只导入兼容，非法/未知字段继续报告 |
+| RT-03 | 扩展允许上述三项及 dataset 显示名定位；仅读取 ZIP 内 `ontofoundry-extension.json`，非法/未知字段继续报告（2026-11-27 起不再兼容旧版 `ai_context.ontofoundry` 块） |
 | RT-13 | 保留引号规范化，扩大 query 中已解析标识；不能重写字符串字面量 |
 | RT-21 | 二元角色名随扩展往返；值角色及一元/多元原形不保存。 |
 | RT-26 | 一元转布尔属性，规范导出并报告结构差异；不保存原形。 |
