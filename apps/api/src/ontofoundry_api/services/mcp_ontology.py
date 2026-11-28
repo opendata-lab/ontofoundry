@@ -180,7 +180,9 @@ def _response_fits(value, *, request_id=None) -> bool:
     text = json.dumps(structured, ensure_ascii=False)
     envelope = {
         "jsonrpc": "2.0",
-        "id": request_id if request_id is not None else _DEFAULT_REQUEST_ID_RESERVE,
+        # Always size with the fixed reserve: pages (and the cursors they issue) must not
+        # depend on the caller's request id, which clients increment per request.
+        "id": _DEFAULT_REQUEST_ID_RESERVE,
         "result": {
             "content": [{"type": "text", "text": text}],
             "structuredContent": structured,

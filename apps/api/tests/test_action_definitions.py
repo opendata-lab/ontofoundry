@@ -2757,19 +2757,10 @@ def test_mcp_action_with_uuid_request_id_and_default_reserve_stays_under_256kib(
         assert not result["isError"], result
         assert result["structuredContent"]["elements"][0]["name"] == "uuid_rid_near_limit_action"
 
-    # Verify exact wire-limit sensitivity: a payload right at 256 KiB with request_id=1
-    # exceeds 256 KiB for a 36-char UUID id and for the default 256 B reserve (request_id=None).
-    lo, hi = 1, 50_000
-    while lo < hi:
-        mid = (lo + hi + 1) // 2
-        if _response_fits({"workspace_id": WID, "version_id": None, "blob": "\\" * mid}, request_id=1):
-            lo = mid
-        else:
-            hi = mid - 1
-    tight_payload = {"workspace_id": WID, "version_id": None, "blob": "\\" * lo}
-    assert _response_fits(tight_payload, request_id=1) is True
-    assert _response_fits(tight_payload, request_id=uuid_rid) is False
-    assert _response_fits(tight_payload, request_id=None) is False
+    # Sizing uses a fixed 256 B id reserve, so pages and the cursors they issue do not
+    # depend on the caller's request id (clients increment ids between requests).
+    payload = {"workspace_id": WID, "version_id": None, "blob": "\\" * 40_000}
+    assert _response_fits(payload, request_id=1) == _response_fits(payload, request_id=uuid_rid) == _response_fits(payload)
 
 
 def test_mcp_stale_action_continuation_field_cursor_returns_cursor_invalid(client):
