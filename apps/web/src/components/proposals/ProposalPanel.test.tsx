@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CoreElement, DecisionResult, ModelingSession, ProposalBatchDetail, ProposalItem } from "../../api/types";
+import type { CoreElement, DecisionResult, Draft, ModelingSession, ProposalBatchDetail, ProposalItem } from "../../api/types";
 import type { ProposalsState } from "../../hooks/useProposals";
 import { emptyDraft } from "../../lib/coreModel";
 import { example } from "../../test/drafts";
@@ -469,6 +469,102 @@ describe("proposal review", () => {
     expect(payload.after.id).toBe(customer.id);
     expect(payload.after.values).toMatchObject({ customer_no: "C001", name: "星海贸易有限公司", is_vip: true });
     expect(payload.after.evidence.map((e) => e.id)).toEqual([...customer.evidence.map((e) => e.id), "e"]);
+  });
+
+  it("opens proposal detail on a runtime v0.5 draft without actions or material_objects", () => {
+    const ticketTypeId = "obj-service-ticket";
+    const statusPropId = "prop-ticket-status";
+    const priorityVtId = "vt-priority-level";
+    const base = {
+      ...emptyDraft("w"),
+      object_types: [
+        {
+          id: ticketTypeId,
+          name: "service_ticket",
+          display_name: "服务工单",
+          description: "",
+          synonyms: [],
+          tags: [],
+          evidence: [],
+          extends: null,
+          derived_by: [],
+          title_property_id: null,
+        },
+      ],
+      properties: [
+        {
+          id: statusPropId,
+          owner_type_id: ticketTypeId,
+          name: "ticket_status",
+          display_name: "工单状态",
+          description: "",
+          synonyms: [],
+          evidence: [],
+          value_kind: "string" as const,
+          identifier: false,
+          unique: false,
+          required: true,
+          value_type_id: null,
+        },
+      ],
+      value_types: [
+        {
+          id: priorityVtId,
+          name: "priority_level",
+          display_name: "优先级编码",
+          base_kind: "string" as const,
+          description: "",
+          evidence: [],
+        },
+      ],
+    };
+    const { actions: _omittedActions, material_objects: _omittedFacts, ...legacyDraft } = base;
+    void _omittedActions;
+    void _omittedFacts;
+    const actionProposal = item({
+      id: "act-assign",
+      target_kind: "action",
+      target_id: "action-assign-ticket",
+      display_name: "指派工单",
+      reason: "收到报修后需要指派现场工程师并更新状态",
+      evidence: [evidence],
+      after: element({
+        id: "action-assign-ticket",
+        name: "assign_ticket",
+        display_name: "指派工单",
+        description: "将工单分派给值班人员",
+        target_type_id: ticketTypeId,
+        parameters: [
+          {
+            name: "priority",
+            display_name: "紧急程度",
+            value_kind: "string",
+            value_type_id: priorityVtId,
+            required: true,
+            description: "工单响应级别",
+          },
+        ],
+        effects: [
+          {
+            kind: "set_property",
+            property_id: statusPropId,
+            description: "置为已指派",
+          },
+        ],
+      }),
+    });
+    const list = [actionProposal];
+    panel(
+      state({ detail: batch(list), batches: [batch(list)] }),
+      session({ draft: legacyDraft as unknown as Draft }),
+    );
+    fireEvent.click(row("assign_ticket"));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/新增动作 · 指派工单/)).toBeInTheDocument();
+    expect(within(dialog).getByText("服务工单")).toBeInTheDocument();
+    expect(within(dialog).getByText("优先级编码")).toBeInTheDocument();
+    expect(within(dialog).getByText("服务工单.工单状态")).toBeInTheDocument();
+    expect(within(dialog).getByText("收到报修后需要指派现场工程师并更新状态")).toBeInTheDocument();
   });
 });
 
