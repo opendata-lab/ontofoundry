@@ -3051,3 +3051,168 @@ def test_mcp_action_object_last_resort_collection_trimming_keeps_every_page_unde
             collected_acts.extend(a["name"] for a in act_page["items"])
             act_cursor = act_page["next_cursor"]
         assert collected_acts == [expected_act_name]
+
+
+def test_legacy_v05_draft_without_actions_key_reads_accepts_and_publishes_first_action_proposal(
+    client,
+):
+    """Restored v0.5.0 core-1 drafts lack top-level `actions`; first Action proposals must read, accept, and publish."""
+    from test_t1_proposal_contract import items_only
+
+    from ontofoundry_api.db_models import ModelingSessionRecord
+    from ontofoundry_api.domain.canonical import snapshot_sha256
+    from ontofoundry_api.services.dataset_proposals import candidate_for
+    from ontofoundry_api.services.instance_store import baseline
+    from ontofoundry_api.services.materials_lookup import material_lookup
+    from ontofoundry_api.services.proposals import dependency_map, store_batch
+
+    session = create_session(client)
+    original_revision = session["revision"]
+    legacy_draft = deepcopy(session["draft"])
+    legacy_draft.pop("actions", None)
+    assert "actions" not in legacy_draft
+    legacy_sha256 = snapshot_sha256(legacy_draft)
+    existing_object_ids = {o["id"] for o in legacy_draft["object_types"]}
+    existing_property_ids = {p["id"] for p in legacy_draft["properties"]}
+    assert existing_object_ids, "demo workspace fixture must contain pre-existing object types"
+
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        row.draft_json = deepcopy(legacy_draft)
+        row.draft_sha256 = legacy_sha256
+        db.commit()
+
+    # Store a valid first-Action proposal batch against the legacy v0.5-shaped draft.
+    run_token = uuid4().hex
+    manifest = {
+        "run_token": run_token,
+        "workspace_id": session["workspace_id"],
+        "session_id": session["id"],
+        "base_version_id": session["base_version_id"],
+        "base_version_sha256": session["base_version_sha256"],
+        "source_session_revision": original_revision,
+        "source_draft_sha256": legacy_sha256,
+        "materials": [],
+    }
+    with client.app.state.session_factory() as db:
+        instances = baseline(db, session["workspace_id"], session["id"])
+        context = RunContext(
+            **{k: manifest[k] for k in list(manifest)[:7]},
+            draft=deepcopy(legacy_draft),
+            instance_baseline=instances,
+        )
+        parsed = parse_result(
+            json.dumps({"items": items_only(_work_order_proposal_fixture())}).encode(),
+            context,
+            material_lookup(db, client.app.state.settings, session["workspace_id"]),
+        )
+        store_batch(
+            db,
+            workspace_id=session["workspace_id"],
+            session_id=session["id"],
+            task_id=None,
+            manifest=manifest,
+            parsed=parsed,
+        )
+        db.commit()
+
+    # 1. Reading the batch through the real GET endpoint must succeed (not 500 KeyError: 'actions').
+    read_resp = client.get(
+        ROOT + f"/sessions/{session['id']}/proposal-batches/{parsed.id}"
+    )
+    assert read_resp.status_code == 200, read_resp.text
+    batch = read_resp.json()
+    by_ref = {item["client_ref"]: item for item in batch["items"]}
+    assert {"act_dispatch", "act_create_inspection"} <= set(by_ref)
+    assert by_ref["act_dispatch"]["acceptance_issues"] == []
+    assert by_ref["act_dispatch"]["source_diagnostics"] == []
+    assert by_ref["act_create_inspection"]["acceptance_issues"] == []
+    assert by_ref["act_create_inspection"]["source_diagnostics"] == []
+    expected_deps = {
+        by_ref[ref]["id"]
+        for ref in (
+            "obj_work_order",
+            "vt_team_code",
+            "prop_wo_status",
+            "link_wo_team",
+            "prop_team_pending",
+        )
+    }
+    assert expected_deps <= set(by_ref["act_dispatch"]["depends_on"])
+
+    # Read must not mutate the persisted v0.5 draft, its hash, or the session revision.
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        assert "actions" not in row.draft_json
+        assert row.draft_json == legacy_draft
+        assert row.draft_sha256 == legacy_sha256
+        assert row.revision == original_revision
+        candidate = candidate_for(db, row)
+        assert {a["name"] for a in candidate["actions"]} == {
+            "dispatch_work_order",
+            "create_inspection_order",
+        }
+        assert "actions" not in row.draft_json
+
+    # 2. Accepting the batch writes the actions and preserves unrelated existing definitions.
+    accept = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "legacy-v05-accept-first-actions",
+            "expected_session_revision": original_revision,
+            "decisions": [
+                {"proposal_id": item["id"], "decision": "accept"}
+                for item in batch["items"]
+            ],
+        },
+    )
+    assert accept.status_code == 200, accept.text
+    accepted_session = accept.json()["session"]
+    assert accepted_session["revision"] == original_revision + 1
+    assert {a["name"] for a in accepted_session["draft"]["actions"]} == {
+        "dispatch_work_order",
+        "create_inspection_order",
+    }
+    assert existing_object_ids <= {
+        o["id"] for o in accepted_session["draft"]["object_types"]
+    }
+    assert existing_property_ids <= {
+        p["id"] for p in accepted_session["draft"]["properties"]
+    }
+
+    # 3. Publishing retains the new actions alongside existing definitions.
+    pub = publish(client, accepted_session)
+    assert pub.status_code == 200, pub.text
+    assert pub.json()["version"]["counts"]["actions"] == 2
+    types_resp = client.get(ROOT + "/types", params={"kind": "action"})
+    assert types_resp.status_code == 200, types_resp.text
+    assert {item["definition"]["name"] for item in types_resp.json()["items"]} == {
+        "dispatch_work_order",
+        "create_inspection_order",
+    }
+
+    # 4. Non-action missing collections are not silently normalized in candidate assembly.
+    corrupt_session = create_session(client)
+    corrupt_batch = seed_batch(
+        client,
+        corrupt_session,
+        [create("new_obj", "object_type", {"name": "fictional_corrupt_obj"})],
+    )
+    corrupt_draft = deepcopy(corrupt_session["draft"])
+    corrupt_draft.pop("object_types")
+    with client.app.state.session_factory() as db:
+        corrupt_row = db.get(ModelingSessionRecord, corrupt_session["id"])
+        corrupt_row.draft_json = corrupt_draft
+        db.commit()
+    with client.app.state.session_factory() as db:
+        corrupt_row = db.get(ModelingSessionRecord, corrupt_session["id"])
+        with pytest.raises(KeyError, match="object_types"):
+            dependency_map(
+                db,
+                [corrupt_batch["id"]],
+                corrupt_session["workspace_id"],
+                corrupt_session["id"],
+            )
+        with pytest.raises(KeyError, match="object_types"):
+            candidate_for(db, corrupt_row)
+

@@ -270,8 +270,14 @@ def dependency_map(
         for item in items:
             if item.status in {"pending", "accepted"}:
                 collection = PROPOSAL_COLLECTIONS[ElementKind(item.target_kind)]
+                # Pre-Action v0.5 core-1 drafts omit `actions`; match CoreDraft's optional default on this transient copy.
+                existing = (
+                    candidate.get(collection, [])
+                    if collection == "actions"
+                    else candidate[collection]
+                )
                 candidate[collection] = [
-                    e for e in candidate[collection] if e["id"] != item.target_id
+                    e for e in existing if e["id"] != item.target_id
                 ]
                 if item.after_json is not None:
                     candidate[collection].append(item.after_json)
