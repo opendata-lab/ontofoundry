@@ -2300,3 +2300,754 @@ def test_mcp_global_action_enumeration_via_get_ontology_kinds_action(client):
         e for e in details["elements"] if e["definition"]["target_type_id"] is None
     ]
     assert [a["display_name"] for a in global_actions] == ["新建巡检单"]
+
+
+def test_ossie_core_fallback_drops_action_on_generated_suffix_collision():
+    """Reproduces PR #129 verification #1: status code / status-code / status-code_2 shifts target to status_code_2_2 and must drop the action instead of rebinding."""
+    ws_id = uuid4()
+    obj_id = uuid4()
+    p1_id, p2_id, p3_id = uuid4(), uuid4(), uuid4()
+    act_id = uuid4()
+    model = CoreDraft(
+        workspace_id=ws_id,
+        object_types=[ObjectType(id=obj_id, name="work_order", display_name="工单")],
+        properties=[
+            Property(
+                id=p1_id,
+                owner_type_id=obj_id,
+                name="aux_one",
+                display_name="辅助一",
+                value_kind=ValueKind.STRING,
+            ),
+            Property(
+                id=p2_id,
+                owner_type_id=obj_id,
+                name="aux_two",
+                display_name="辅助二",
+                value_kind=ValueKind.STRING,
+            ),
+            Property(
+                id=p3_id,
+                owner_type_id=obj_id,
+                name="status_code_2",
+                display_name="真实状态编码",
+                value_kind=ValueKind.STRING,
+            ),
+        ],
+        actions=[
+            Action(
+                id=act_id,
+                name="update_status",
+                display_name="更新状态",
+                target_type_id=obj_id,
+                effects=[
+                    SetPropertyEffect(
+                        kind="set_property",
+                        property_id=p3_id,
+                        description="更新真实状态编码",
+                    )
+                ],
+            )
+        ],
+    )
+    adapter = OssieAdapter()
+    exported = adapter.export_document(
+        model,
+        ExportContext(
+            workspace_name="ops_demo", workspace_slug="ops-demo", workspace_description=""
+        ),
+    )
+    assert exported.document is not None
+
+    # Rewrite the three relationship source names to ("status code", "status-code", "status-code_2"),
+    # keeping ontofoundry-extension.json pointing at "work_order.status_code_2".
+    repacked = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(exported.document), "r") as zin, zipfile.ZipFile(
+        repacked, "w"
+    ) as zout:
+        for info in zin.infolist():
+            raw = zin.read(info.filename)
+            if info.filename.endswith(".ossie.json"):
+                doc = json.loads(raw.decode("utf-8"))
+                for concept in doc["ontology"]:
+                    if concept.get("concept") == "work_order":
+                        rels = concept["relationships"]
+                        assert len(rels) == 3
+                        rels[0]["name"] = "status code"
+                        rels[1]["name"] = "status-code"
+                        rels[2]["name"] = "status-code_2"
+                raw = json.dumps(doc, ensure_ascii=False).encode("utf-8")
+            zout.writestr(info.filename, raw)
+
+    imported = adapter.import_document(repacked.getvalue(), ImportContext(workspace_id=ws_id))
+    assert [p.name for p in imported.model.properties] == [
+        "status_code",
+        "status_code_2",
+        "status_code_2_2",
+    ]
+    assert imported.model.actions == []
+    dropped = [
+        i for i in imported.report.issues if i.construct == "Action" and i.outcome == "dropped"
+    ]
+    assert len(dropped) == 1
+    assert dropped[0].completion_status == "available"
+    assert dropped[0].original is not None
+    assert "work_order.status_code_2" in dropped[0].original
+
+
+def test_mcp_first_object_with_40_long_properties_and_action_stays_under_256kib(client):
+    """Reproduces PR #129 verification #2: first action-carrying object exceeding 256 KiB segments long fields, keeps property cursor, and leaves room for actions; actionless object stays untouched."""
+    from test_modeling import mcp_request
+
+    session = create_session(client)
+    obj_desc = "\\" * 7950
+    obj_syns = ["\\" * 106 for _ in range(9)]
+    prop_desc = "\\" * 580
+    items = [
+        create(
+            "plain_big_obj",
+            "object_type",
+            {
+                "name": "plain_heavy_order",
+                "display_name": "无动作重载工单",
+                "description": obj_desc,
+                "synonyms": obj_syns,
+            },
+        ),
+        create(
+            "act_big_obj",
+            "object_type",
+            {
+                "name": "action_heavy_order",
+                "display_name": "带动作重载工单",
+                "description": obj_desc,
+                "synonyms": obj_syns,
+            },
+        ),
+        *[
+            create(
+                f"plain_p_{i:02d}",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "plain_big_obj"},
+                    "name": f"plain_prop_{i:02d}",
+                    "display_name": f"无动作属性{i:02d}",
+                    "description": prop_desc,
+                    "value_kind": "string",
+                },
+            )
+            for i in range(40)
+        ],
+        *[
+            create(
+                f"act_p_{i:02d}",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "act_big_obj"},
+                    "name": f"act_prop_{i:02d}",
+                    "display_name": f"带动作属性{i:02d}",
+                    "description": prop_desc,
+                    "value_kind": "string",
+                },
+            )
+            for i in range(40)
+        ],
+        create(
+            "single_order_act",
+            "action",
+            {
+                "name": "confirm_heavy_order",
+                "display_name": "确认重载工单",
+                "description": "确认当前工单并进入下一环节。",
+                "target_type_id": {"client_ref": "act_big_obj"},
+                "parameters": [],
+                "effects": [],
+            },
+        ),
+    ]
+    batch = seed_batch(client, session, items)
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-40-props-1-action-boundary",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    session = dec.json()["session"]
+    plain_id = next(
+        o["id"] for o in session["draft"]["object_types"] if o["name"] == "plain_heavy_order"
+    )
+    act_obj_id = next(
+        o["id"] for o in session["draft"]["object_types"] if o["name"] == "action_heavy_order"
+    )
+    pub = publish(client, session)
+    assert pub.status_code == 200, pub.text
+
+    # 1. Non-action object stays on the exact main path (no actions key, no extra segmentation);
+    #    do not assert a hard wire cap on non-action objects since main's behaviour is preserved.
+    plain_resp = mcp_request(
+        client, "tools/call", {"name": "get_ontology", "arguments": {"ids": [plain_id], "limit": 100}}
+    )
+    assert plain_resp.status_code == 200, plain_resp.text
+    assert len(plain_resp.content) >= 261_950, len(plain_resp.content)
+    plain_sc = plain_resp.json()["result"]["structuredContent"]
+    plain_el = plain_sc["elements"][0]
+    assert "actions" not in plain_el
+    assert "field_segments" not in plain_sc
+    assert plain_el["description"] == obj_desc
+    assert plain_el["definition"]["description"] == obj_desc
+    plain_prop_count = len(plain_el["properties"]["items"])
+    assert plain_el["properties"]["next_cursor"] is not None
+
+    # 2. Action-carrying object stays <= 256 KiB, segments long fields, keeps property cursor, and delivers action.
+    act_resp = mcp_request(
+        client,
+        "tools/call",
+        {"name": "get_ontology", "arguments": {"ids": [act_obj_id], "limit": 100}},
+    )
+    assert act_resp.status_code == 200, act_resp.text
+    assert len(act_resp.content) <= 262_144, len(act_resp.content)
+    act_res = act_resp.json()["result"]
+    assert not act_res["isError"], act_res
+    act_sc = act_res["structuredContent"]
+    act_el = act_sc["elements"][0]
+    assert act_el["properties"]["total"] == 40
+    assert len(act_el["properties"]["items"]) == plain_prop_count
+    assert act_el["properties"]["next_cursor"] is not None
+    assert act_sc.get("field_segments"), "oversized action-carrying base object should segment long fields"
+
+    # Reassemble segmented description via field_segments cursor.
+    desc_seg = next(s for s in act_sc["field_segments"] if s["field"] == "/definition/description")
+    reassembled = desc_seg["text"]
+    seg_cursor = desc_seg["next_cursor"]
+    while seg_cursor is not None:
+        seg_resp = mcp_request(
+            client,
+            "tools/call",
+            {"name": "get_ontology", "arguments": {"ids": [act_obj_id], "limit": 100, "cursor": seg_cursor}},
+        )
+        assert seg_resp.status_code == 200, seg_resp.text
+        assert len(seg_resp.content) <= 262_144
+        seg = seg_resp.json()["result"]["structuredContent"]["field_segments"][0]
+        reassembled += seg["text"]
+        seg_cursor = seg["next_cursor"]
+    assert reassembled == obj_desc
+
+    # Follow properties cursor to read remaining properties <= 256 KiB.
+    prop_cont = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "get_ontology",
+            "arguments": {
+                "ids": [act_obj_id],
+                "limit": 100,
+                "cursor": act_el["properties"]["next_cursor"],
+            },
+        },
+    )
+    assert prop_cont.status_code == 200, prop_cont.text
+    assert len(prop_cont.content) <= 262_144
+    prop_cont_el = prop_cont.json()["result"]["structuredContent"]["elements"][0]
+    assert plain_prop_count + len(prop_cont_el["properties"]["items"]) == 40
+
+    # Verify action is readable (either inline or via actions cursor).
+    collected_actions = list(act_el["actions"]["items"])
+    act_cursor = act_el["actions"]["next_cursor"]
+    while act_cursor is not None:
+        cont = mcp_request(
+            client,
+            "tools/call",
+            {"name": "get_ontology", "arguments": {"ids": [act_obj_id], "limit": 100, "cursor": act_cursor}},
+        )
+        assert cont.status_code == 200, cont.text
+        assert len(cont.content) <= 262_144
+        page_act = cont.json()["result"]["structuredContent"]["elements"][0]["actions"]
+        assert len(page_act["items"]) >= 1
+        collected_actions.extend(page_act["items"])
+        act_cursor = page_act["next_cursor"]
+    assert [a["name"] for a in collected_actions] == ["confirm_heavy_order"]
+
+
+def test_mcp_batch_read_50_actions_with_40_evidence_sizes_proportionally_to_returned_items(
+    client, monkeypatch
+):
+    """Reproduces PR #129 verification #3: batch reading 50 actions x 40 evidence must assemble lazily and size proportionally to returned items."""
+    from test_modeling import mcp_request
+
+    from ontofoundry_api.services import mcp_ontology
+
+    lines = [
+        f"第 {j:02d} 条：批量动作规范条款，描述操作前提条件与审批留痕要求。" * 2
+        for j in range(1, 41)
+    ]
+    upload = client.post(
+        ROOT + "/materials",
+        params={"name": "batch-50x40-actions.md"},
+        content=("\n".join(lines) + "\n").encode("utf-8"),
+    )
+    assert upload.status_code in (200, 201), upload.text
+    material_id = upload.json()["id"]
+
+    session = create_session(client)
+    evidences = [
+        {
+            "kind": "material",
+            "material_id": material_id,
+            "locator": {"heading": f"规范 {j:02d}", "line_start": j, "line_end": j},
+            "quote": lines[j - 1],
+        }
+        for j in range(1, 41)
+    ]
+    batch = seed_batch(
+        client,
+        session,
+        [
+            create(
+                f"batch_act_{i:02d}",
+                "action",
+                {
+                    "name": f"batch_op_{i:02d}",
+                    "display_name": f"批量操作{i:02d}",
+                    "description": f"第 {i:02d} 个批量测试动作的业务说明。",
+                    "parameters": [],
+                    "effects": [],
+                    "evidence": evidences,
+                },
+            )
+            for i in range(50)
+        ],
+    )
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-50x40-batch-actions",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    session = dec.json()["session"]
+    action_ids = [
+        a["id"] for a in session["draft"]["actions"] if a["name"].startswith("batch_op_")
+    ]
+    assert len(action_ids) == 50
+    pub = publish(client, session)
+    assert pub.status_code == 200, pub.text
+
+    sizing_calls = 0
+    real_fits = mcp_ontology._response_fits
+
+    def counted_fits(value, **kwargs):
+        nonlocal sizing_calls
+        sizing_calls += 1
+        return real_fits(value, **kwargs)
+
+    monkeypatch.setattr(mcp_ontology, "_response_fits", counted_fits)
+
+    resp = mcp_request(
+        client,
+        "tools/call",
+        {"name": "get_ontology", "arguments": {"ids": action_ids, "limit": 100}},
+    )
+    assert resp.status_code == 200, resp.text
+    assert len(resp.content) <= 262_144, len(resp.content)
+    res = resp.json()["result"]
+    assert not res["isError"], res
+    sc = res["structuredContent"]
+    returned = len(sc["elements"])
+    assert 1 <= returned < 50
+    assert sc["total"] == 50
+    assert sc["next_cursor"] is not None
+    # Number of full-response sizings must be proportional to returned items (1 per candidate),
+    # never O(50 * 40) across unreturned actions and their evidence entries.
+    assert sizing_calls <= returned + 2, (
+        f"expected sizings proportional to returned={returned}, got {sizing_calls}"
+    )
+
+    # Also verify following the outer cursor stays proportional and <= 256 KiB.
+    sizing_calls = 0
+    page2 = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "get_ontology",
+            "arguments": {"ids": action_ids, "limit": 100, "cursor": sc["next_cursor"]},
+        },
+    )
+    assert page2.status_code == 200, page2.text
+    assert len(page2.content) <= 262_144
+    sc2 = page2.json()["result"]["structuredContent"]
+    returned2 = len(sc2["elements"])
+    assert returned2 >= 1
+    assert sizing_calls <= returned2 + 2
+    assert {e["id"] for e in sc["elements"]}.isdisjoint({e["id"] for e in sc2["elements"]})
+
+
+def test_mcp_action_with_uuid_request_id_and_default_reserve_stays_under_256kib(client):
+    """Reproduces PR #130 review #2: 36-char UUID request id on gateway must stay <= 256 KiB, and request_id=None reserves 256 B."""
+    from gateway_helpers import WID, rpc, token, user
+
+    from ontofoundry_api.services.mcp_ontology import MCP_WIRE_LIMIT, _response_fits
+
+    # Build a published action whose unsegmented gateway wire size sits right at ~262,132 B
+    # for numeric id=1 (so a 36-char UUID id would cross 262,144 B if id weren't budgeted).
+    session = create_session(client)
+    batch = seed_batch(
+        client,
+        session,
+        [
+            create(
+                "act_uuid_rid",
+                "action",
+                {
+                    "name": "uuid_rid_near_limit_action",
+                    "display_name": "近上限请求ID动作",
+                    "description": "\\" * 1650,
+                    "synonyms": ["\\" * 120 for _ in range(50)],
+                    "tags": ["\\" * 120 for _ in range(10)],
+                    "parameters": [
+                        {
+                            "name": f"up_{i:02d}",
+                            "display_name": "\\" * 240,
+                            "description": "\\" * 200,
+                            "value_kind": "string",
+                            "required": True,
+                        }
+                        for i in range(44)
+                    ],
+                    "effects": [],
+                },
+            )
+        ],
+    )
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-uuid-rid-action",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    s = dec.json()["session"]
+    act_id = next(
+        a["id"] for a in s["draft"]["actions"] if a["name"] == "uuid_rid_near_limit_action"
+    )
+    pub = publish(client, s)
+    assert pub.status_code == 200, pub.text
+
+    # Read through the personal-token MCP gateway using both numeric id=1 and a 36-char UUID request id.
+    user(client, role="editor")
+    cred = token(client, permissions=["ontology:read"])["token"]
+    uuid_rid = str(uuid4())
+    for rid in (1, uuid_rid):
+        resp = rpc(
+            client,
+            cred,
+            "tools/call",
+            {"name": "get_ontology", "arguments": {"workspace_id": WID, "ids": [act_id], "limit": 100}},
+            request_id=rid,
+        )
+        assert resp.status_code == 200, resp.text
+        assert len(resp.content) <= MCP_WIRE_LIMIT, f"rid={rid!r} exceeded 256 KiB: {len(resp.content)}"
+        result = resp.json()["result"]
+        assert not result["isError"], result
+        assert result["structuredContent"]["elements"][0]["name"] == "uuid_rid_near_limit_action"
+
+    # Sizing uses a fixed 256 B id reserve, so pages and the cursors they issue do not
+    # depend on the caller's request id (clients increment ids between requests).
+    payload = {"workspace_id": WID, "version_id": None, "blob": "\\" * 40_000}
+    assert _response_fits(payload, request_id=1) == _response_fits(payload, request_id=uuid_rid) == _response_fits(payload)
+
+
+def test_mcp_stale_action_continuation_field_cursor_returns_cursor_invalid(client):
+    """Reproduces PR #130 review #3: stale wire_field or field cursors whose paths no longer exist must return cursor_invalid, never HTTP 500."""
+    from test_modeling import mcp_request
+
+    from ontofoundry_api.services.cursors import cursor_signer, encode_cursor
+
+    session = create_session(client)
+    long_desc = "工单语义说明" * 1000  # 6,000 Chinese chars (18,000 UTF-8 bytes > 12,000)
+    batch = seed_batch(
+        client,
+        session,
+        [
+            create(
+                "stale_obj",
+                "object_type",
+                {
+                    "name": "stale_cursor_order",
+                    "display_name": "旧游标工单",
+                    "description": long_desc,
+                },
+            ),
+            create(
+                "stale_act_1",
+                "action",
+                {
+                    "name": "stale_act_one",
+                    "display_name": "动作一",
+                    "target_type_id": {"client_ref": "stale_obj"},
+                    "parameters": [],
+                    "effects": [],
+                },
+            ),
+            create(
+                "stale_act_2",
+                "action",
+                {
+                    "name": "stale_act_two",
+                    "display_name": "动作二",
+                    "target_type_id": {"client_ref": "stale_obj"},
+                    "parameters": [],
+                    "effects": [],
+                },
+            ),
+        ],
+    )
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-stale-cursor-case",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    s = dec.json()["session"]
+    obj_id = next(o["id"] for o in s["draft"]["object_types"] if o["name"] == "stale_cursor_order")
+    pub = publish(client, s)
+    assert pub.status_code == 200, pub.text
+
+    # Obtain a valid actions continuation cursor at limit=1 (context matches current version & auth).
+    first = mcp_request(
+        client, "tools/call", {"name": "get_ontology", "arguments": {"ids": [obj_id], "limit": 1}}
+    )
+    assert first.status_code == 200, first.text
+    actions_cursor = first.json()["result"]["structuredContent"]["elements"][0]["actions"]["next_cursor"]
+    assert actions_cursor is not None
+
+    settings = client.app.state.settings
+    decoded = cursor_signer(settings).loads(actions_cursor)
+    valid_context = decoded["context"]
+
+    # 1. Pre-PR #130 wire_field cursor pointing at /elements/0/description on an actions continuation.
+    stale_wire_cursor = encode_cursor(
+        settings,
+        valid_context,
+        2000,
+        {
+            "kind": "wire_field",
+            "path": ["elements", "0", "description"],
+            "pointer": "/description",
+            "element_id": obj_id,
+            "base_cursor": actions_cursor,
+        },
+    )
+    resp_wire = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "get_ontology",
+            "arguments": {"ids": [obj_id], "limit": 1, "cursor": stale_wire_cursor},
+        },
+    )
+    assert resp_wire.status_code == 200, resp_wire.text
+    res_wire = resp_wire.json()["result"]
+    assert res_wire["isError"] is True
+    assert res_wire["structuredContent"]["code"] == "cursor_invalid"
+
+    # 2. Stale field cursor whose path does not exist in the current projection.
+    stale_field_cursor = encode_cursor(
+        settings,
+        valid_context,
+        2000,
+        {
+            "kind": "field",
+            "element_id": obj_id,
+            "path": ["nonexistent_section", "description"],
+        },
+    )
+    resp_field = mcp_request(
+        client,
+        "tools/call",
+        {
+            "name": "get_ontology",
+            "arguments": {"ids": [obj_id], "limit": 1, "cursor": stale_field_cursor},
+        },
+    )
+    assert resp_field.status_code == 200, resp_field.text
+    res_field = resp_field.json()["result"]
+    assert res_field["isError"] is True
+    assert res_field["structuredContent"]["code"] == "cursor_invalid"
+
+
+def test_mcp_action_object_last_resort_collection_trimming_keeps_every_page_under_256kib(client):
+    """Reproduces PR #130 review #1: 50 backslash synonyms + 50 backslash tags + 5 heavy-synonym properties + 1 action trims properties to fit <= 256 KiB on both page 1 and property continuation pages."""
+    from test_modeling import mcp_request
+
+    heavy_obj_syns = ["\\" * 120 for _ in range(50)]
+    heavy_obj_tags = ["\\" * 120 for _ in range(50)]
+    heavy_prop_syns = ["\\" * 105 for _ in range(50)]
+
+    session = create_session(client)
+    items = [
+        # Variant A: 5 heavy-synonym properties right on page 1.
+        create(
+            "trim_obj_p1",
+            "object_type",
+            {
+                "name": "heavy_syn_order_p1",
+                "display_name": "首屏重载同义词工单",
+                "synonyms": heavy_obj_syns,
+                "tags": heavy_obj_tags,
+            },
+        ),
+        *[
+            create(
+                f"trim_p1_{i:02d}",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "trim_obj_p1"},
+                    "name": f"heavy_syn_prop_{i:02d}",
+                    "display_name": f"重载同义词属性{i:02d}",
+                    "synonyms": heavy_prop_syns,
+                    "value_kind": "string",
+                },
+            )
+            for i in range(5)
+        ],
+        create(
+            "trim_act_p1",
+            "action",
+            {
+                "name": "heavy_syn_act_p1",
+                "display_name": "首屏动作",
+                "target_type_id": {"client_ref": "trim_obj_p1"},
+                "parameters": [],
+                "effects": [],
+            },
+        ),
+        # Variant B: 38 normal properties on page 1 + 5 heavy-synonym properties pushed onto page 2.
+        create(
+            "trim_obj_p2",
+            "object_type",
+            {
+                "name": "heavy_syn_order_p2",
+                "display_name": "续页重载同义词工单",
+                "synonyms": heavy_obj_syns,
+                "tags": heavy_obj_tags,
+            },
+        ),
+        *[
+            create(
+                f"trim_p2_norm_{i:02d}",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "trim_obj_p2"},
+                    "name": f"aa_norm_prop_{i:02d}",
+                    "display_name": f"普通属性{i:02d}",
+                    "description": "普通字段业务语义说明" * 45,
+                    "value_kind": "string",
+                },
+            )
+            for i in range(40)
+        ],
+        *[
+            create(
+                f"trim_p2_heavy_{i:02d}",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "trim_obj_p2"},
+                    "name": f"zz_heavy_prop_{i:02d}",
+                    "display_name": f"续页重载属性{i:02d}",
+                    "synonyms": heavy_prop_syns,
+                    "value_kind": "string",
+                },
+            )
+            for i in range(5)
+        ],
+        create(
+            "trim_act_p2",
+            "action",
+            {
+                "name": "heavy_syn_act_p2",
+                "display_name": "续页动作",
+                "target_type_id": {"client_ref": "trim_obj_p2"},
+                "parameters": [],
+                "effects": [],
+            },
+        ),
+    ]
+    batch = seed_batch(client, session, items)
+    dec = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "accept-last-resort-trim-objects",
+            "expected_session_revision": session["revision"],
+            "decisions": [{"proposal_id": i["id"], "decision": "accept"} for i in batch["items"]],
+        },
+    )
+    assert dec.status_code == 200, dec.text
+    s = dec.json()["session"]
+    obj_p1_id = next(o["id"] for o in s["draft"]["object_types"] if o["name"] == "heavy_syn_order_p1")
+    obj_p2_id = next(o["id"] for o in s["draft"]["object_types"] if o["name"] == "heavy_syn_order_p2")
+    pub = publish(client, s)
+    assert pub.status_code == 200, pub.text
+
+    for obj_id, expected_prop_count, expected_act_name in (
+        (obj_p1_id, 5, "heavy_syn_act_p1"),
+        (obj_p2_id, 45, "heavy_syn_act_p2"),
+    ):
+        first = mcp_request(
+            client, "tools/call", {"name": "get_ontology", "arguments": {"ids": [obj_id], "limit": 100}}
+        )
+        assert first.status_code == 200, first.text
+        assert len(first.content) <= 262_144, len(first.content)
+        first_res = first.json()["result"]
+        assert not first_res["isError"], first_res
+        el = first_res["structuredContent"]["elements"][0]
+
+        # Walk all property pages; every page must stay <= 256 KiB and deliver all properties.
+        collected_props = [p["name"] for p in el["properties"]["items"]]
+        prop_cursor = el["properties"]["next_cursor"]
+        assert prop_cursor is not None, "heavy-synonym properties must be trimmed and paginated"
+        pages = 1
+        while prop_cursor is not None:
+            cont = mcp_request(
+                client,
+                "tools/call",
+                {"name": "get_ontology", "arguments": {"ids": [obj_id], "limit": 100, "cursor": prop_cursor}},
+            )
+            assert cont.status_code == 200, cont.text
+            assert len(cont.content) <= 262_144, len(cont.content)
+            cont_res = cont.json()["result"]
+            assert not cont_res["isError"], cont_res
+            prop_page = cont_res["structuredContent"]["elements"][0]["properties"]
+            assert len(prop_page["items"]) >= 1
+            collected_props.extend(p["name"] for p in prop_page["items"])
+            prop_cursor = prop_page["next_cursor"]
+            pages += 1
+            assert pages <= 10
+        assert len(collected_props) == expected_prop_count
+        assert len(set(collected_props)) == expected_prop_count
+
+        # Walk actions (inline or via cursor); every page <= 256 KiB and action is read.
+        collected_acts = [a["name"] for a in el["actions"]["items"]]
+        act_cursor = el["actions"]["next_cursor"]
+        while act_cursor is not None:
+            acont = mcp_request(
+                client,
+                "tools/call",
+                {"name": "get_ontology", "arguments": {"ids": [obj_id], "limit": 100, "cursor": act_cursor}},
+            )
+            assert acont.status_code == 200, acont.text
+            assert len(acont.content) <= 262_144, len(acont.content)
+            act_page = acont.json()["result"]["structuredContent"]["elements"][0]["actions"]
+            assert len(act_page["items"]) >= 1
+            collected_acts.extend(a["name"] for a in act_page["items"])
+            act_cursor = act_page["next_cursor"]
+        assert collected_acts == [expected_act_name]

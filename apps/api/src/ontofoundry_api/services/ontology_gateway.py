@@ -67,6 +67,7 @@ class GatewayContext:
     versions: list[dict] = field(default_factory=list)
     workspace_ids: list[str] = field(default_factory=list)
     spaces: list[dict] | None = None
+    request_id: str | int | None = None
 
 
 def directory(db, principal, *, members_only=False):
@@ -186,8 +187,13 @@ def invoke(db, principal, name, args, settings, context):
     version = workspace_version(db, wid, principal, context)
     if name == "get_ontology":
         return read_tool(
-            db, wid, principal, name,
-            args.model_dump(mode="json", exclude={"workspace_id"}), settings,
+            db,
+            wid,
+            principal,
+            name,
+            args.model_dump(mode="json", exclude={"workspace_id"}),
+            settings,
+            request_id=context.request_id,
         )
     element_ids = list(dict.fromkeys(str(identity) for identity in args.element_ids))
     if element_ids:

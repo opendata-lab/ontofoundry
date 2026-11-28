@@ -38,7 +38,15 @@ async def rpc(
     return await handle_rpc(
         request, tools=TOOLS, inputs=INPUTS, instructions=INSTRUCTIONS,
         call_tool=lambda name, args, rid: execute_tool(
-            lambda: invoke(db, workspace_id, principal, name, args, request.app.state.settings)
+            lambda: invoke(
+                db,
+                workspace_id,
+                principal,
+                name,
+                args,
+                request.app.state.settings,
+                request_id=rid,
+            )
         ),
     )
 
