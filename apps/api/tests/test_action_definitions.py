@@ -3051,3 +3051,93 @@ def test_mcp_action_object_last_resort_collection_trimming_keeps_every_page_unde
             collected_acts.extend(a["name"] for a in act_page["items"])
             act_cursor = act_page["next_cursor"]
         assert collected_acts == [expected_act_name]
+
+
+def test_legacy_v05_draft_without_actions_key_reads_accepts_and_publishes_first_action_proposal(
+    client,
+):
+    """Restored v0.5.0 core-1 drafts lack top-level `actions`; first Action proposals must read, accept, and publish."""
+    from ontofoundry_api.db_models import ModelingSessionRecord
+    from ontofoundry_api.domain.canonical import snapshot_sha256
+
+    session = create_session(client)
+    original_revision = session["revision"]
+    legacy_draft = deepcopy(session["draft"])
+    legacy_draft.pop("actions", None)
+    assert "actions" not in legacy_draft
+    legacy_sha256 = snapshot_sha256(legacy_draft)
+    existing_object_ids = {o["id"] for o in legacy_draft["object_types"]}
+    existing_property_ids = {p["id"] for p in legacy_draft["properties"]}
+    assert existing_object_ids, "demo workspace fixture must contain pre-existing object types"
+
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        row.draft_json = deepcopy(legacy_draft)
+        row.draft_sha256 = legacy_sha256
+        db.commit()
+
+    # 1. Store and read the first-Action proposal batch through seed_batch's real GET endpoint.
+    legacy_session = {**session, "draft": deepcopy(legacy_draft)}
+    batch = seed_batch(client, legacy_session, _work_order_proposal_fixture())
+    by_ref = {item["client_ref"]: item for item in batch["items"]}
+    assert {"act_dispatch", "act_create_inspection"} <= set(by_ref)
+    assert by_ref["act_dispatch"]["acceptance_issues"] == []
+    assert by_ref["act_dispatch"]["source_diagnostics"] == []
+    assert by_ref["act_create_inspection"]["acceptance_issues"] == []
+    assert by_ref["act_create_inspection"]["source_diagnostics"] == []
+    expected_deps = {
+        by_ref[ref]["id"]
+        for ref in (
+            "obj_work_order",
+            "vt_team_code",
+            "prop_wo_status",
+            "link_wo_team",
+            "prop_team_pending",
+        )
+    }
+    assert expected_deps <= set(by_ref["act_dispatch"]["depends_on"])
+
+    # Read must not mutate the persisted v0.5 draft, its hash, or the session revision.
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        assert "actions" not in row.draft_json
+        assert row.draft_json == legacy_draft
+        assert row.draft_sha256 == legacy_sha256
+        assert row.revision == original_revision
+
+    # 2. Accepting the batch writes the actions and preserves unrelated existing definitions.
+    accept = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-decisions",
+        json={
+            "idempotency_key": "legacy-v05-accept-first-actions",
+            "expected_session_revision": original_revision,
+            "decisions": [
+                {"proposal_id": item["id"], "decision": "accept"}
+                for item in batch["items"]
+            ],
+        },
+    )
+    assert accept.status_code == 200, accept.text
+    accepted_session = accept.json()["session"]
+    assert accepted_session["revision"] == original_revision + 1
+    assert {a["name"] for a in accepted_session["draft"]["actions"]} == {
+        "dispatch_work_order",
+        "create_inspection_order",
+    }
+    assert existing_object_ids <= {
+        o["id"] for o in accepted_session["draft"]["object_types"]
+    }
+    assert existing_property_ids <= {
+        p["id"] for p in accepted_session["draft"]["properties"]
+    }
+
+    # 3. Publishing retains the new actions alongside existing definitions.
+    pub = publish(client, accepted_session)
+    assert pub.status_code == 200, pub.text
+    assert pub.json()["version"]["counts"]["actions"] == 2
+    types_resp = client.get(ROOT + "/types", params={"kind": "action"})
+    assert types_resp.status_code == 200, types_resp.text
+    assert {item["definition"]["name"] for item in types_resp.json()["items"]} == {
+        "dispatch_work_order",
+        "create_inspection_order",
+    }

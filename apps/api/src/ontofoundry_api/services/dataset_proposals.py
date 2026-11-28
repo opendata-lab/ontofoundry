@@ -18,7 +18,13 @@ def candidate_for(db, session):
         if ElementKind(item.target_kind) not in COLLECTIONS:
             continue
         collection = COLLECTIONS[ElementKind(item.target_kind)]
-        draft[collection] = [e for e in draft[collection] if e["id"] != item.target_id]
+        # Pre-Action v0.5 core-1 drafts omit `actions`; match CoreDraft's optional default on this transient copy.
+        existing = (
+            draft.get(collection, [])
+            if collection == "actions"
+            else draft[collection]
+        )
+        draft[collection] = [e for e in existing if e["id"] != item.target_id]
         if item.after_json:
             draft[collection].append(deepcopy(item.after_json))
     return draft
