@@ -585,7 +585,7 @@ ontofoundry_api/
       importer.py
       exporter.py
       mappings.py          ontology_mappings 的双向翻译
-      extension.py         ontofoundry-extension.json 扩展文件读写（旧块只在导入读取）
+      extension.py         ontofoundry-extension.json 扩展文件读写（文档内旧 `ai_context.ontofoundry` 块不再读取，§5.7）
       validator.py         官方 schema + 语义校验（沿用现有 ossie/validator.py）
       assets/vendor/       固定版本的 Ossie schema（沿用）
     native/                OntoFoundry 原生格式（§4.6）
@@ -1133,7 +1133,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 |---|---|---|---|
 | RT-01 | 文档名称、描述换成工作空间的 | `"name": "library", "description": "图书馆"` | `"name": "<工作空间名称>", "description": "<工作空间描述>"` |
 | RT-02 | 文档上下文没有明确对象归属时不自动分配（含旧版 `ai_context.ontofoundry` 块，提示重新导出为 ZIP）；能够归属的 instructions 另按 RT-59 合并 | `{"synonyms": [...], "instructions": "...", "acme": {...}, "ontofoundry": {...}}` | 不写入 `ai_context.ontofoundry`；规范 `synonyms` 按支持位置输出，平台扩展写 ZIP 内 `ontofoundry-extension.json` |
-| RT-03 | 仅读取 ZIP 内 `ontofoundry-extension.json`（`version=core-1`）；不支持版本、未知字段与无效扩展引用报告 | 非 `core-1` 或未承载扩展字段 | dropped，原文留材料；只输出 ZIP 内 `core-1` 扩展文件 |
+| RT-03 | 仅读取 ZIP 内 `ontofoundry-extension.json`（`version=core-1`） | 扩展文件版本不是 `core-1`；或 `core-1` 扩展中有未承载字段、无效扩展引用 | 版本不符时导入以文件级 error 结束；未承载字段和无效引用逐项 dropped，原文留材料。只输出 ZIP 内 `core-1` 扩展文件 |
 | RT-04 | 文档级 `requires` 消失 | `"requires": ["COUNT(Customer) > 0"]` | 不出现 |
 
 **格式规范化**（不改变含义）
@@ -1304,7 +1304,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 内容 | 说明 |
 |---|---|
 | 适配器接口 | 只需导入函数：文件 → 核心模型与转换报告（§4.1、§4.2） |
-| Ossie 导入 | 概念、属性、二元关系、值概念折叠、一元 / 多元转换、规则、扩展文件及旧块导入兼容（§5.1–5.4、§5.7）；映射：Dataset 一一登记（含未引用者）、对象、属性列、外键、多对多映射表、复合键、多来源、计算列、唯一属性键、派生子概念成员条件互译及继承绑定冲突报告（§5.5）；指标只引用自己的数据集，固定聚合、CASE 过滤和同数据集比率按列结构化，其余本数据集算法保留 expression；超出边界按 RT-69 留报告待补全（§5.6） |
+| Ossie 导入 | 概念、属性、二元关系、值概念折叠、一元 / 多元转换、规则、扩展文件（§5.1–5.4、§5.7；文档内旧扩展块报 RT-02 dropped，不再读取）；映射：Dataset 一一登记（含未引用者）、对象、属性列、外键、多对多映射表、复合键、多来源、计算列、唯一属性键、派生子概念成员条件互译及继承绑定冲突报告（§5.5）；指标只引用自己的数据集，固定聚合、CASE 过滤和同数据集比率按列结构化，其余本数据集算法保留 expression；超出边界按 RT-69 留报告待补全（§5.6） |
 | 导入走提案 | 新建会话、按英文标识对比生成提案、复用提案面板和发布（§4.5）；只新增和修改，从不生成 delete 提案，转换失败条目保留原文等待补全；原文件保存为材料，提案证据指向原文行号 |
 | 导入报告 | 按条目列出改写和丢弃，标注 RT 编号、原文路径、行号 |
 | 原生格式导入 | 单文件形式（§4.6） |
