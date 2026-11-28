@@ -19,6 +19,7 @@ description: 回答业务数据或业务动作问题（指标、口径、对象�
 3. `unmatched_terms` 是问题中没有对应定义的原文片段，通常是实体名称、时间范围或其他条件，不要再当成定义检索；实体名称在查询时按映射的字段过滤。
 4. 没检索到所需的指标或对象时，换用更短的业务术语再检索一次；仍没有就说明本体中没有对应定义，不臆造口径。
 5. 多个空间都命中同一个术语时，分别说明各空间的口径，请用户确认采用哪一个，不合并。
+6. 用户泛问动作清单（如“有哪些全局操作”“有哪些业务动作”）而 `search_ontology` 未命中或可能遗漏时，调用 `get_ontology(workspace_id, kinds=["action"])` 分页列出全部动作，按需用 `ids` 分批读取完整定义，再按 `definition.target_type_id` 筛选（为 `null` 表示全局动作，非空表示对应对象类型的实例动作）。
 
 工具返回 `workspace_unavailable` 表示空间不存在或无权阅读；`search_limit_exceeded` 时缩小 `workspace_ids` 或降低 `limit` 后重试；`cursor_invalid` 表示版本或权限已变化，从第 1 节重新开始。
 

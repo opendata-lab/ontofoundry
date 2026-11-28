@@ -68,6 +68,13 @@ def test_skills_are_one_directory_level_and_frontmatter_is_portable():
         assert 0 < len(fields["description"]) <= 1024
 
 
+def test_ontology_grounding_skill_documents_global_action_listing():
+    skill = (PLUGIN / "skills/ontology-grounding/SKILL.md").read_text()
+    assert 'get_ontology(workspace_id, kinds=["action"])' in skill
+    assert "target_type_id" in skill
+    assert "全局动作" in skill
+
+
 def _build_offline_package(tmp_path):
     docker = tmp_path / "fiction-docker"
     docker.write_text('''#!/usr/bin/env python3

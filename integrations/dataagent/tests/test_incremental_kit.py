@@ -327,6 +327,7 @@ def test_incremental_read_budget_counts_public_outputs_and_enforces_limit(monkey
     monkeypatch.setattr(budget, "INCREMENTAL_ROUTE_LIMIT", 1)
     report = budget.byte_report()
     assert not report["routes"]["增量（退款补齐）"]["pass"]
+    assert not report["routes"]["增量（含动作）"]["pass"]
     assert not report["all_limits_pass"]
 
 
@@ -336,10 +337,30 @@ def test_skill_incremental_instructions_and_guide_are_bounded():
     step = (BASE / "skills/ontology-discovery/references/steps/incremental.md").read_text()
     assert "references/steps/incremental.md" in skill.decode()
     assert "context_file 全文、脚本源码或 Schema" in step and "sha256 由平台补" in step and "原文可省" in step
-    for args in [("--incremental-guide",), ("--part", "edit"), ("--part", "update")]:
+    assert "--action" in step and "--guide" not in step and "--part 04" not in step
+    for args in [("--incremental-guide",), ("--action",), ("--part", "edit"), ("--part", "update")]:
         result = lookup(*args)
         assert result.returncode == 0 and len(result.stdout) <= 8192
     assert "display_name 只写名称" in (KIT / "incremental.md").read_text()
+
+
+def test_incremental_action_example_and_budget_and_step_wording():
+    action_res = lookup("--action")
+    assert action_res.returncode == 0 and len(action_res.stdout) <= 8192
+    text = action_res.stdout.decode()
+    assert "动作也在 04" in text and "lend_loan" in text and "open_claim" in text
+    assert "deposits" not in text and "deposit_nonnegative" not in text
+    report = budget.byte_report()
+    route = report["routes"]["增量（含动作）"]
+    assert route["pass"] and route["bytes"] <= budget.INCREMENTAL_ROUTE_LIMIT
+    assert route["components"]["写法包/action"]["bytes"] == len(action_res.stdout)
+
+    extract = (BASE / "skills/ontology-discovery/references/steps/extract.md").read_text()
+    plan = (BASE / "skills/ontology-discovery/references/steps/plan.md").read_text()
+    assert "不合清单的实体" in extract and "端点无表等特殊关系" in extract
+    assert len(extract.encode()) <= 1700
+    assert "跨行统计" in plan and "CSV 等成批记录" in plan
+    assert len(plan.encode()) <= 1500
 
 
 def test_library_base_is_independent_and_incremental_references_are_explicit():

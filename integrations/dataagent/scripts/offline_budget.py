@@ -448,6 +448,22 @@ def byte_report():
             "basis": "可执行路径估计，没有模型行为实测；分页、歧义重查增加轮数",
         },
     }
+    from show_example import action_example
+
+    action_output = (action_example() + "\n").encode()
+    limits["增量单次/动作判据与正例"] = (len(action_output), 8192)
+    incremental_action_inputs = {**incremental_inputs, "写法包/action": action_output}
+    incremental_action_components = {
+        name: measure(data) for name, data in incremental_action_inputs.items()
+    }
+    incremental_action_bytes = sum(c["bytes"] for c in incremental_action_components.values())
+    routes["增量（含动作）"] = {
+        "bytes": incremental_action_bytes,
+        "limit": INCREMENTAL_ROUTE_LIMIT,
+        "pass": incremental_action_bytes <= INCREMENTAL_ROUTE_LIMIT,
+        "components": incremental_action_components,
+        "scope": "增量（退款补齐）基线＋ show_example.py --action（仅含动作判据与 04.json 动作条目）",
+    }
     # The retail fixtures contain definitions, not concrete instances. Dynamic
     # selection does not load entity-extraction for those routes. This separate
     # document fixture counts both complete skill entries and all shared inputs.
