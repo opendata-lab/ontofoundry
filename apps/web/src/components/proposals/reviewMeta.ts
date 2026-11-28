@@ -148,8 +148,8 @@ export function mergedFact(existing: MaterialObject, proposed: MaterialObject): 
 export function elementNames(draft: Draft, items: ProposalItem[]) {
   const names = new Map<string, string>();
   for (const key of NAMED_DRAFT_COLLECTIONS)
-    for (const element of draft[key] as { id: string; name: string; display_name?: string | null }[]) names.set(element.id, element.display_name || element.name);
-  for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
+    for (const element of (draft[key] ?? []) as { id: string; name: string; display_name?: string | null }[]) names.set(element.id, element.display_name || element.name);
+  for (const fact of draft.material_objects ?? []) names.set(fact.id, documentDisplayText(draft, fact));
   for (const item of items) names.set(item.target_id, item.display_name);
   return names;
 }
