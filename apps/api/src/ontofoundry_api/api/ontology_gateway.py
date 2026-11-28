@@ -103,7 +103,7 @@ def gateway_call(
 
 
 def call_tool(db, principal, name, arguments, settings, recorder, request_id):
-    context = ontology_gateway.GatewayContext()
+    context = ontology_gateway.GatewayContext(request_id=request_id)
     started = perf_counter()
     call = {
         "id": str(uuid4()),

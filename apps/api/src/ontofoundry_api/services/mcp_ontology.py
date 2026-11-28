@@ -107,10 +107,50 @@ _ACTION_SEGMENT_TIERS = (
     (1_500, 256),
     (950, 128),
 )
+_TRIM_COLLECTIONS = (
+    "effective_bindings",
+    "datasets",
+    "sources",
+    "links",
+    "rules",
+    "child_types",
+    "columns",
+    "referenced_by",
+    "properties",
+)
+_DEFAULT_REQUEST_ID_RESERVE = "x" * 254  # 256 bytes in JSON including quotes.
 
 
 def _skip_segment_key(key: str) -> bool:
     return key in _NO_SEGMENT_KEYS or key.endswith(_NO_SEGMENT_SUFFIXES)
+
+
+def _invalid_cursor() -> ServiceError:
+    return ServiceError(
+        "游标无效或与当前版本、权限、筛选不一致",
+        code="INVALID_CURSOR",
+        status_code=422,
+    )
+
+
+def _resolve_field_path(root, path) -> str:
+    value = root
+    try:
+        for token in path:
+            if isinstance(value, list):
+                idx = int(token)
+                if idx < 0:
+                    raise IndexError(idx)
+                value = value[idx]
+            elif isinstance(value, dict):
+                value = value[token]
+            else:
+                raise TypeError(type(value))
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise _invalid_cursor() from exc
+    if not isinstance(value, str):
+        raise _invalid_cursor()
+    return value
 
 
 def size(value):
@@ -123,7 +163,7 @@ def size(value):
     )
 
 
-def _response_fits(value) -> bool:
+def _response_fits(value, *, request_id=None) -> bool:
     """Check structuredContent cap and full JSON-RPC HTTP wire size <= 256 KiB."""
     from fastapi.encoders import jsonable_encoder
 
@@ -140,7 +180,7 @@ def _response_fits(value) -> bool:
     text = json.dumps(structured, ensure_ascii=False)
     envelope = {
         "jsonrpc": "2.0",
-        "id": 1,
+        "id": request_id if request_id is not None else _DEFAULT_REQUEST_ID_RESERVE,
         "result": {
             "content": [{"type": "text", "text": text}],
             "structuredContent": structured,
@@ -189,7 +229,7 @@ def _initial_segment_chunk(entry: str, max_wire_bytes: int = 4_000) -> str:
     return chunk[:lo]
 
 
-def _invoke(db, workspace_id, principal, name, arguments, settings):
+def _invoke(db, workspace_id, principal, name, arguments, settings, *, request_id=None):
     require_read(db, workspace_id, principal)
     args = INPUTS[name].model_validate(arguments)
     space = get_workspace(db, workspace_id)
@@ -518,6 +558,19 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 **({"field_segments": segs} if segs else {}),
             }
 
+        def fits(resp):
+            return _response_fits(resp, request_id=request_id)
+
+        def checked_response(elements, segs, next_cursor, missing_ids, verified):
+            resp = build_response(elements, segs, next_cursor, missing_ids)
+            if not verified and not fits(resp):
+                raise ServiceError(
+                    "当前投影超过单页预算，请缩小 limit 或 include",
+                    code="response_too_large",
+                    status_code=422,
+                )
+            return resp
+
         def fit_first_element(
             base_el,
             col_key,
@@ -527,6 +580,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             next_cursor,
             missing_ids,
             *,
+            elem_idx=None,
+            raw_def=None,
             cursor_extra=None,
             require_progress=False,
         ):
@@ -539,10 +594,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             candidate_el = (
                 {**seg_el, col_key: initial_col} if col_key is not None else seg_el
             )
-            if _response_fits(
-                build_response([candidate_el], el_fields, next_cursor, missing_ids)
-            ):
-                return candidate_el, el_fields
+            if fits(build_response([candidate_el], el_fields, next_cursor, missing_ids)):
+                return candidate_el, el_fields, True
 
             # Ensure base (+ empty collection cursor) fits, progressively segmenting if needed.
             empty_col = (
@@ -553,7 +606,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             base_fits = False
             segmented_further = False
             if col_key is not None and initial_col["items"]:
-                base_fits = _response_fits(
+                base_fits = fits(
                     build_response(
                         [{**seg_el, col_key: empty_col}],
                         el_fields,
@@ -576,33 +629,103 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     test_el = (
                         {**seg_el, col_key: empty_col} if col_key is not None else seg_el
                     )
-                    if _response_fits(
-                        build_response([test_el], el_fields, next_cursor, missing_ids)
-                    ):
+                    if fits(build_response([test_el], el_fields, next_cursor, missing_ids)):
+                        base_fits = True
                         break
-            if col_key is None:
-                return seg_el, el_fields
-
-            hi = (
-                len(initial_col["items"])
-                if segmented_further
-                else max(0, len(initial_col["items"]) - 1)
-            )
-            lo = 0
-            while lo < hi:
-                mid = (lo + hi + 1) // 2
-                col_page = make_collection_page(raw_col, col_path, start, mid)
-                if _response_fits(
-                    build_response(
-                        [{**seg_el, col_key: col_page}],
-                        el_fields,
-                        next_cursor,
-                        missing_ids,
+            if not base_fits and raw_def is not None and elem_idx is not None:
+                # Last-resort guard: trim paged collections (e.g. properties with heavy
+                # synonyms) to what fits while advancing each collection's cursor.
+                trimmed_base = dict(base_el)
+                last_wt, last_cap = _ACTION_SEGMENT_TIERS[-1]
+                for k in _TRIM_COLLECTIONS:
+                    if base_fits:
+                        break
+                    col = trimmed_base.get(k)
+                    raw_k = raw_def.get(k)
+                    if not isinstance(col, dict) or not col.get("items") or not raw_k:
+                        continue
+                    k_start = (
+                        cursor_extra["list_offset"]
+                        if cursor_extra and cursor_extra.get("list_key") == k
+                        else 0
                     )
-                ):
-                    lo = mid
-                else:
-                    hi = mid - 1
+                    min_count = (
+                        1 if (cursor_extra and cursor_extra.get("list_key") == k) else 0
+                    )
+
+                    def eval_trim(
+                        count,
+                        base_snapshot=trimmed_base,
+                        key=k,
+                        raw_items=raw_k,
+                        start_idx=k_start,
+                    ):
+                        cand = {
+                            **base_snapshot,
+                            key: make_collection_page(
+                                raw_items, [elem_idx, key], start_idx, count
+                            ),
+                        }
+                        cand_fields = []
+                        cand_seg = segment_value(
+                            cand,
+                            base_el["id"],
+                            cand_fields,
+                            wire_threshold=last_wt,
+                            chunk_wire_cap=last_cap,
+                            cursor_extra=cursor_extra,
+                        )
+                        test = (
+                            {**cand_seg, col_key: empty_col}
+                            if col_key is not None
+                            else cand_seg
+                        )
+                        ok = fits(
+                            build_response([test], cand_fields, next_cursor, missing_ids)
+                        )
+                        return ok, cand, cand_seg, cand_fields
+
+                    fits_min, cand_min, seg_min, fields_min = eval_trim(min_count)
+                    if not fits_min:
+                        trimmed_base, seg_el, el_fields = cand_min, seg_min, fields_min
+                        continue
+                    lo_k, hi_k = min_count, len(col["items"]) - 1
+                    best = (cand_min, seg_min, fields_min)
+                    while lo_k < hi_k:
+                        mid_k = (lo_k + hi_k + 1) // 2
+                        ok_k, c_k, s_k, f_k = eval_trim(mid_k)
+                        if ok_k:
+                            lo_k = mid_k
+                            best = (c_k, s_k, f_k)
+                        else:
+                            hi_k = mid_k - 1
+                    trimmed_base, seg_el, el_fields = best
+                    base_fits = True
+
+            if col_key is None:
+                return seg_el, el_fields, base_fits
+
+            lo = 0
+            if base_fits:
+                hi = (
+                    len(initial_col["items"])
+                    if segmented_further
+                    else max(0, len(initial_col["items"]) - 1)
+                )
+                while lo < hi:
+                    mid = (lo + hi + 1) // 2
+                    col_page = make_collection_page(raw_col, col_path, start, mid)
+                    if fits(
+                        build_response(
+                            [{**seg_el, col_key: col_page}],
+                            el_fields,
+                            next_cursor,
+                            missing_ids,
+                        )
+                    ):
+                        lo = mid
+                    else:
+                        hi = mid - 1
             if lo == 0 and require_progress and start < len(raw_col):
                 single_el = {
                     **seg_el,
@@ -622,32 +745,41 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                         chunk_wire_cap=chunk_wire_cap,
                         cursor_extra={"list_key": col_key, "list_offset": start},
                     )
-                    if _response_fits(
+                    if fits(
                         build_response([fitted], cont_fields, next_cursor, missing_ids)
                     ):
-                        return fitted, cont_fields
-                return fitted, cont_fields
+                        return fitted, cont_fields, True
+                return fitted, cont_fields, False
             return (
                 {**seg_el, col_key: make_collection_page(raw_col, col_path, start, lo)},
                 el_fields,
+                base_fits,
             )
 
         if section and section["kind"] == "list":
-            path = section["path"]
+            path = section.get("path")
+            if (
+                not isinstance(path, list)
+                or len(path) != 2
+                or not isinstance(path[0], int)
+                or not (0 <= path[0] < total)
+                or not isinstance(path[1], str)
+            ):
+                raise _invalid_cursor()
             # Rebuild the unpaged section by requesting the matching resource.
             n, key = path
             identity, r = entries[n]
             d = r["definition"]
+            header = {
+                "id": identity,
+                "kind": r["kind"],
+                "display_name": d.get("display_name"),
+                "name": d["name"],
+            }
             if (key == "evidence" and r["kind"] == "action") or (
                 key == "actions" and r["kind"] == "object_type"
             ):
-                header = {
-                    "id": identity,
-                    "kind": r["kind"],
-                    "display_name": d.get("display_name"),
-                    "name": d["name"],
-                }
-                fitted, segs = fit_first_element(
+                fitted, segs, ok = fit_first_element(
                     header,
                     key,
                     d.get(key) or [],
@@ -657,11 +789,14 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     [],
                     require_progress=True,
                 )
-                return build_response([fitted], segs, None, [])
+                return checked_response([fitted], segs, None, [], ok)
             element = build_element(n)
-            element[key] = page(d.get(key), path, offset)
+            raw = d.get(key)
+            if not isinstance(raw, list):
+                raise _invalid_cursor()
+            element[key] = page(raw, path, offset)
             if r["kind"] == "object_type" and d.get("actions"):
-                fitted, segs = fit_first_element(
+                fitted, segs, ok = fit_first_element(
                     element,
                     "actions",
                     d["actions"],
@@ -669,9 +804,22 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     0,
                     None,
                     [],
+                    elem_idx=n,
+                    raw_def=d,
                     cursor_extra={"list_key": key, "list_offset": offset},
                 )
-                return build_response([fitted], segs, None, [])
+                if not ok:
+                    fitted, segs, ok = fit_first_element(
+                        header,
+                        key,
+                        raw,
+                        path,
+                        offset,
+                        None,
+                        [],
+                        require_progress=True,
+                    )
+                return checked_response([fitted], segs, None, [], ok)
             return {
                 **envelope,
                 "total": total,
@@ -681,20 +829,25 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             }
         if section and section["kind"] == "field":
             n = next(
-                i
-                for i, (identity, _) in enumerate(entries)
-                if identity == section["element_id"]
+                (
+                    i
+                    for i, (identity, _) in enumerate(entries)
+                    if identity == section.get("element_id")
+                ),
+                None,
             )
+            if n is None:
+                raise _invalid_cursor()
             value = build_element(n)
             if "list_key" in section:
                 lk = section["list_key"]
-                value[lk] = page(
-                    entries[n][1]["definition"].get(lk) or [],
-                    [n, lk],
-                    section["list_offset"],
-                )
-            for token in section["path"]:
-                value = value[int(token)] if isinstance(value, list) else value[token]
+                raw_lk = entries[n][1]["definition"].get(lk)
+                if not isinstance(raw_lk, list) or not isinstance(
+                    section.get("list_offset"), int
+                ):
+                    raise _invalid_cursor()
+                value[lk] = page(raw_lk, [n, lk], section["list_offset"])
+            value = _resolve_field_path(value, section.get("path", ()))
             text = value[offset : offset + 2000]
             segment = {
                 "element_id": section["element_id"],
@@ -747,6 +900,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
 
         items = []
         page_fields = []
+        verified = True
         for n in range(offset, min(total, offset + args.limit)):
             base_el = build_element(n)
             col_key, raw_col, col_path = action_collection(n)
@@ -754,8 +908,16 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 encode_cursor(settings, context, n + 1) if n + 1 < total else None
             )
             if not items:
-                el, el_fields = fit_first_element(
-                    base_el, col_key, raw_col, col_path, 0, cand_next_cursor, missing
+                el, el_fields, verified = fit_first_element(
+                    base_el,
+                    col_key,
+                    raw_col,
+                    col_path,
+                    0,
+                    cand_next_cursor,
+                    missing,
+                    elem_idx=n,
+                    raw_def=entries[n][1]["definition"],
                 )
                 items.append(el)
                 page_fields.extend(el_fields)
@@ -768,7 +930,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             if size(candidate_items) > BUDGET // 2:
                 break
             candidate_fields = page_fields + el_fields
-            if not _response_fits(
+            if not fits(
                 build_response(candidate_items, candidate_fields, cand_next_cursor, missing)
             ):
                 break
@@ -779,7 +941,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             if offset + len(items) < total
             else None
         )
-        return build_response(items, page_fields, next_cursor, missing)
+        return checked_response(items, page_fields, next_cursor, missing, verified)
     require_instances(db, workspace_id, principal)
     from ontofoundry_api.domain.core import MaterialLink, MaterialObject
     from ontofoundry_api.services.instance_store import visible
@@ -890,7 +1052,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     return {**envelope, "item": item}
 
 
-def invoke(db, workspace_id, principal, name, arguments, settings):
+def invoke(db, workspace_id, principal, name, arguments, settings, *, request_id=None):
     require_read(db, workspace_id, principal)
     args = INPUTS[name].model_validate(arguments)
     if name == "search_ontology":
@@ -923,10 +1085,10 @@ def invoke(db, workspace_id, principal, name, arguments, settings):
     offset, section = decode_cursor(settings, args.cursor, context)
     if section and section.get("kind") == "wire_field":
         original = {**arguments, "cursor": section.get("base_cursor")}
-        value = _invoke(db, workspace_id, principal, name, original, settings)
-        field = value
-        for token in section["path"]:
-            field = field[int(token)] if isinstance(field, list) else field[token]
+        value = _invoke(
+            db, workspace_id, principal, name, original, settings, request_id=request_id
+        )
+        field = _resolve_field_path(value, section.get("path", ()))
         chunk = field[offset : offset + 2000]
         return {
             "workspace_id": workspace_id,
@@ -947,7 +1109,9 @@ def invoke(db, workspace_id, principal, name, arguments, settings):
                 }
             ],
         }
-    result = _invoke(db, workspace_id, principal, name, arguments, settings)
+    result = _invoke(
+        db, workspace_id, principal, name, arguments, settings, request_id=request_id
+    )
     segments = []
 
     def bounded(value, path=(), element_id=None, relative=()):
