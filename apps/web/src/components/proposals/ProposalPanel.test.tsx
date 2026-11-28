@@ -314,6 +314,53 @@ describe("proposal review", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
+  it("scopes object folds per view without discarding earlier choices or kind-group folds", () => {
+    panel();
+    const tiles = screen.getByLabelText("提案分类");
+    const search = screen.getByRole("searchbox", { name: "搜索提案名称" });
+
+    // Collapse the metric kind group under 全部; searching order_count keeps it collapsed.
+    const metricToggle = within(screen.getByRole("region", { name: "指标提案" })).getByRole("button", { name: /^指标/ });
+    fireEvent.click(metricToggle);
+    expect(metricToggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.change(search, { target: { value: "order_count" } });
+    expect(within(screen.getByRole("region", { name: "指标提案" })).getByRole("button", { name: /^指标/ })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    expect(within(screen.getByRole("region", { name: "指标提案" })).getByRole("button", { name: /^指标/ })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    // Expand 采购订单 in 全部, then enter search: search still opens by default.
+    fireEvent.click(screen.getByRole("button", { name: "展开 采购订单 的属性（1）" }));
+    expect(screen.getByRole("article", { name: /order_no/ })).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "order_no" } });
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByRole("article", { name: /order_no/ })).toBeInTheDocument();
+
+    // Collapsing during search does not discard the earlier 全部 expand on return.
+    fireEvent.click(screen.getByRole("button", { name: "收起 采购订单 的属性（1）" }));
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    expect(screen.getByRole("button", { name: "收起 采购订单 的属性（1）" })).toHaveAttribute("aria-expanded", "true");
+
+    // Switching to 属性 enters open by default; collapsing there preserves 全部 and 属性 separately.
+    fireEvent.click(within(tiles).getByRole("button", { name: "属性 1" }));
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByRole("article", { name: /order_no/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "收起 采购订单 的属性（1）" }));
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+
+    fireEvent.click(within(tiles).getByRole("button", { name: "全部 4" }));
+    expect(screen.getByRole("button", { name: "收起 采购订单 的属性（1）" })).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(within(tiles).getByRole("button", { name: "属性 1" }));
+    expect(screen.getByRole("button", { name: "展开 采购订单 的属性（1）" })).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("accepts everything acceptable regardless of filters and asks before rejecting all", async () => {
     const proposals = state();
     panel(proposals);

@@ -123,7 +123,8 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const categories = ELEMENT_CATEGORIES.filter((category) => items.some((item) => item.target_kind === category.key));
   const [kind, setKind] = useState<TargetKind | null>(null);
-  // Groups the reviewer flipped from their default: objects start closed (open under 属性), kind groups open.
+  // Groups the reviewer flipped from their default: kind groups stay keyed by kind across
+  // queries, while object groups scope flips per view (all / property / search).
   const [toggled, setToggled] = useState(new Set<string>());
   const [status, setStatus] = useState<StatusFilter>("pending");
   const [query, setQuery] = useState("");
@@ -153,15 +154,19 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   // Under 全部 and 属性, each object is a group holding its own proposal and its
   // properties; the other kinds follow as one group per kind, in tile order.
   const groups = kind && kind !== "property" ? null : proposalGroups(visible, kind ? [] : categories, items, session.draft);
+  const objectFoldView = terms.length > 0 ? "search" : kind === "property" ? "property" : "all";
+  const foldKey = (group: ProposalGroup) => (group.type === "object" ? `${objectFoldView}:${group.key}` : group.key);
   // A search opens objects too, so a matching property is never hidden behind a closed object.
-  const isOpen = (group: ProposalGroup) => (group.type === "object" ? kind === "property" || terms.length > 0 : true) !== toggled.has(group.key);
-  const flip = (key: string) =>
+  const isOpen = (group: ProposalGroup) => (group.type === "object" ? objectFoldView !== "all" : true) !== toggled.has(foldKey(group));
+  const flip = (group: ProposalGroup) => {
+    const key = foldKey(group);
     setToggled((current) => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
+  };
   const openItem = openId ? byId.get(openId) : undefined;
   useEffect(() => {
     if (!toast || undoBusy) return;
@@ -388,7 +393,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
               if (group.type === "kind")
                 return (
                   <section key={group.key} aria-label={`${group.title}提案`}>
-                    <button type="button" aria-expanded={open} onClick={() => flip(group.key)}
+                    <button type="button" aria-expanded={open} onClick={() => flip(group)}
                       className="sticky top-0 z-1 flex w-full items-center gap-2 border-b border-rule bg-surface-raised px-4 py-1.5 text-left text-xs font-semibold text-ink-2">
                       {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       <span className={group.tone}>{group.title}</span>
@@ -398,7 +403,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
                   </section>
                 );
               const toggle = group.properties.length > 0 && (
-                <button type="button" aria-expanded={open} onClick={() => flip(group.key)}
+                <button type="button" aria-expanded={open} onClick={() => flip(group)}
                   aria-label={`${open ? "收起" : "展开"} ${group.title} 的属性（${group.properties.length}）`}
                   className="flex w-full items-center gap-1.5 border-b border-rule-soft bg-surface px-4 py-1 pl-10 text-left text-xs text-ink-2 hover:bg-surface-soft">
                   {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
