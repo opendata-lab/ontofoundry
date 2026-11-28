@@ -230,10 +230,12 @@ def _defining_items(items):
     One batch proposes each element once; across batches (an undo reaches all
     unpublished ones) the same element can be created, changed and deleted by
     different proposals. A reference needs the element to exist, so it depends
-    on its creation, else its latest change, never on its deletion."""
+    on its creation, else its latest change, never on its deletion. Superseded
+    items were replaced by a later merged batch and do not participate in
+    active dependency reconstruction."""
     found = {}
     for item in sorted(items, key=lambda i: (i.accepted_revision or 0, i.ordinal)):
-        if item.operation == "delete":
+        if item.operation == "delete" or item.status == "superseded":
             continue
         current = found.get(item.target_id)
         if current is None or current.operation != "create":
