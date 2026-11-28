@@ -42,6 +42,28 @@ def variants():
     return json.loads((KIT / "variants.json").read_bytes())
 
 
+def action_example():
+    """Return only the action rule from guide.md and the action entries from 04.json."""
+    guide_text = (KIT / "guide.md").read_text()
+    marker = "动作也在 04，"
+    rule_line = next(
+        (line[line.index(marker) :].strip() for line in guide_text.splitlines() if marker in line),
+        None,
+    )
+    if not rule_line:
+        raise KeyError("guide.md 缺少动作判据")
+    part04 = without_material_hashes(json.loads((KIT / "04.json").read_text()))
+    actions = [item for item in part04 if item.get("target_kind") == "action"]
+    if not actions:
+        raise KeyError("04.json 缺少动作正例")
+    return (
+        "===== 动作判据（guide.md）=====\n"
+        + rule_line
+        + "\n===== 动作正例（04.json）=====\n"
+        + json.dumps(actions, ensure_ascii=False, separators=(",", ":"))
+    )
+
+
 def by_kind(kinds):
     """Per-kind examples are gone (design §6): name the kit part that shows each kind."""
     unknown = [k for k in kinds if k not in PARTS_BY_KIND]
@@ -49,7 +71,7 @@ def by_kind(kinds):
         return f"未知类型 {'、'.join(unknown)}；类型可选：" + "、".join(PARTS_BY_KIND)
     parts = dict.fromkeys(PARTS_BY_KIND[k] for k in kinds)
     return ("按类型的正例已并入固定包：" + "；".join(command("show_example.py", "--part", n) for n in parts)
-            + "；修改用 --part update，改名称或删除用 --part edit，少见写法用 --variant <名称>")
+            + "；增量动作判据与正例用 --action，修改用 --part update，改名称或删除用 --part edit，少见写法用 --variant <名称>")
 
 
 def main():
@@ -58,19 +80,23 @@ def main():
     fixed = parser.add_mutually_exclusive_group()
     fixed.add_argument("--part", choices=["01", "02", "03", "04", "05", "01b", "02b", "03b", "update", "edit"], help="裸 items 数组；01–05 全量（01b–03b 同 01–03），update 增量补齐，edit 修改删除")
     fixed.add_argument("--incremental-guide", action="store_true", help="增量查询与写法说明")
+    fixed.add_argument("--action", action="store_true", help="增量涉及动作时的判据与正例（仅含 guide.md 动作规则与 04.json 动作条目）")
     fixed.add_argument("--values", action="store_true", help="契约取值速查")
     fixed.add_argument("--guide", action="store_true", help="固定包说明与确定的读取参数")
     fixed.add_argument("--extract", choices=sorted(EXTRACT_PAGES), help="全量抽取要读的全部内容，分两页：1 原则、说明、取值、01–02；2 为 03–05")
     fixed.add_argument("--variant", help="少见写法，如 inheritance、metric-ratio；写错时列出全部")
     args, extra = parser.parse_known_args()
     try:
-        if extra or (args.target_kinds and any([args.part, args.values, args.guide, args.incremental_guide, args.extract, args.variant])):
-            raise ValueError("参数只写一个入口：--part、--extract、--variant、--guide、--values 或 --incremental-guide")
+        if extra or (args.target_kinds and any([args.part, args.values, args.guide, args.incremental_guide, args.action, args.extract, args.variant])):
+            raise ValueError("参数只写一个入口：--part、--extract、--variant、--guide、--values、--incremental-guide 或 --action")
         if args.target_kinds:
             raise ValueError(by_kind(list(dict.fromkeys(args.target_kinds))))
         if args.extract:
             content = extract_page(args.extract)
             limit, what = PAGE_LIMIT, f"抽取第 {args.extract} 页"
+        elif args.action:
+            content = action_example()
+            limit, what = LIMIT, "动作判据与正例"
         elif args.variant:
             found = variants()
             if args.variant not in found:
@@ -88,7 +114,7 @@ def main():
                 content += "\n===== 增量补齐正例（update.json，同 --part update）=====\n" + update
             limit, what = LIMIT, f"固定包 {filename}"
         else:
-            raise ValueError("请用 --extract 1、--part 01 至 --part 05、--variant <名称>、--values 或 --guide")
+            raise ValueError("请用 --extract 1、--part 01 至 --part 05、--variant <名称>、--values、--guide、--incremental-guide 或 --action")
     except ValueError as exc:
         print(error("INVALID_ARGUMENT", str(exc), "未返回示例"))
         return 1

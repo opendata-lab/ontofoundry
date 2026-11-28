@@ -85,7 +85,23 @@ INPUTS = {
     "get_object": GetObject,
 }
 BUDGET = 110_000  # Both text and structuredContent count toward the 256 KiB wire limit.
-ACTION_EVIDENCE_WIRE_BUDGET = 220_000  # Wire-byte budget for action evidence paging (content[].text + structuredContent) under 256 KiB.
+MCP_WIRE_LIMIT = 262_144  # 256 KiB HTTP JSON-RPC response cap.
+# Reserve 2 KiB for gateway _meta (versions list) and request IDs.
+ACTION_WIRE_BUDGET = MCP_WIRE_LIMIT - 2_048
+ACTION_RAW_BUDGET = 118_000  # Stay safely under the final 120,000-byte structuredContent cap.
+_ACTION_NO_SEGMENT_KEYS = frozenset(
+    {
+        "id",
+        "kind",
+        "name",
+        "property_id",
+        "link_type_id",
+        "object_type_id",
+        "target_type_id",
+        "value_type_id",
+        "value_kind",
+    }
+)
 
 
 def size(value):
@@ -98,33 +114,53 @@ def size(value):
     )
 
 
-def _wire_size(value):
-    """UTF-8 byte size of tool_result(value) as serialized by FastAPI/Starlette (used by action evidence paging)."""
+def _jsonrpc_wire_size(value):
+    """UTF-8 byte size of the full JSON-RPC response for tool_result(value)."""
     from fastapi.encoders import jsonable_encoder
 
     structured = jsonable_encoder(value)
     text = json.dumps(structured, ensure_ascii=False)
+    envelope = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "content": [{"type": "text", "text": text}],
+            "structuredContent": structured,
+            "isError": False,
+            "resultType": "complete",
+            "_meta": {
+                "io.modelcontextprotocol/serverInfo": {
+                    "name": "ontofoundry",
+                    "version": "0.1.0",
+                }
+            },
+        },
+    }
     return len(
-        json.dumps(
-            {"content": [{"type": "text", "text": text}], "structuredContent": structured},
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode()
+        json.dumps(envelope, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     )
 
 
-def _wire_item_delta(value):
-    """Incremental JSON-RPC wire bytes contributed by one evidence item (structuredContent + escaped text)."""
-    from fastapi.encoders import jsonable_encoder
+def _str_wire_bytes(text: str) -> int:
+    """Wire bytes contributed by one JSON string value across structuredContent + content[].text."""
+    compact = json.dumps(text, ensure_ascii=False)
+    escaped = json.dumps(compact, ensure_ascii=False)
+    return len(compact.encode("utf-8")) + len(escaped.encode("utf-8"))
 
-    structured = jsonable_encoder(value)
-    compact_bytes = len(
-        json.dumps(structured, ensure_ascii=False, separators=(",", ":")).encode()
-    )
-    text = json.dumps(structured, ensure_ascii=False)
-    # json.dumps(text) adds 2 bytes for quotes, matching the ", " separator inside content[0].text.
-    escaped_text_bytes = len(json.dumps(text, ensure_ascii=False).encode())
-    return compact_bytes + 1 + escaped_text_bytes
+
+def _initial_segment_chunk(entry: str, max_wire_bytes: int = 4_000) -> str:
+    """Take up to 2000 chars, shrinking if heavy escaping would bloat the segment."""
+    chunk = entry[:2000]
+    if _str_wire_bytes(chunk) <= max_wire_bytes:
+        return chunk
+    lo, hi = 1, len(chunk)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if _str_wire_bytes(chunk[:mid]) <= max_wire_bytes:
+            lo = mid
+        else:
+            hi = mid - 1
+    return chunk[:lo]
 
 
 def _invoke(db, workspace_id, principal, name, arguments, settings):
@@ -179,26 +215,160 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
         return {"total": len(values), "items": items, "next_cursor": cursor}
 
-    def page_action_evidence(values, path, base_element, start=0):
-        # Measure both real JSON-RPC wire bytes and structuredContent size for action
-        # evidence so backslash-heavy evidence never overflows 256 KiB or the 120 KB cap.
-        wire_budget = max(8_000, ACTION_EVIDENCE_WIRE_BUDGET - _wire_size(base_element) - 8_000)
-        raw_budget = max(4_000, BUDGET - size(base_element) - 4_000)
+    def segment_action_base(element, build_base_response):
+        # First try the exact same 12,000-byte rule as other elements.
+        def run_segment(value, path=(), wire_threshold=None, chunk_wire_cap=None, out_fields=None):
+            if isinstance(value, dict):
+                result = {}
+                for key, entry in value.items():
+                    over_utf8 = isinstance(entry, str) and len(entry.encode()) > 12000
+                    over_wire = (
+                        wire_threshold is not None
+                        and isinstance(entry, str)
+                        and key not in _ACTION_NO_SEGMENT_KEYS
+                        and _str_wire_bytes(entry) > wire_threshold
+                    )
+                    if over_utf8 or over_wire:
+                        pointer = "/" + "/".join((*path, key))
+                        text = (
+                            _initial_segment_chunk(entry, chunk_wire_cap)
+                            if chunk_wire_cap is not None
+                            else entry[:2000]
+                        )
+                        out_fields.append(
+                            {
+                                "element_id": element["id"],
+                                "field": pointer,
+                                "start": 0,
+                                "end": len(text),
+                                "total": len(entry),
+                                "text": text,
+                                "next_cursor": encode_cursor(
+                                    settings,
+                                    context,
+                                    len(text),
+                                    {
+                                        "kind": "field",
+                                        "element_id": element["id"],
+                                        "path": [*path, key],
+                                    },
+                                )
+                                if len(text) < len(entry)
+                                else None,
+                            }
+                        )
+                    else:
+                        result[key] = run_segment(
+                            entry, (*path, key), wire_threshold, chunk_wire_cap, out_fields
+                        )
+                return result
+            if isinstance(value, list):
+                return [
+                    run_segment(
+                        v, (*path, str(n)), wire_threshold, chunk_wire_cap, out_fields
+                    )
+                    for n, v in enumerate(value)
+                ]
+            return value
+
+        el_fields = []
+        candidate = run_segment(element, out_fields=el_fields)
+        resp = build_base_response(candidate, el_fields)
+        if size(resp) <= ACTION_RAW_BUDGET and _jsonrpc_wire_size(resp) <= ACTION_WIRE_BUDGET:
+            return candidate, el_fields
+
+        # Base projection alone still exceeds budget: progressively segment escape-heavy
+        # or long string fields using the same field_segments mechanism.
+        for wire_threshold, chunk_wire_cap in (
+            (12_000, 4_000),
+            (4_000, 2_000),
+            (1_000, 512),
+            (256, 128),
+        ):
+            el_fields = []
+            candidate = run_segment(
+                element,
+                wire_threshold=wire_threshold,
+                chunk_wire_cap=chunk_wire_cap,
+                out_fields=el_fields,
+            )
+            resp = build_base_response(candidate, el_fields)
+            if size(resp) <= ACTION_RAW_BUDGET and _jsonrpc_wire_size(resp) <= ACTION_WIRE_BUDGET:
+                return candidate, el_fields
+        return candidate, el_fields
+
+    def page_action_evidence(raw_evidence, path, base_el, el_fields, build_response, start=0):
+        # Budget against the full serialized JSON-RPC response; never append evidence
+        # when the base projection leaves no room (return a cursor instead).
         items, cursor = [], None
-        used_wire = 0
-        for n in range(start, min(len(values), start + args.limit)):
-            delta_wire = _wire_item_delta(values[n])
-            if items and (
-                used_wire + delta_wire > wire_budget
-                or size(items + [values[n]]) > raw_budget
+        max_end = min(len(raw_evidence), start + args.limit)
+        for n in range(start, max_end):
+            candidate_items = items + [raw_evidence[n]]
+            next_c = (
+                encode_cursor(settings, context, n + 1, {"kind": "list", "path": path})
+                if n + 1 < len(raw_evidence)
+                else None
+            )
+            candidate_el = {
+                **base_el,
+                "evidence": {
+                    "total": len(raw_evidence),
+                    "items": candidate_items,
+                    "next_cursor": next_c,
+                },
+            }
+            candidate_resp = build_response(candidate_el, el_fields)
+            if (
+                size(candidate_resp) > ACTION_RAW_BUDGET
+                or _jsonrpc_wire_size(candidate_resp) > ACTION_WIRE_BUDGET
             ):
                 break
-            items.append(values[n])
-            used_wire += delta_wire
+            items.append(raw_evidence[n])
         end = start + len(items)
-        if end < len(values):
+        if end < len(raw_evidence):
             cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
-        return {"total": len(values), "items": items, "next_cursor": cursor}
+        return {"total": len(raw_evidence), "items": items, "next_cursor": cursor}
+
+    def page_object_actions(raw_actions, path, base_el, total_elements, start=0):
+        # Allocate object action summaries from the object's remaining budget so
+        # properties and their cursor behave identically to main.
+        items, cursor = [], None
+        max_end = min(len(raw_actions), start + args.limit)
+        for n in range(start, max_end):
+            candidate_items = items + [raw_actions[n]]
+            if items and size(candidate_items) > BUDGET // 2:
+                break
+            next_c = (
+                encode_cursor(settings, context, n + 1, {"kind": "list", "path": path})
+                if n + 1 < len(raw_actions)
+                else None
+            )
+            candidate_el = {
+                **base_el,
+                "actions": {
+                    "total": len(raw_actions),
+                    "items": candidate_items,
+                    "next_cursor": next_c,
+                },
+            }
+            candidate_resp = {
+                **envelope,
+                "total": total_elements,
+                "elements": [candidate_el],
+                "missing": [],
+                "next_cursor": None,
+            }
+            if (
+                size(candidate_items) > BUDGET // 2
+                or size(candidate_resp) > ACTION_RAW_BUDGET
+                or _jsonrpc_wire_size(candidate_resp) > ACTION_WIRE_BUDGET
+            ):
+                break
+            items.append(raw_actions[n])
+        end = start + len(items)
+        if end < len(raw_actions):
+            cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
+        return {"total": len(raw_actions), "items": items, "next_cursor": cursor}
 
     def paginate_nested(item, path):
         values = item
@@ -383,10 +553,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     element["definition"] = definition
                     if action_evidence is not None and instances:
                         d["evidence"] = action_evidence
-                        element["evidence"] = page_action_evidence(
-                            action_evidence, [len(values), "evidence"], element
-                        )
-                for key in ("properties", "child_types", "actions"):
+                for key in ("properties", "child_types"):
                     if key in d:
                         element[key] = page(d[key], [len(values), key])
                 if "rules" in args.include and "rules" in d:
@@ -407,6 +574,14 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     ):
                         if key in d:
                             element[key] = d[key]
+                if d.get("actions"):
+                    element["actions"] = page_object_actions(
+                        d["actions"],
+                        [len(values), "actions"],
+                        element,
+                        total_elements=max(1, len(lookup)),
+                        start=0,
+                    )
             values.append(element)
         if section and section["kind"] == "list":
             path = section["path"]
@@ -416,9 +591,89 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             raw = d.get(key)
             if key == "evidence" and values[n]["kind"] == "action":
                 base_el = {k: v for k, v in values[n].items() if k != "evidence"}
-                values[n][key] = page_action_evidence(raw, path, base_el, offset)
-            else:
-                values[n][key] = page(raw, path, offset)
+                sample_ev_cursor = (
+                    encode_cursor(settings, context, offset, {"kind": "list", "path": path})
+                    if offset < len(raw)
+                    else None
+                )
+
+                def build_cont(el, segs):
+                    return {
+                        **envelope,
+                        "total": len(values),
+                        "elements": [el],
+                        "missing": [],
+                        "next_cursor": None,
+                        **({"field_segments": segs} if segs else {}),
+                    }
+
+                def build_cont_base(el, segs):
+                    return build_cont(
+                        {
+                            **el,
+                            "evidence": {
+                                "total": len(raw),
+                                "items": [],
+                                "next_cursor": sample_ev_cursor,
+                            },
+                        },
+                        segs,
+                    )
+
+                seg_el, cont_fields = segment_action_base(base_el, build_cont_base)
+                ev_page = page_action_evidence(
+                    raw, path, seg_el, cont_fields, build_cont, offset
+                )
+                if not ev_page["items"] and offset < len(raw):
+                    # Base projection left no room for the next evidence entry even after
+                    # field segmentation; serve the continuation with a minimal header so
+                    # evidence pagination always makes forward progress under 256 KiB.
+                    stub_el = {
+                        k: values[n][k]
+                        for k in ("id", "kind", "display_name", "name")
+                        if k in values[n]
+                    }
+                    cont_fields = []
+                    ev_page = page_action_evidence(
+                        raw, path, stub_el, cont_fields, build_cont, offset
+                    )
+                    seg_el = stub_el
+                return build_cont({**seg_el, "evidence": ev_page}, cont_fields)
+            if key == "actions" and values[n]["kind"] == "object_type":
+                base_el = {k: v for k, v in values[n].items() if k != "actions"}
+                act_page = page_object_actions(
+                    raw, path, base_el, total_elements=len(values), start=offset
+                )
+                if not act_page["items"] and offset < len(raw):
+                    stub_el = {
+                        k: values[n][k]
+                        for k in ("id", "kind", "display_name", "name")
+                        if k in values[n]
+                    }
+                    act_page = page_object_actions(
+                        raw, path, stub_el, total_elements=len(values), start=offset
+                    )
+                    return {
+                        **envelope,
+                        "total": len(values),
+                        "elements": [{**stub_el, "actions": act_page}],
+                        "missing": [],
+                        "next_cursor": None,
+                    }
+                values[n][key] = act_page
+                return {
+                    **envelope,
+                    "total": len(values),
+                    "elements": [values[n]],
+                    "missing": [],
+                    "next_cursor": None,
+                }
+            values[n][key] = page(raw, path, offset)
+            if values[n]["kind"] == "object_type" and "actions" in values[n]:
+                base_el = {k: v for k, v in values[n].items() if k != "actions"}
+                values[n]["actions"] = page_object_actions(
+                    d["actions"], [n, "actions"], base_el, total_elements=len(values), start=0
+                )
             return {
                 **envelope,
                 "total": len(values),
@@ -450,13 +705,95 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 "next_cursor": None,
                 "field_segments": [segment],
             }
-        cleaned = [segment_fields(v, v["id"]) for v in values]
-        data = page(cleaned, [], offset)
+        missing = sorted(wanted - set(lookup)) if wanted else []
+        cleaned = []
+        for idx, v in enumerate(values):
+            if v["kind"] == "action" and wanted is not None:
+                raw_ev = lookup[v["id"]]["definition"].get("evidence") if instances else None
+                base_el = {k: val for k, val in v.items() if k != "evidence"}
+                sample_outer_cursor = (
+                    encode_cursor(settings, context, idx + 1)
+                    if len(values) > 1
+                    else None
+                )
+
+                def build_single(el, segs, outer_cursor=sample_outer_cursor):
+                    return {
+                        **envelope,
+                        "total": len(values),
+                        "elements": [el],
+                        "missing": missing,
+                        "next_cursor": outer_cursor,
+                        **({"field_segments": segs} if segs else {}),
+                    }
+
+                def build_base(el, segs, ev_raw=raw_ev, elem_idx=idx, single=build_single):
+                    if ev_raw is None:
+                        return single(el, segs)
+                    sample_ev_cursor = (
+                        encode_cursor(
+                            settings, context, 0, {"kind": "list", "path": [elem_idx, "evidence"]}
+                        )
+                        if ev_raw
+                        else None
+                    )
+                    return single(
+                        {
+                            **el,
+                            "evidence": {
+                                "total": len(ev_raw),
+                                "items": [],
+                                "next_cursor": sample_ev_cursor,
+                            },
+                        },
+                        segs,
+                    )
+
+                seg_el, el_fields = segment_action_base(base_el, build_base)
+                fields.extend(el_fields)
+                if raw_ev is not None:
+                    seg_el["evidence"] = page_action_evidence(
+                        raw_ev, [idx, "evidence"], seg_el, el_fields, build_single, 0
+                    )
+                cleaned.append(seg_el)
+            else:
+                cleaned.append(segment_fields(v, v["id"]))
+        has_action_content = any(
+            e["kind"] == "action" or "actions" in e for e in cleaned
+        )
+        if not has_action_content:
+            data = page(cleaned, [], offset)
+        else:
+            items = []
+            for n in range(offset, min(len(cleaned), offset + args.limit)):
+                candidate_items = items + [cleaned[n]]
+                if items:
+                    if size(candidate_items) > BUDGET // 2:
+                        break
+                    item_ids = {e["id"] for e in candidate_items}
+                    item_fields = [f for f in fields if f["element_id"] in item_ids]
+                    candidate_resp = {
+                        **envelope,
+                        "total": len(values),
+                        "elements": candidate_items,
+                        "missing": missing,
+                        "next_cursor": encode_cursor(settings, context, n + 1)
+                        if n + 1 < len(values)
+                        else None,
+                        **({"field_segments": item_fields} if item_fields else {}),
+                    }
+                    if (
+                        size(candidate_resp) > ACTION_RAW_BUDGET
+                        or _jsonrpc_wire_size(candidate_resp) > ACTION_WIRE_BUDGET
+                    ):
+                        break
+                items.append(cleaned[n])
+            data = {"total": len(cleaned), "items": items, "next_cursor": None}
         return {
             **envelope,
             "total": len(values),
             "elements": data["items"],
-            "missing": sorted(wanted - set(lookup)) if wanted else [],
+            "missing": missing,
             "next_cursor": encode_cursor(settings, context, offset + len(data["items"]))
             if offset + len(data["items"]) < len(values)
             else None,

@@ -125,7 +125,7 @@ def read_extension(translation):
         data.get("required", []) if isinstance(data.get("required", []), list) else []
     )
     if "action_ref_names" in data and data["action_ref_names"] is not None:
-        if data["action_ref_names"] == "core":
+        if source_path == "/ontofoundry-extension.json" and data["action_ref_names"] == "core":
             clean["action_ref_names"] = "core"
         else:
             translation.issue(
@@ -133,7 +133,7 @@ def read_extension(translation):
                 "dropped",
                 "Extension",
                 "RT-03",
-                "扩展字段 action_ref_names 仅支持 core",
+                "扩展字段 action_ref_names 仅在 ZIP 的 ontofoundry-extension.json 中支持 core",
             )
     if "actions" in data and not isinstance(data["actions"], dict):
         translation.issue(

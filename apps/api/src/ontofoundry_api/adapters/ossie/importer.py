@@ -33,7 +33,7 @@ from ontofoundry_api.domain.graph import DraftIndex
 from ontofoundry_api.domain.validation import validate_core_graph
 
 from .extension import read_extension
-from .ids import identifier_name
+from .ids import base_identifier_name, identifier_name
 from .translation import Translation
 from .validator import BUILTIN_VALUE_CONCEPTS, validate_schema, validate_semantics
 
@@ -914,8 +914,12 @@ class OntologyImporter:
         # Index every concept and relationship path written in the source Ossie document
         # (including multi-way, duplicate, invalid, or dropped items) so uncarried or absent
         # source paths can never silently fall through to a normalized core identifier.
+        # Also track pre-suffix normalized names so collisions (e.g. "status-code" vs
+        # "status code", where one gets suffixed to "_2") are treated as ambiguous.
         source_concept_counts: Counter[str] = Counter()
         source_member_counts: Counter[str] = Counter()
+        source_norm_concept_counts: Counter[str] = Counter()
+        source_norm_member_counts: Counter[str] = Counter()
         raw_ontology = self.document.get("ontology")
         for concept in raw_ontology if isinstance(raw_ontology, list) else ():
             if not isinstance(concept, dict):
@@ -924,6 +928,8 @@ class OntologyImporter:
             if not isinstance(cname, str) or not cname:
                 continue
             source_concept_counts[cname] += 1
+            norm_cname = base_identifier_name(cname)
+            source_norm_concept_counts[norm_cname.casefold()] += 1
             raw_rels = concept.get("relationships")
             if isinstance(raw_rels, list):
                 for rel in raw_rels:
@@ -931,6 +937,10 @@ class OntologyImporter:
                         rname = rel.get("name")
                         if isinstance(rname, str) and rname:
                             source_member_counts[f"{cname}.{rname}"] += 1
+                            norm_rname = base_identifier_name(rname)
+                            source_norm_member_counts[
+                                f"{norm_cname}.{norm_rname}".casefold()
+                            ] += 1
 
         carried_concepts: dict[str, list[ObjectType | ValueType]] = {}
         for name, obj in self.t.objects.items():
@@ -942,9 +952,12 @@ class OntologyImporter:
         for (owner, member_name), member in self.t.members.items():
             carried_members.setdefault(f"{owner}.{member_name}", []).append(member)
 
-        # Core-name fallback is only permitted when the extension explicitly declares it was
-        # written by our exporter with core names (never for hand-authored/third-party Ossie).
-        allow_core_fallback = self.extension.data.get("action_ref_names") == "core"
+        # Core-name fallback is only permitted when the ZIP sidecar extension explicitly
+        # declares it was written by our exporter with core names (never inline ai_context).
+        allow_core_fallback = (
+            self.extension.source_path == "/ontofoundry-extension.json"
+            and self.extension.data.get("action_ref_names") == "core"
+        )
         core_concepts: dict[str, list[ObjectType | ValueType]] = {}
         core_members: dict[str, list[Property | LinkType]] = {}
         if allow_core_fallback:
@@ -961,7 +974,16 @@ class OntologyImporter:
                     f"{index.objects[link.source_type_id].name}.{link.name}", []
                 ).append(link)
 
-        def resolve_ref(ref, source_counts, carried_map, core_map, expected_cls, label):
+        def resolve_ref(
+            ref,
+            source_counts,
+            carried_map,
+            core_map,
+            norm_counts,
+            expected_cls,
+            label,
+            owner_norm_counts=None,
+        ):
             if not isinstance(ref, str) or not ref:
                 return None, f"{label} {ref!r} 未解析到有效元素"
             count = source_counts.get(ref, 0)
@@ -977,14 +999,22 @@ class OntologyImporter:
                 if not isinstance(target, expected_cls):
                     return None, f"{label} {ref!r} 解析到的元素种类不符"
                 return target, None
-            if allow_core_fallback and ref in core_map:
-                matches = core_map[ref]
-                if len(matches) != 1:
-                    return None, f"{label} {ref!r} 路径存在歧义"
-                target = matches[0]
-                if not isinstance(target, expected_cls):
-                    return None, f"{label} {ref!r} 解析到的元素种类不符"
-                return target, None
+            if allow_core_fallback:
+                if owner_norm_counts is not None and "." in ref:
+                    owner_part = ref.split(".", 1)[0]
+                    if owner_norm_counts.get(owner_part.casefold(), 0) > 1:
+                        return None, f"{label} {ref!r} 所属概念规范化后存在冲突歧义"
+                norm_count = norm_counts.get(ref.casefold(), 0)
+                if norm_count > 1:
+                    return None, f"{label} {ref!r} 源路径规范化后存在冲突歧义"
+                if norm_count == 1 and ref in core_map:
+                    matches = core_map[ref]
+                    if len(matches) != 1:
+                        return None, f"{label} {ref!r} 路径存在歧义"
+                    target = matches[0]
+                    if not isinstance(target, expected_cls):
+                        return None, f"{label} {ref!r} 解析到的元素种类不符"
+                    return target, None
             return None, f"{label} {ref!r} 在源文档中不存在"
 
         for raw_name, entry in raw_actions.items():
@@ -1007,6 +1037,7 @@ class OntologyImporter:
                     source_concept_counts,
                     carried_concepts,
                     core_concepts,
+                    source_norm_concept_counts,
                     ObjectType,
                     "目标对象",
                 )
@@ -1047,6 +1078,7 @@ class OntologyImporter:
                         source_concept_counts,
                         carried_concepts,
                         core_concepts,
+                        source_norm_concept_counts,
                         ValueType,
                         "参数值类型",
                     )
@@ -1095,8 +1127,10 @@ class OntologyImporter:
                             source_member_counts,
                             carried_members,
                             core_members,
+                            source_norm_member_counts,
                             Property,
                             "效果属性",
+                            owner_norm_counts=source_norm_concept_counts,
                         )
                         if err is not None:
                             unresolved = err
@@ -1114,8 +1148,10 @@ class OntologyImporter:
                             source_member_counts,
                             carried_members,
                             core_members,
+                            source_norm_member_counts,
                             LinkType,
                             "效果关系",
+                            owner_norm_counts=source_norm_concept_counts,
                         )
                         if err is not None:
                             unresolved = err
@@ -1134,6 +1170,7 @@ class OntologyImporter:
                             source_concept_counts,
                             carried_concepts,
                             core_concepts,
+                            source_norm_concept_counts,
                             ObjectType,
                             "效果对象",
                         )
