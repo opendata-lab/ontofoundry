@@ -918,8 +918,8 @@ class OntologyImporter:
         # "status code", where one gets suffixed to "_2") are treated as ambiguous.
         source_concept_counts: Counter[str] = Counter()
         source_member_counts: Counter[str] = Counter()
-        source_norm_concept_counts: Counter[str] = Counter()
-        source_norm_member_counts: Counter[str] = Counter()
+        source_norm_concepts: dict[str, list[str]] = {}
+        source_norm_members: dict[str, list[str]] = {}
         raw_ontology = self.document.get("ontology")
         for concept in raw_ontology if isinstance(raw_ontology, list) else ():
             if not isinstance(concept, dict):
@@ -929,7 +929,7 @@ class OntologyImporter:
                 continue
             source_concept_counts[cname] += 1
             norm_cname = base_identifier_name(cname)
-            source_norm_concept_counts[norm_cname.casefold()] += 1
+            source_norm_concepts.setdefault(norm_cname.casefold(), []).append(cname)
             raw_rels = concept.get("relationships")
             if isinstance(raw_rels, list):
                 for rel in raw_rels:
@@ -938,9 +938,9 @@ class OntologyImporter:
                         if isinstance(rname, str) and rname:
                             source_member_counts[f"{cname}.{rname}"] += 1
                             norm_rname = base_identifier_name(rname)
-                            source_norm_member_counts[
-                                f"{norm_cname}.{norm_rname}".casefold()
-                            ] += 1
+                            source_norm_members.setdefault(
+                                f"{norm_cname}.{norm_rname}".casefold(), []
+                            ).append(f"{cname}.{rname}")
 
         carried_concepts: dict[str, list[ObjectType | ValueType]] = {}
         for name, obj in self.t.objects.items():
@@ -979,10 +979,10 @@ class OntologyImporter:
             source_counts,
             carried_map,
             core_map,
-            norm_counts,
+            norm_paths,
             expected_cls,
             label,
-            owner_norm_counts=None,
+            owner_norm_paths=None,
         ):
             if not isinstance(ref, str) or not ref:
                 return None, f"{label} {ref!r} 未解析到有效元素"
@@ -1000,20 +1000,23 @@ class OntologyImporter:
                     return None, f"{label} {ref!r} 解析到的元素种类不符"
                 return target, None
             if allow_core_fallback:
-                if owner_norm_counts is not None and "." in ref:
+                if owner_norm_paths is not None and "." in ref:
                     owner_part = ref.split(".", 1)[0]
-                    if owner_norm_counts.get(owner_part.casefold(), 0) > 1:
+                    if len(owner_norm_paths.get(owner_part.casefold(), ())) > 1:
                         return None, f"{label} {ref!r} 所属概念规范化后存在冲突歧义"
-                norm_count = norm_counts.get(ref.casefold(), 0)
-                if norm_count > 1:
+                norm_matches = norm_paths.get(ref.casefold(), ())
+                if len(norm_matches) > 1:
                     return None, f"{label} {ref!r} 源路径规范化后存在冲突歧义"
-                if norm_count == 1 and ref in core_map:
+                if len(norm_matches) == 1 and ref in core_map:
                     matches = core_map[ref]
                     if len(matches) != 1:
                         return None, f"{label} {ref!r} 路径存在歧义"
                     target = matches[0]
                     if not isinstance(target, expected_cls):
                         return None, f"{label} {ref!r} 解析到的元素种类不符"
+                    source_carried = carried_map.get(norm_matches[0], ())
+                    if len(source_carried) != 1 or source_carried[0].id != target.id:
+                        return None, f"{label} {ref!r} 规范化回退目标与唯一源路径不一致（存在命名冲突）"
                     return target, None
             return None, f"{label} {ref!r} 在源文档中不存在"
 
@@ -1037,7 +1040,7 @@ class OntologyImporter:
                     source_concept_counts,
                     carried_concepts,
                     core_concepts,
-                    source_norm_concept_counts,
+                    source_norm_concepts,
                     ObjectType,
                     "目标对象",
                 )
@@ -1078,7 +1081,7 @@ class OntologyImporter:
                         source_concept_counts,
                         carried_concepts,
                         core_concepts,
-                        source_norm_concept_counts,
+                        source_norm_concepts,
                         ValueType,
                         "参数值类型",
                     )
@@ -1127,10 +1130,10 @@ class OntologyImporter:
                             source_member_counts,
                             carried_members,
                             core_members,
-                            source_norm_member_counts,
+                            source_norm_members,
                             Property,
                             "效果属性",
-                            owner_norm_counts=source_norm_concept_counts,
+                            owner_norm_paths=source_norm_concepts,
                         )
                         if err is not None:
                             unresolved = err
@@ -1148,10 +1151,10 @@ class OntologyImporter:
                             source_member_counts,
                             carried_members,
                             core_members,
-                            source_norm_member_counts,
+                            source_norm_members,
                             LinkType,
                             "效果关系",
-                            owner_norm_counts=source_norm_concept_counts,
+                            owner_norm_paths=source_norm_concepts,
                         )
                         if err is not None:
                             unresolved = err
@@ -1170,7 +1173,7 @@ class OntologyImporter:
                             source_concept_counts,
                             carried_concepts,
                             core_concepts,
-                            source_norm_concept_counts,
+                            source_norm_concepts,
                             ObjectType,
                             "效果对象",
                         )
