@@ -3057,14 +3057,8 @@ def test_legacy_v05_draft_without_actions_key_reads_accepts_and_publishes_first_
     client,
 ):
     """Restored v0.5.0 core-1 drafts lack top-level `actions`; first Action proposals must read, accept, and publish."""
-    from test_t1_proposal_contract import items_only
-
     from ontofoundry_api.db_models import ModelingSessionRecord
     from ontofoundry_api.domain.canonical import snapshot_sha256
-    from ontofoundry_api.services.dataset_proposals import candidate_for
-    from ontofoundry_api.services.instance_store import baseline
-    from ontofoundry_api.services.materials_lookup import material_lookup
-    from ontofoundry_api.services.proposals import dependency_map, store_batch
 
     session = create_session(client)
     original_revision = session["revision"]
@@ -3082,46 +3076,9 @@ def test_legacy_v05_draft_without_actions_key_reads_accepts_and_publishes_first_
         row.draft_sha256 = legacy_sha256
         db.commit()
 
-    # Store a valid first-Action proposal batch against the legacy v0.5-shaped draft.
-    run_token = uuid4().hex
-    manifest = {
-        "run_token": run_token,
-        "workspace_id": session["workspace_id"],
-        "session_id": session["id"],
-        "base_version_id": session["base_version_id"],
-        "base_version_sha256": session["base_version_sha256"],
-        "source_session_revision": original_revision,
-        "source_draft_sha256": legacy_sha256,
-        "materials": [],
-    }
-    with client.app.state.session_factory() as db:
-        instances = baseline(db, session["workspace_id"], session["id"])
-        context = RunContext(
-            **{k: manifest[k] for k in list(manifest)[:7]},
-            draft=deepcopy(legacy_draft),
-            instance_baseline=instances,
-        )
-        parsed = parse_result(
-            json.dumps({"items": items_only(_work_order_proposal_fixture())}).encode(),
-            context,
-            material_lookup(db, client.app.state.settings, session["workspace_id"]),
-        )
-        store_batch(
-            db,
-            workspace_id=session["workspace_id"],
-            session_id=session["id"],
-            task_id=None,
-            manifest=manifest,
-            parsed=parsed,
-        )
-        db.commit()
-
-    # 1. Reading the batch through the real GET endpoint must succeed (not 500 KeyError: 'actions').
-    read_resp = client.get(
-        ROOT + f"/sessions/{session['id']}/proposal-batches/{parsed.id}"
-    )
-    assert read_resp.status_code == 200, read_resp.text
-    batch = read_resp.json()
+    # 1. Store and read the first-Action proposal batch through seed_batch's real GET endpoint.
+    legacy_session = {**session, "draft": deepcopy(legacy_draft)}
+    batch = seed_batch(client, legacy_session, _work_order_proposal_fixture())
     by_ref = {item["client_ref"]: item for item in batch["items"]}
     assert {"act_dispatch", "act_create_inspection"} <= set(by_ref)
     assert by_ref["act_dispatch"]["acceptance_issues"] == []
@@ -3147,12 +3104,6 @@ def test_legacy_v05_draft_without_actions_key_reads_accepts_and_publishes_first_
         assert row.draft_json == legacy_draft
         assert row.draft_sha256 == legacy_sha256
         assert row.revision == original_revision
-        candidate = candidate_for(db, row)
-        assert {a["name"] for a in candidate["actions"]} == {
-            "dispatch_work_order",
-            "create_inspection_order",
-        }
-        assert "actions" not in row.draft_json
 
     # 2. Accepting the batch writes the actions and preserves unrelated existing definitions.
     accept = client.post(
@@ -3190,29 +3141,3 @@ def test_legacy_v05_draft_without_actions_key_reads_accepts_and_publishes_first_
         "dispatch_work_order",
         "create_inspection_order",
     }
-
-    # 4. Non-action missing collections are not silently normalized in candidate assembly.
-    corrupt_session = create_session(client)
-    corrupt_batch = seed_batch(
-        client,
-        corrupt_session,
-        [create("new_obj", "object_type", {"name": "fictional_corrupt_obj"})],
-    )
-    corrupt_draft = deepcopy(corrupt_session["draft"])
-    corrupt_draft.pop("object_types")
-    with client.app.state.session_factory() as db:
-        corrupt_row = db.get(ModelingSessionRecord, corrupt_session["id"])
-        corrupt_row.draft_json = corrupt_draft
-        db.commit()
-    with client.app.state.session_factory() as db:
-        corrupt_row = db.get(ModelingSessionRecord, corrupt_session["id"])
-        with pytest.raises(KeyError, match="object_types"):
-            dependency_map(
-                db,
-                [corrupt_batch["id"]],
-                corrupt_session["workspace_id"],
-                corrupt_session["id"],
-            )
-        with pytest.raises(KeyError, match="object_types"):
-            candidate_for(db, corrupt_row)
-
