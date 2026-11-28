@@ -62,6 +62,10 @@ test("proposal list groups filters, selection and compact rows in one result pan
   await mockReviewApi(page);
   await page.goto(builder);
   const review = page.getByLabel("提案审核面板", { exact: true });
+  await expect(review.getByRole("article")).toHaveCount(2);
+  const expandProps = review.getByRole("button", { name: "展开 供应商 的属性（1）", exact: true });
+  await expect(expandProps).toHaveAttribute("aria-expanded", "false");
+  await expandProps.click();
   await expect(review.getByRole("article")).toHaveCount(3);
   await review.getByRole("checkbox", { name: "选择 供应范围", exact: true }).check();
   await expect(review.getByText("显示 3 / 5 条", { exact: true })).toBeVisible();

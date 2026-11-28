@@ -314,6 +314,22 @@ describe("proposal review", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
+  it("keeps an expanded object open when switching to 属性 or searching its property", () => {
+    panel();
+    fireEvent.click(screen.getByRole("button", { name: "展开 采购订单 的属性（1）" }));
+    expect(screen.getByRole("article", { name: /order_no/ })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索提案名称" }), { target: { value: "order_no" } });
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByRole("article", { name: /order_no/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
+    expect(screen.getByRole("button", { name: "收起 采购订单 的属性（1）" })).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(within(screen.getByLabelText("提案分类")).getByRole("button", { name: "属性 1" }));
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByRole("article", { name: /order_no/ })).toBeInTheDocument();
+  });
+
   it("accepts everything acceptable regardless of filters and asks before rejecting all", async () => {
     const proposals = state();
     panel(proposals);

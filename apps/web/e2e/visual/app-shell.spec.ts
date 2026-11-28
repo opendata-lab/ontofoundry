@@ -20,6 +20,26 @@ test("delivery page and its own tabs fit below the application strip", async ({ 
 test("multiple open pages retain one unsaved tab and leave page tabs unchanged", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  // Redesigned SettingsPage (1b4ed4b) fits inside 900px with 2 members; add fictional members
+  // in this test so PageBody overflows and keep-alive scroll restoration stays exercised.
+  await page.route(`**/api/v1/workspaces/${WORKSPACE_ID}/members`, (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          { id: 1, user_id: "user-visual-demo", username: "linxiao", display_name: "林晓", role: "admin", last_login_at: "2026-11-12T08:00:00Z" },
+          { id: 2, user_id: "user-visual-member", username: "chenning", display_name: "陈宁", role: "member", last_login_at: "2026-11-12T08:00:00Z" },
+          ...Array.from({ length: 10 }, (_, index) => ({
+            id: index + 3,
+            user_id: `user-visual-extra-${index + 3}`,
+            username: `demo_member_${String(index + 3).padStart(2, "0")}`,
+            display_name: `示例成员 ${index + 3}`,
+            role: "viewer",
+            last_login_at: "2026-11-12T08:00:00Z",
+          })),
+        ],
+      },
+    }),
+  );
   await page.goto(`/workspaces/${WORKSPACE_ID}/mappings`);
   await expect(page.getByRole("heading", { name: "数据管理", level: 1 })).toBeVisible();
   const innerTab = page.getByRole("tab", { name: /^数据表/ });

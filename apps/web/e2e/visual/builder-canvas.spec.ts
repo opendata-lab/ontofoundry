@@ -33,7 +33,9 @@ test("builder empty session aligns configuration, guidance and results", async (
 test("builder proposals retain session and material controls", async ({ page }) => {
   await mockCanvasApi(page);
   await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
-  await expect(page.getByLabel("提案审核面板", { exact: true }).getByRole("article")).toHaveCount(3);
+  const review = page.getByLabel("提案审核面板", { exact: true });
+  await expect(review.getByRole("article")).toHaveCount(2);
+  await expect(review.getByRole("button", { name: "展开 供应商 的属性（1）", exact: true })).toHaveAttribute("aria-expanded", "false");
   await page.getByText("选择已上传材料", { exact: true }).click();
   await expect(page.getByRole("checkbox", { name: /星河采购业务说明.md/ })).toBeChecked();
   await expect(page.getByRole("heading", { name: "供应商范围修订", exact: true })).toBeVisible();
@@ -66,8 +68,10 @@ test("builder draft opens element modal from model results", async ({ page }) =>
 test("builder shows an expanded plan in the results column", async ({ page }) => {
   await mockCanvasApi(page);
   await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
-  await expect(page.getByLabel("提案审核面板", { exact: true }).getByRole("article")).toHaveCount(3);
-  await expect(page.locator("dataagent-conversation").getByRole("button", { name: /计划/ })).toBeVisible();
+  const review = page.getByLabel("提案审核面板", { exact: true });
+  await expect(review.getByRole("article")).toHaveCount(2);
+  await expect(review.getByRole("button", { name: "展开 供应商 的属性（1）", exact: true })).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("dataagent-conversation").getByRole("combobox", { name: "权限模式", exact: true })).toHaveValue("plan");
   await page.locator("dataagent-conversation").evaluate((el) => {
     el.dispatchEvent(new CustomEvent("dataagent-plan-open", {
       cancelable: true,

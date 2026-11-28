@@ -123,8 +123,9 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const categories = ELEMENT_CATEGORIES.filter((category) => items.some((item) => item.target_kind === category.key));
   const [kind, setKind] = useState<TargetKind | null>(null);
-  // Groups the reviewer flipped from their default: objects start closed (open under 属性), kind groups open.
-  const [toggled, setToggled] = useState(new Set<string>());
+  // Groups the reviewer flipped from their default in the current fold scope;
+  // scoping by kind and search keeps an earlier expand from inverting into collapsed.
+  const [toggled, setToggled] = useState<{ scope: string; keys: Set<string> }>({ scope: ":0", keys: new Set() });
   const [status, setStatus] = useState<StatusFilter>("pending");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(new Set<string>());
@@ -153,14 +154,16 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   // Under 全部 and 属性, each object is a group holding its own proposal and its
   // properties; the other kinds follow as one group per kind, in tile order.
   const groups = kind && kind !== "property" ? null : proposalGroups(visible, kind ? [] : categories, items, session.draft);
+  const foldScope = `${kind ?? ""}:${terms.length > 0 ? 1 : 0}`;
+  const toggledKeys = toggled.scope === foldScope ? toggled.keys : null;
   // A search opens objects too, so a matching property is never hidden behind a closed object.
-  const isOpen = (group: ProposalGroup) => (group.type === "object" ? kind === "property" || terms.length > 0 : true) !== toggled.has(group.key);
+  const isOpen = (group: ProposalGroup) => (group.type === "object" ? kind === "property" || terms.length > 0 : true) !== Boolean(toggledKeys?.has(group.key));
   const flip = (key: string) =>
     setToggled((current) => {
-      const next = new Set(current);
+      const next = new Set(current.scope === foldScope ? current.keys : undefined);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      return next;
+      return { scope: foldScope, keys: next };
     });
   const openItem = openId ? byId.get(openId) : undefined;
   useEffect(() => {
