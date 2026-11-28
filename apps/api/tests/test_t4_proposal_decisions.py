@@ -433,3 +433,199 @@ def test_batch_read_builds_the_candidate_once_and_keeps_item_diagnostics(client,
     assert {i["id"]: i["source_diagnostics"] for i in read["items"]} == expected
     metrics = [i["source_diagnostics"] for i in read["items"] if i["target_kind"] == "metric"]
     assert [[d["code"] for d in diags] for diags in metrics] == [["DATASET_SOURCE_BLOCKED"]] * 2
+
+
+def test_accepting_merged_batch_ignores_superseded_dependency_root(client):
+    """Dynamic dependency reconstruction across open batches must skip superseded rows."""
+    from sqlalchemy import update as sa_update
+    from test_pending_merge import run_on_top_of_pending
+
+    from ontofoundry_api.services.proposals import dependency_map
+
+    session = create_session(client)
+    old_batch = seed_batch(client, session, chain(session)[:2])
+    po_old, prop_old = old_batch["items"]
+    assert po_old["ordinal"] == 0 and prop_old["ordinal"] == 1
+
+    # Merge a new run on top of pending proposals: revise the property first (ordinal 0),
+    # add a new link referencing the pending object (ordinal 1), and leave the object to be
+    # carried after them (ordinal 2 > po_old.ordinal 0), deterministically ordering the
+    # superseded create ahead of its live replacement across open batches.
+    _, candidate, url, headers = run_on_top_of_pending(client, session)
+    pending_prop = next(p for p in candidate["properties"] if p["id"] == prop_old["target_id"])
+    supplier_id = session["draft"]["object_types"][0]["id"]
+    revised_prop = {
+        "operation": "update",
+        "target_kind": "property",
+        "target_id": prop_old["target_id"],
+        "after": {
+            **{k: v for k, v in pending_prop.items() if k != "id"},
+            "description": "修订后的订单号",
+        },
+    }
+    added_link = create(
+        "po-link",
+        "link_type",
+        {
+            "name": "supplied_by",
+            "source_type_id": po_old["target_id"],
+            "target_type_id": supplier_id,
+        },
+    )
+    submitted = client.post(url, json={"items": items_only([revised_prop, added_link])}, headers=headers)
+    assert submitted.status_code == 200 and submitted.json()["passed"], submitted.text
+    new_batch_id = submitted.json()["batch_id"]
+
+    with client.app.state.session_factory() as db:
+        db.execute(
+            sa_update(ModelingSessionRecord)
+            .where(ModelingSessionRecord.id == session["id"])
+            .values(task_status="finished", result_state="done")
+        )
+        db.commit()
+
+    new_batch = client.get(
+        ROOT + f"/sessions/{session['id']}/proposal-batches/{new_batch_id}"
+    ).json()
+    by_target = {item["target_id"]: item for item in new_batch["items"]}
+    po_new = by_target[po_old["target_id"]]
+    prop_new = by_target[prop_old["target_id"]]
+    link_new = next(item for item in new_batch["items"] if item["target_kind"] == "link_type")
+    assert prop_new["ordinal"] == 0 and link_new["ordinal"] == 1 and po_new["ordinal"] == 2
+
+    with client.app.state.session_factory() as db:
+        deps = dependency_map(
+            db, [old_batch["id"], new_batch_id], session["workspace_id"], session["id"]
+        )
+
+    # Accepting the dependents expands to the live object create rather than failing on the superseded one.
+    latest_session = current(client, session)
+    accepted = decide(client, latest_session, [(prop_new["id"], "accept"), (link_new["id"], "accept")])
+    assert accepted.status_code == 200, accepted.text
+    assert po_new["id"] in deps.get(prop_new["id"], [])
+    assert po_old["id"] not in deps.get(prop_new["id"], [])
+    assert po_new["id"] in deps.get(link_new["id"], [])
+    assert po_old["id"] not in deps.get(link_new["id"], [])
+    # Historical explicit metadata stays on the superseded batch without stale edges to live items.
+    assert deps.get(prop_old["id"], []) == [po_old["id"]]
+
+    results = {r["proposal_id"]: r for r in accepted.json()["results"]}
+    assert set(results) == {po_new["id"], prop_new["id"], link_new["id"]}
+    assert {r["status"] for r in results.values()} == {"accepted"}
+    assert results[po_new["id"]]["triggered_by"] in {prop_new["id"], link_new["id"]}
+
+    draft = accepted.json()["session"]["draft"]
+    assert any(o["id"] == po_new["target_id"] for o in draft["object_types"])
+    assert any(p["id"] == prop_new["target_id"] for p in draft["properties"])
+    assert any(link["id"] == link_new["target_id"] for link in draft["link_types"])
+
+    old_detail = client.get(
+        ROOT + f"/sessions/{session['id']}/proposal-batches/{old_batch['id']}"
+    ).json()
+    assert old_detail["counts"] == {"pending": 0, "accepted": 0, "rejected": 0}
+    old_prop_view = next(i for i in old_detail["items"] if i["id"] == prop_old["id"])
+    assert old_prop_view["depends_on"] == [po_old["id"]]
+
+
+def test_superseded_rows_do_not_reconstruct_stale_edges_and_preserve_undo_and_rejected_deps(client):
+    """Superseded rows referencing an accepted root get no dynamic edge; live undo and rejected deps still work."""
+    from sqlalchemy import update as sa_update
+    from test_pending_merge import run_on_top_of_pending
+
+    from ontofoundry_api.services.proposals import dependency_map
+
+    session = create_session(client)
+    root_batch = seed_batch(client, session, chain(session)[:1])
+    root = root_batch["items"][0]
+    accepted_root = decide(client, session, [(root["id"], "accept")])
+    assert accepted_root.status_code == 200, accepted_root.text
+    session = accepted_root.json()["session"]
+
+    # Seed a pending property referencing the accepted root from a separate batch (no persisted edge to root).
+    old_prop_batch = seed_batch(
+        client,
+        session,
+        [
+            create(
+                "po-no",
+                "property",
+                {
+                    "owner_type_id": root["target_id"],
+                    "display_name": "订单号",
+                    "name": "order_no",
+                },
+            )
+        ],
+    )
+    old_prop = old_prop_batch["items"][0]
+
+    # Revise that pending property after an unrelated object so old_prop (ordinal 0)
+    # deterministically precedes new_prop (ordinal 1) across open batches.
+    _, candidate, url, headers = run_on_top_of_pending(client, session)
+    pending_prop = next(p for p in candidate["properties"] if p["id"] == old_prop["target_id"])
+    extra_obj = create("extra-obj", "object_type", {"display_name": "补充实体", "name": "extra_obj"})
+    revised_prop = {
+        "operation": "update",
+        "target_kind": "property",
+        "target_id": old_prop["target_id"],
+        "after": {
+            **{k: v for k, v in pending_prop.items() if k != "id"},
+            "description": "新版订单号",
+        },
+    }
+    submitted = client.post(url, json={"items": items_only([extra_obj, revised_prop])}, headers=headers)
+    assert submitted.status_code == 200 and submitted.json()["passed"], submitted.text
+    new_prop_batch_id = submitted.json()["batch_id"]
+
+    with client.app.state.session_factory() as db:
+        db.execute(
+            sa_update(ModelingSessionRecord)
+            .where(ModelingSessionRecord.id == session["id"])
+            .values(task_status="finished", result_state="done")
+        )
+        db.commit()
+
+    new_prop_batch = client.get(
+        ROOT + f"/sessions/{session['id']}/proposal-batches/{new_prop_batch_id}"
+    ).json()
+    new_prop = next(i for i in new_prop_batch["items"] if i["target_id"] == old_prop["target_id"])
+    assert old_prop["ordinal"] == 0 and new_prop["ordinal"] == 1
+
+    with client.app.state.session_factory() as db:
+        deps = dependency_map(
+            db,
+            [root_batch["id"], old_prop_batch["id"], new_prop_batch_id],
+            session["workspace_id"],
+            session["id"],
+        )
+    # No stale dynamic edge reconstructed from the superseded row to the accepted root.
+    assert deps.get(old_prop["id"], []) == []
+    assert root["id"] in deps.get(new_prop["id"], [])
+
+    # Accept the live property, then undo the accepted root (via human_batch_id so root stays decidable)
+    # and verify cascade undo reaches the live replacement without touching the superseded row.
+    latest = current(client, session)
+    accepted_prop = decide(client, latest, [(new_prop["id"], "accept")])
+    assert accepted_prop.status_code == 200, accepted_prop.text
+    latest = accepted_prop.json()["session"]
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session["id"]).human_batch_id = root_batch["id"]
+        db.commit()
+    undone = decide(client, latest, [(root["id"], "reject")])
+    assert undone.status_code == 200, undone.text
+    assert {r["proposal_id"]: r["status"] for r in undone.json()["results"]} == {
+        root["id"]: "rejected",
+        new_prop["id"]: "rejected",
+    }
+
+    # A rejected dependency still blocks accepting a pending dependent.
+    fresh = create_session(client)
+    rej_batch = seed_batch(client, fresh, chain(fresh)[:2])
+    rej_po, rej_prop = rej_batch["items"]
+    with client.app.state.session_factory() as db:
+        db.get(ProposalItemRecord, rej_po["id"]).status = "rejected"
+        db.commit()
+    blocked = decide(client, fresh, [(rej_prop["id"], "accept")])
+    assert blocked.status_code == 409
+    assert blocked.json()["error"]["code"] == "PROPOSAL_NOT_DECIDABLE"
+    assert blocked.json()["error"]["message"] == "依赖提案已拒绝，请先恢复"
