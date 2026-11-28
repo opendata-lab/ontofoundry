@@ -14,20 +14,5 @@
         }
       ]
     }
-  ],
-  "ai_context": {
-    "ontofoundry": {
-      "version": "core-1",
-      "display_names": {
-        "customer": "客户",
-        "customer.is_vip": "是 VIP"
-      },
-      "unsupported": [
-        {
-          "path": "material_objects",
-          "message": "Ossie 不含实例事实；事实使用原生单文件交换"
-        }
-      ]
-    }
-  }
+  ]
 }

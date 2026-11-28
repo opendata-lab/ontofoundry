@@ -45,7 +45,7 @@ def test_optional_display_names_and_strict_identifiers():
         validate_core_graph(model)
 
 
-def test_ossie_zip_separates_names_and_preserves_legacy_external_extension():
+def test_ossie_zip_separates_names_and_drops_legacy_embedded_extension():
     model = example_draft("01-basic-sales")
     model.link_types[0].display_name = "签约方"
     model.object_types[0].synonyms = ["合作方"]
@@ -71,8 +71,16 @@ def test_ossie_zip_separates_names_and_preserves_legacy_external_extension():
     assert all(link.display_name is None for link in standalone.link_types)
     pure["ai_context"] = {"ontofoundry": extension}
     old = adapter.import_document(json.dumps(pure).encode(), ctx)
-    assert any("旧版扩展块" in i.message for i in old.report.issues)
-    assert old.model.link_types[0].display_name == "签约方"
+    assert all(o.display_name is None for o in old.model.object_types)
+    assert all(link.display_name is None for link in old.model.link_types)
+    assert not any(i.rule_id == "RT-03" for i in old.report.issues)
+    assert any(
+        i.rule_id == "RT-02"
+        and i.outcome == "dropped"
+        and i.source_path == "/ai_context/ontofoundry"
+        and "ZIP" in i.message
+        for i in old.report.issues
+    )
 
 
 def test_metric_synonyms_use_native_ai_context():

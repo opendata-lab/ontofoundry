@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Extension:
     data: dict = field(default_factory=dict)
-    source_path: str = "/ai_context/ontofoundry"
+    source_path: str = "/ontofoundry-extension.json"
 
     def name(self, path, fallback=None):
         return self.data.get("display_names", {}).get(path, fallback)
@@ -20,21 +20,9 @@ class Extension:
 
 def read_extension(translation):
     data = getattr(translation, "extension", None)
-    source_path = (
-        "/ontofoundry-extension.json" if data is not None else "/ai_context/ontofoundry"
-    )
+    source_path = "/ontofoundry-extension.json"
     if data is None:
-        context = translation.source.value.get("ai_context")
-        data = context.get("ontofoundry") if isinstance(context, dict) else None
-        if data is None:
-            return Extension()
-        translation.issue(
-            source_path,
-            "converted",
-            "Extension",
-            "RT-03",
-            "读取旧版扩展块；再次导出时改用 ontofoundry-extension.json",
-        )
+        return Extension()
     if not isinstance(data, dict) or data.get("version") != "core-1":
         translation.issue(
             source_path,

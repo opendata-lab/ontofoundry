@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 from rt_cases import OSSIE_IMPORT_CASES
 
+from ontofoundry_api.adapters.archive import write_archive
 from ontofoundry_api.adapters.base import ImportContext
 from ontofoundry_api.adapters.documents import SourceDocument
 from ontofoundry_api.adapters.ossie.importer import OssieAdapter
@@ -641,24 +642,55 @@ def test_identity_mapping_accepts_owner_qualified_members():
     assert not [i for i in result.report.issues if i.construct == "ObjectMapping"]
 
 
-def test_legacy_extension_is_not_read_and_core_extension_restores_presentation_only():
-    data = document(
-        entity("customer", relationships=[rel("code", "String")]),
-        ai_context={
-            "ontofoundry": {"version": "3", "display_names": {"customer": "错误名称"}}
+def test_legacy_embedded_extension_is_dropped_and_zip_sidecar_restores_presentation():
+    base = document(entity("customer", relationships=[rel("code", "String")]))
+    for extension in (
+        {"version": "3", "display_names": {"customer": "错误名称"}},
+        {
+            "version": "core-1",
+            "display_names": {"customer": "客户"},
+            "required": ["customer.code"],
+            "title_properties": {"customer": "code"},
         },
+    ):
+        data = copy.deepcopy(base)
+        data["ai_context"] = {"ontofoundry": extension}
+        result = run(data)
+        assert result.model.object_types[0].name == "customer"
+        assert result.model.object_types[0].display_name is None
+        assert not result.model.properties[0].required
+        assert result.model.object_types[0].title_property_id is None
+        assert not issues(result, "RT-03")
+        dropped = [
+            i
+            for i in issues(result, "RT-02", "dropped")
+            if i.source_path == "/ai_context/ontofoundry"
+        ]
+        assert len(dropped) == 1
+        assert "ZIP" in dropped[0].message
+
+    archive = write_archive(
+        {
+            "model.ossie.json": json.dumps(base, ensure_ascii=False).encode(),
+            "ontofoundry-extension.json": json.dumps(
+                {
+                    "version": "core-1",
+                    "display_names": {"customer": "客户"},
+                    "required": ["customer.code"],
+                    "title_properties": {"customer": "code"},
+                },
+                ensure_ascii=False,
+            ).encode(),
+        }
     )
-    assert run(data).model.object_types[0].name == "customer"
-    data["ai_context"]["ontofoundry"] = {
-        "version": "core-1",
-        "display_names": {"customer": "客户"},
-        "required": ["customer.code"],
-        "title_properties": {"customer": "code"},
-    }
-    result = run(data)
-    assert result.model.object_types[0].display_name == "客户"
-    assert result.model.properties[0].required
-    assert result.model.object_types[0].title_property_id == result.model.properties[0].id
+    zip_result = OssieAdapter().import_document(archive, CTX)
+    validate_core_graph(zip_result.model)
+    assert zip_result.model.object_types[0].display_name == "客户"
+    assert zip_result.model.properties[0].required
+    assert (
+        zip_result.model.object_types[0].title_property_id
+        == zip_result.model.properties[0].id
+    )
 
 
 def test_local_schema_error_does_not_drop_unrelated_valid_definition():

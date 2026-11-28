@@ -698,7 +698,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 
 ## 5. Ossie 适配器：导入
 
-支持纯 Ossie JSON 或 ZIP（Ossie 文件 + ontofoundry-extension.json）。单个文件不推导中文名称，display_name 为空；旧 ai_context.ontofoundry 只在导入边界兼容读取，报告“旧版扩展块”。
+支持纯 Ossie JSON 或 ZIP（Ossie 文件 + ontofoundry-extension.json）。单个文件不推导中文名称，display_name 为空；不再读取旧版 `ai_context.ontofoundry` 块，按 RT-02 dropped 并提示重新导出为 ZIP。
 
 适用入口是现有 `ontology/ontology.json` 中 version 为 0.2.0.dev0 的内嵌 ontology_mappings 文档，其他版本报 error。上游[现行说明](https://github.com/apache/ossie/blob/main/ontology/ontology.md#mapping-documents)已将内嵌形式标为弃用但仍接受；新的独立 mapping documents 不在本期适配范围，不能仅凭版本号相同就声称全部支持。
 只包含 `semantic_model`、没有 `ontology` 的 OSI core-spec 独立文档：报 `error`（没有可导入的业务对象）。
@@ -711,7 +711,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 | `name`、`description` | 不读，记入报告 | 模型名称取工作空间自身 |
 | `requires` | `dropped` | 核心模型没有工作空间级约束；原文留在报告里，可由 AI 补全改写成具体元素上的规则（§13.4） |
 | `ai_context`（字符串） | `dropped` | |
-| `ai_context.ontofoundry` | 读取，见 §5.7 | 旧版平台扩展块（仅导入兼容；报告“旧版扩展块”） |
+| `ai_context.ontofoundry` | `dropped`（RT-02） | 旧版扩展块不再读取，与其他未归属文档上下文一样丢弃并提示重新导出为 ZIP |
 | `ai_context.instructions` | 能确定对应对象时并入该对象的 description，报 converted（RT-59） | 文档级说明没有明确归属时留报告待 AI 分配，不复制到每个对象（RT-02） |
 | `ai_context` 其他键 | 未支持的内容报 dropped | 同义词可由后续 AI 补全分配，不能猜归属 |
 | `ontology` | 见 §5.2–5.4 | |
@@ -859,7 +859,7 @@ COUNT(ds.f) 和 COUNT(CASE WHEN 条件 THEN ds.f END) 保留 expression，不能
 
 ### 5.7 平台扩展文件
 
-`ontofoundry-extension.json` 的 version=core-1，包含 rules、display_names、link_role_names、generated_link_readings、synonyms、tags、title_properties、required、unsupported。键使用对象 name、对象.name、metric:name 等英文路径。display_names 可包含关系。仅当 Ossie 原生位置不能放同义词时使用扩展 synonyms；Metric 等从 ai_context.synonyms 恢复。导入旧 ai_context.ontofoundry 块按同一字段读取并明确提示旧版扩展块。未导出清单保留损失定位，不承诺恢复未导出语义。
+`ontofoundry-extension.json` 的 version=core-1，包含 rules、display_names、link_role_names、generated_link_readings、synonyms、tags、title_properties、required、unsupported。键使用对象 name、对象.name、metric:name 等英文路径。display_names 可包含关系。仅当 Ossie 原生位置不能放同义词时使用扩展 synonyms；Metric 等从 ai_context.synonyms 恢复。不再读取文档内旧版 `ai_context.ontofoundry` 块（按 RT-02 dropped 并提示重新导出为 ZIP）。未导出清单保留损失定位，不承诺恢复未导出语义。
 
 ### 5.8 id
 
@@ -1023,7 +1023,7 @@ Ossie 没有快照字段。每个 Dataset 的 snapshot_date_column 和“各数�
 }
 ```
 
-键一律用 name 英文路径（对象、对象.属性、对象.关系、metric:指标），不用 UUID。显示名不拼入 Ossie name/concept 或 description。Metric 等同义词放在规范 ai_context.synonyms，概念和本体关系无此原生位置才用扩展 synonyms。title_properties 解析为有效属性 id；规则英文标识及描述用 rules 关联匿名表达式，名称用 rule: 路径的 display_names；实例和证据不在扩展恢复，完整保留用原生完整包。旧 ai_context.ontofoundry 仅在导入接受，并报告“旧版扩展块”。
+键一律用 name 英文路径（对象、对象.属性、对象.关系、metric:指标），不用 UUID。显示名不拼入 Ossie name/concept 或 description。Metric 等同义词放在规范 ai_context.synonyms，概念和本体关系无此原生位置才用扩展 synonyms。title_properties 解析为有效属性 id；规则英文标识及描述用 rules 关联匿名表达式，名称用 rule: 路径的 display_names；实例和证据不在扩展恢复，完整保留用原生完整包。不再读取文档内旧版 `ai_context.ontofoundry` 块，需保留扩展信息时重新导出为 ZIP。
 
 ### 6.7 不导出
 
@@ -1132,8 +1132,8 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | 编号 | 差异 | 原文件 | 再导出 |
 |---|---|---|---|
 | RT-01 | 文档名称、描述换成工作空间的 | `"name": "library", "description": "图书馆"` | `"name": "<工作空间名称>", "description": "<工作空间描述>"` |
-| RT-02 | 文档上下文没有明确对象归属时不自动分配；能够归属的 instructions 另按 RT-59 合并 | `{"synonyms": [...], "instructions": "...", "acme": {...}}` | `{"ontofoundry": {"version": "core-1", ...}}` |
-| RT-03 | core-1 旧版扩展块仅导入兼容；不支持版本与字段报告 | 旧 version 或未承载内容 | dropped，原文留材料；只输出 core-1 命名扩展 |
+| RT-02 | 文档上下文没有明确对象归属时不自动分配（含旧版 `ai_context.ontofoundry` 块，提示重新导出为 ZIP）；能够归属的 instructions 另按 RT-59 合并 | `{"synonyms": [...], "instructions": "...", "acme": {...}, "ontofoundry": {...}}` | 不写入 `ai_context.ontofoundry`；规范 `synonyms` 按支持位置输出，平台扩展写 ZIP 内 `ontofoundry-extension.json` |
+| RT-03 | 仅读取 ZIP 内 `ontofoundry-extension.json`（`version=core-1`）；不支持版本、未知字段与无效扩展引用报告 | 非 `core-1` 或未承载扩展字段 | dropped，原文留材料；只输出 ZIP 内 `core-1` 扩展文件 |
 | RT-04 | 文档级 `requires` 消失 | `"requires": ["COUNT(Customer) > 0"]` | 不出现 |
 
 **格式规范化**（不改变含义）
@@ -1592,7 +1592,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 
 多元 OneToOne、实体继承值类型是非法输入，直接 error，不在上表中安排转换或 AI 补全。
 
-不交给 AI 的条目：纯格式规范化（RT-10 至 RT-13）、文档名称和描述（RT-01）、旧扩展块（RT-03）、方言丢弃（RT-45）。
+不交给 AI 的条目：纯格式规范化（RT-10 至 RT-13）、文档名称和描述（RT-01）、扩展字段丢弃（RT-03）、方言丢弃（RT-45）。
 这些不交给 AI 自动补全，差异仍在报告说明，不能一概视为不影响业务含义。
 
 **原文件的用途**：作为 AI 补全的材料和证据来源，也是导入报告行号的依据；不提供“与原文件对比”的界面（§7.2）。

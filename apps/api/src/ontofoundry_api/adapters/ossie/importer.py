@@ -1242,13 +1242,18 @@ class OntologyImporter:
                 )
         context = self.document.get("ai_context")
         if isinstance(context, dict):
-            for key in context.keys() - {"ontofoundry"}:
+            for key in context:
+                message = (
+                    "文档上下文没有明确对象归属，不复制到全部对象；旧版扩展块已不再读取，请重新导出为 ZIP"
+                    if key == "ontofoundry"
+                    else "文档上下文没有明确对象归属，不复制到全部对象"
+                )
                 self.issue(
                     "/ai_context/" + escape_pointer(key),
                     "dropped",
                     "AIContext",
                     "RT-02",
-                    "文档上下文没有明确对象归属，不复制到全部对象",
+                    message,
                     completion=True,
                 )
         return self.t.finish()
